@@ -1,948 +1,762 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股每日雷達｜AI 個股分析儀表板</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SpeakUp — AI English Speaking Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --bg: #0d0f14;
-    --bg2: #13161e;
-    --bg3: #1a1e28;
-    --bg4: #222736;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.12);
-    --text: #e8eaf0;
-    --text2: #8b90a0;
-    --text3: #555b6e;
-    --accent: #4a9eff;
-    --accent-dim: rgba(74,158,255,0.12);
-    --accent-border: rgba(74,158,255,0.3);
-    --up: #39d98a;
-    --up-dim: rgba(57,217,138,0.1);
-    --down: #ff5f57;
-    --down-dim: rgba(255,95,87,0.1);
-    --warn: #f5a623;
-    --warn-dim: rgba(245,166,35,0.1);
-    --radius: 10px;
-    --radius-lg: 14px;
-    --font: 'Noto Sans TC', sans-serif;
-    --mono: 'DM Mono', monospace;
-  }
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: var(--font);
-    background: var(--bg);
-    color: var(--text);
+    background: #0d0d1a;
+    color: #f0ece0;
+    font-family: 'Source Sans 3', sans-serif;
     min-height: 100vh;
-    font-size: 14px;
-    line-height: 1.6;
   }
 
-  /* ── TOPBAR ── */
-  .topbar {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: rgba(13,15,20,0.92);
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 2rem;
-    height: 60px;
-    gap: 1rem;
-  }
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-  }
-  .logo-icon {
-    width: 32px;
-    height: 32px;
-    background: var(--accent);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-  }
-  .logo-text {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: -0.02em;
-  }
-  .logo-sub {
-    font-size: 11px;
-    color: var(--text3);
-    font-family: var(--mono);
-  }
-  .topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .date-badge {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--text2);
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    padding: 5px 12px;
-    border-radius: 99px;
-  }
-  .status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--text3);
-    display: inline-block;
-    margin-right: 6px;
-    transition: background 0.3s;
-  }
-  .status-dot.live { background: var(--up); box-shadow: 0 0 6px var(--up); animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-
-  /* ── API KEY SETUP ── */
-  .setup-section {
-    max-width: 680px;
-    margin: 4rem auto;
-    padding: 0 1.5rem;
-  }
-  .setup-card {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius-lg);
-    padding: 2rem 2.5rem;
-  }
-  .setup-card h2 {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    color: var(--text);
-  }
-  .setup-card p {
-    color: var(--text2);
-    font-size: 13px;
-    margin-bottom: 1.5rem;
-    line-height: 1.7;
-  }
-  .setup-card a { color: var(--accent); text-decoration: none; }
-  .setup-card a:hover { text-decoration: underline; }
-  .input-group {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .api-input {
-    flex: 1;
-    min-width: 240px;
-    background: var(--bg3);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius);
-    padding: 10px 14px;
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .api-input:focus { border-color: var(--accent); }
-  .api-input::placeholder { color: var(--text3); }
-  .btn {
-    padding: 10px 20px;
-    border-radius: var(--radius);
-    border: none;
-    font-family: var(--font);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-  }
-  .btn-accent {
-    background: var(--accent);
-    color: #fff;
-  }
-  .btn-accent:hover { background: #66aeff; }
-  .btn-accent:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-outline {
-    background: transparent;
-    color: var(--text2);
-    border: 1px solid var(--border2);
-  }
-  .btn-outline:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
-  .hint {
-    margin-top: 1rem;
-    font-size: 12px;
-    color: var(--text3);
-    line-height: 1.6;
-  }
-
-  /* ── MAIN DASHBOARD ── */
-  .dashboard { display: none; max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-  .dashboard.visible { display: block; }
-
-  .dash-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .dash-header h2 {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .dash-header p { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: var(--mono); }
-
-  /* ── METRICS ── */
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
-    margin-bottom: 1.5rem;
-  }
-  .metric-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    transition: border-color 0.2s;
-  }
-  .metric-card:hover { border-color: var(--border2); }
-  .metric-label { font-size: 11px; color: var(--text3); margin-bottom: 8px; letter-spacing: 0.04em; text-transform: uppercase; }
-  .metric-val { font-size: 24px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-  .metric-sub { font-size: 12px; margin-top: 4px; color: var(--text2); font-family: var(--mono); }
-  .metric-sub.up { color: var(--up); }
-  .metric-sub.down { color: var(--down); }
-
-  /* ── SECTION LABEL ── */
-  .section-label {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin-bottom: 10px;
-  }
-
-  /* ── STOCKS GRID ── */
-  .stocks-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px;
-    margin-bottom: 1.5rem;
-  }
-  .stock-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-    position: relative;
-    overflow: hidden;
-  }
-  .stock-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: transparent;
-    transition: background 0.2s;
-  }
-  .stock-card:hover { border-color: var(--border2); background: var(--bg3); }
-  .stock-card.selected { border-color: var(--accent-border); background: var(--accent-dim); }
-  .stock-card.selected::before { background: var(--accent); }
-  .stock-card.tag-buy::before { background: var(--up); }
-  .stock-card.tag-hot::before { background: var(--down); }
-  .stock-card.tag-watch::before { background: var(--warn); }
-  .stock-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-  .stock-code { font-size: 16px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-  .stock-tag { font-size: 10px; padding: 2px 8px; border-radius: 99px; font-weight: 500; }
-  .tag-buy { background: var(--up-dim); color: var(--up); border: 1px solid rgba(57,217,138,0.25); }
-  .tag-watch { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(245,166,35,0.25); }
-  .tag-hot { background: var(--down-dim); color: var(--down); border: 1px solid rgba(255,95,87,0.25); }
-  .stock-name { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
-  .stock-price { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--text); }
-  .stock-change { font-size: 12px; margin-top: 3px; font-family: var(--mono); }
-  .up { color: var(--up); }
-  .down { color: var(--down); }
-
-  /* ── ANALYSIS PANEL ── */
-  .analysis-panel {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    margin-bottom: 1.5rem;
-    animation: fadeIn 0.3s ease;
-  }
-  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-  .analysis-header {
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-  .analysis-title { font-size: 20px; font-weight: 700; color: var(--text); }
-  .analysis-sector { font-size: 12px; color: var(--text3); margin-top: 3px; font-family: var(--mono); }
-  .analysis-price { font-size: 28px; font-weight: 700; font-family: var(--mono); }
-  .analysis-price-chg { font-size: 13px; margin-top: 2px; font-family: var(--mono); }
-  .analysis-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0;
-  }
-  @media (max-width: 600px) { .analysis-body { grid-template-columns: 1fr; } }
-  .analysis-col {
-    padding: 1.25rem 1.5rem;
-  }
-  .analysis-col:first-child { border-right: 1px solid var(--border); }
-  .indicators { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .ind {
-    background: var(--bg3);
-    border-radius: 8px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-  }
-  .ind-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; letter-spacing: 0.04em; }
-  .ind-val { font-size: 16px; font-weight: 700; color: var(--text); font-family: var(--mono); }
-  .reasons { list-style: none; }
-  .reasons li {
-    font-size: 12px;
-    color: var(--text2);
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    line-height: 1.6;
-  }
-  .reasons li:last-child { border-bottom: none; }
-  .reasons-dot { color: var(--accent); font-size: 8px; flex-shrink: 0; margin-top: 5px; }
-  .chart-section { padding: 1rem 1.5rem; border-top: 1px solid var(--border); }
-  .chart-wrap { position: relative; width: 100%; height: 160px; }
-  .analysis-actions {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  /* ── LOADING ── */
-  .loading-bar {
-    height: 2px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-bottom: 1.5rem;
-  }
-  .loading-progress {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.3s ease;
-  }
-  .loading-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 16px;
-    padding: 4rem 0;
-  }
-  .loader {
-    width: 36px;
-    height: 36px;
-    border: 2px solid var(--border2);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-text { font-size: 13px; color: var(--text2); }
-  .loading-step { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-top: 4px; }
-
-  /* ── ERROR ── */
-  .error-msg {
-    background: var(--down-dim);
-    border: 1px solid rgba(255,95,87,0.25);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    font-size: 13px;
-    color: var(--down);
-    margin-bottom: 1rem;
+  /* ── Layout ── */
+  .screen {
     display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  .screen.active { display: flex; }
+
+  /* ── Typography ── */
+  .playfair { font-family: 'Playfair Display', serif; }
+
+  /* ── Gradient text ── */
+  .grad-text {
+    background: linear-gradient(135deg, #f7c948, #ff9a3c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  /* ── FOOTER ── */
-  footer {
-    text-align: center;
-    padding: 2rem 1rem;
-    font-size: 11px;
-    color: var(--text3);
-    border-top: 1px solid var(--border);
-    margin-top: 2rem;
-    line-height: 2;
+  /* ── HOME ── */
+  .hero { text-align: center; margin-bottom: 48px; }
+  .hero-icon { font-size: 48px; margin-bottom: 12px; }
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 900;
+    letter-spacing: -1px;
   }
-  footer a { color: var(--text2); text-decoration: none; }
-  footer a:hover { color: var(--text); }
+  .hero p { color: #9994b8; font-size: 16px; margin-top: 8px; }
 
-  /* ── SECTOR FILTERS ── */
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  .section-label {
+    font-size: 13px;
+    color: #6b6882;
+    text-transform: uppercase;
+    letter-spacing: 2px;
     margin-bottom: 12px;
   }
-  .filter-pill {
-    font-size: 12px;
-    padding: 4px 14px;
-    border-radius: 99px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text2);
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: var(--font);
-  }
-  .filter-pill:hover { border-color: var(--border2); color: var(--text); }
-  .filter-pill.active { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent); }
 
-  /* ── SETTINGS MODAL ── */
-  .overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(4px);
-    z-index: 200;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
+  /* Level buttons */
+  .level-group { display: flex; gap: 10px; margin-bottom: 36px; }
+  .level-btn {
+    padding: 8px 20px;
+    border-radius: 999px;
+    border: 1.5px solid #2a2a40;
+    background: transparent;
+    color: #9994b8;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
   }
-  .overlay.open { display: flex; }
-  .modal {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: var(--radius-lg);
-    padding: 2rem;
+  .level-btn.active,
+  .level-btn:hover {
+    background: #f7c948;
+    border-color: #f7c948;
+    color: #0d0d1a;
+    font-weight: 700;
+  }
+
+  /* Topic grid */
+  .topic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 680px;
+    margin-bottom: 36px;
+  }
+  .topic-card {
+    background: #12122a;
+    border: 1.5px solid #1e1e38;
+    border-radius: 16px;
+    padding: 18px 14px;
+    cursor: pointer;
+    transition: all 0.25s;
+    text-align: center;
+  }
+  .topic-card:hover { transform: translateY(-4px) scale(1.02); border-color: #f7c948; }
+  .topic-card.selected {
+    background: linear-gradient(135deg, #1e1a35, #2a1f3d);
+    border-color: #f7c948;
+  }
+  .topic-card .emoji { font-size: 28px; margin-bottom: 8px; }
+  .topic-card .label { font-size: 13px; font-weight: 600; color: #f0ece0; }
+
+  /* Prompt preview */
+  .prompt-preview {
+    background: #12122a;
+    border: 1px solid #2a2a40;
+    border-radius: 16px;
+    padding: 20px 24px;
     max-width: 500px;
     width: 100%;
+    margin-bottom: 28px;
+    text-align: center;
+    display: none;
   }
-  .modal h3 { font-size: 18px; margin-bottom: 1rem; }
-  .modal p { font-size: 13px; color: var(--text2); margin-bottom: 1rem; line-height: 1.7; }
-  .modal label { display: block; font-size: 12px; color: var(--text3); margin-bottom: 6px; margin-top: 1rem; }
-  .modal-actions { display: flex; gap: 10px; margin-top: 1.5rem; flex-wrap: wrap; }
+  .prompt-preview p { color: #c8c4e0; font-size: 15px; line-height: 1.6; }
 
-  /* ── RESPONSIVE ── */
-  @media (max-width: 768px) {
-    .topbar { padding: 0 1rem; }
-    .dashboard { padding: 1rem; }
-    .analysis-header { gap: 0.5rem; }
-    .analysis-price { font-size: 22px; }
-    .metric-val { font-size: 20px; }
+  /* Start button */
+  .start-btn {
+    background: #1e1e38;
+    color: #444;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 48px;
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: not-allowed;
+    transition: all 0.3s;
   }
+  .start-btn.ready {
+    background: linear-gradient(135deg, #f7c948, #ff6b35);
+    color: #0d0d1a;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(247,201,72,0.25);
+  }
+  .start-btn.ready:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 40px rgba(247,201,72,0.4);
+  }
+
+  /* ── PRACTICE ── */
+  .back-btn {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    color: #6b6882;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 24px;
+    font-family: 'Source Sans 3', sans-serif;
+  }
+  .back-btn:hover { color: #f0ece0; }
+
+  .topic-banner {
+    background: #12122a;
+    border: 1px solid #2a2a40;
+    border-radius: 20px;
+    padding: 24px;
+    max-width: 560px;
+    width: 100%;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .topic-banner .big-emoji { font-size: 32px; flex-shrink: 0; }
+  .topic-banner .topic-label { font-size: 12px; color: #6b6882; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+  .topic-banner p { color: #c8c4e0; line-height: 1.6; font-size: 15px; }
+
+  /* Mic area */
+  .mic-area {
+    position: relative;
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 120px;
+    height: 120px;
+  }
+  .ripple {
+    position: absolute;
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    opacity: 0;
+    display: none;
+  }
+  .ripple-1 { background: rgba(255,107,53,0.2); }
+  .ripple-2 { background: rgba(247,201,72,0.15); }
+  .recording .ripple { display: block; }
+  .recording .ripple-1 { animation: ripple 1.4s infinite; }
+  .recording .ripple-2 { animation: ripple 1.4s 0.4s infinite; }
+
+  @keyframes ripple {
+    0%   { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  @keyframes pulse {
+    0%,100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.12); opacity: 0.8; }
+  }
+
+  .mic-btn {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f7c948, #ff9a3c);
+    border: none;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    font-size: 32px;
+    box-shadow: 0 8px 30px rgba(247,201,72,0.3);
+    transition: all 0.3s;
+  }
+  .mic-btn.recording {
+    background: linear-gradient(135deg, #ff4444, #ff6b35);
+    box-shadow: 0 0 30px rgba(255,68,68,0.5);
+    animation: pulse 1.5s infinite;
+  }
+
+  .rec-status {
+    color: #6b6882;
+    font-size: 14px;
+    margin-bottom: 24px;
+    font-weight: 600;
+  }
+  .rec-status.active { color: #ff9a3c; }
+
+  .transcript-box {
+    background: #12122a;
+    border: 1px solid #2a2a40;
+    border-radius: 20px;
+    padding: 20px;
+    max-width: 560px;
+    width: 100%;
+    min-height: 160px;
+    margin-bottom: 28px;
+  }
+  .transcript-box .box-label { font-size: 12px; color: #6b6882; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+  #transcript-text { color: #e0dced; line-height: 1.7; font-size: 15px; }
+  #interim-text { color: #6b6882; font-style: italic; }
+  #transcript-placeholder { color: #3a3a55; }
+
+  .feedback-btn {
+    background: linear-gradient(135deg, #f7c948, #ff6b35);
+    color: #0d0d1a;
+    border: none;
+    border-radius: 999px;
+    padding: 15px 44px;
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(247,201,72,0.3);
+    display: none;
+    transition: transform 0.2s;
+  }
+  .feedback-btn:hover { transform: scale(1.04); }
+
+  /* ── FEEDBACK ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #feedback-screen { padding: 32px 20px; }
+
+  .feedback-content {
+    max-width: 560px;
+    width: 100%;
+    animation: fadeUp 0.5s ease;
+  }
+
+  .loading-box { text-align: center; padding-top: 80px; }
+  .loading-box .loading-icon { font-size: 48px; margin-bottom: 20px; }
+  .loading-box p { color: #9994b8; font-size: 16px; }
+
+  /* Score hero card */
+  .score-hero {
+    background: linear-gradient(135deg, #1a1435, #2a1f3d);
+    border: 1px solid #3a2a50;
+    border-radius: 24px;
+    padding: 28px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .score-number {
+    font-family: 'Playfair Display', serif;
+    font-size: 56px;
+    font-weight: 900;
+  }
+  .score-number span { font-size: 28px; }
+  .score-hero p { color: #c8c4e0; margin-top: 10px; line-height: 1.6; font-size: 15px; }
+
+  /* Category card */
+  .cat-card {
+    background: #12122a;
+    border: 1px solid #1e1e38;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+  }
+  .cat-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .cat-header .cat-name { font-size: 14px; font-weight: 600; }
+  .cat-header .cat-score { font-weight: 700; font-size: 14px; }
+  .score-bar-bg { background: #1a1a2e; border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 10px; }
+  .score-bar-fill { height: 100%; border-radius: 999px; transition: width 1s ease; }
+  .cat-comment { color: #b0accc; font-size: 13px; line-height: 1.6; }
+
+  /* Sub-label */
+  .sub-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin: 14px 0 8px; }
+
+  /* Expression / correction chip */
+  .chip {
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .chip-vocab { background: #1a1a35; border-left: 3px solid #7b5ea7; }
+  .chip-grammar { background: #1a1a35; border-left: 3px solid #f7c948; }
+  .chip-row { margin-bottom: 4px; }
+  .chip-wrong { color: #ff8080; text-decoration: line-through; }
+  .chip-arrow { color: #6b6882; margin: 0 8px; }
+  .chip-right { color: #a8e6cf; font-weight: 600; }
+  .chip-reason { color: #8884aa; line-height: 1.5; }
+
+  /* Better version */
+  .better-version {
+    background: linear-gradient(135deg, #0f1a2e, #0f2a1a);
+    border: 1px solid #2a4a3a;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .better-version p { color: #c8f0d8; font-size: 14px; line-height: 1.8; }
+
+  /* Tip */
+  .tip-box {
+    background: linear-gradient(135deg, #1a1410, #2a2010);
+    border: 1px solid #4a3a20;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+  }
+  .tip-box p { color: #f0e0c0; font-size: 14px; line-height: 1.6; }
+
+  /* Practice again */
+  .again-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #f7c948, #ff6b35);
+    color: #0d0d1a;
+    border: none;
+    border-radius: 999px;
+    padding: 16px;
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .again-btn:hover { transform: scale(1.02); }
+
+  .error-msg { color: #ff6b6b; font-size: 15px; }
 </style>
 </head>
 <body>
 
-<!-- TOP BAR -->
-<header class="topbar">
-  <div class="logo">
-    <div class="logo-icon">📡</div>
-    <div>
-      <div class="logo-text">台股雷達</div>
-      <div class="logo-sub">AI 每日分析</div>
-    </div>
+<!-- ══════════════════ HOME SCREEN ══════════════════ -->
+<div id="home-screen" class="screen active">
+  <div class="hero">
+    <div class="hero-icon">🎙️</div>
+    <h1 class="playfair grad-text">SpeakUp</h1>
+    <p>AI-powered English speaking practice</p>
   </div>
-  <div class="topbar-right">
-    <span class="date-badge"><span class="status-dot" id="statusDot"></span><span id="todayDate">—</span></span>
-    <button class="btn btn-outline" onclick="openSettings()" style="padding:7px 12px;font-size:12px;">⚙ 設定</button>
-  </div>
-</header>
 
-<!-- SETTINGS MODAL -->
-<div class="overlay" id="settingsOverlay">
-  <div class="modal">
-    <h3>⚙ 設定</h3>
-    <p>輸入你的 Anthropic API Key 以啟用 AI 即時分析功能。API Key 僅儲存在你的瀏覽器本地，不會傳送到任何第三方伺服器。</p>
-    <label>Anthropic API Key</label>
-    <input type="password" class="api-input" id="settingsApiKey" placeholder="sk-ant-..." style="width:100%;">
-    <p style="margin-top:0.5rem;font-size:11px;color:var(--text3);">
-      取得 API Key：<a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
-    </p>
-    <div class="modal-actions">
-      <button class="btn btn-accent" onclick="saveSettings()">儲存</button>
-      <button class="btn btn-outline" onclick="closeSettings()">取消</button>
-      <button class="btn btn-outline" style="margin-left:auto;color:var(--down);" onclick="clearKey()">清除 Key</button>
-    </div>
+  <p class="section-label">Your Level</p>
+  <div class="level-group" id="level-group">
+    <button class="level-btn" data-level="Beginner">Beginner</button>
+    <button class="level-btn active" data-level="Intermediate">Intermediate</button>
+    <button class="level-btn" data-level="Advanced">Advanced</button>
   </div>
+
+  <p class="section-label">Choose a Topic</p>
+  <div class="topic-grid" id="topic-grid"></div>
+
+  <div class="prompt-preview" id="prompt-preview">
+    <p id="prompt-text"></p>
+  </div>
+
+  <button class="start-btn" id="start-btn">Select a topic first</button>
 </div>
 
-<!-- SETUP SCREEN -->
-<div class="setup-section" id="setupSection">
-  <div class="setup-card">
-    <h2>👋 歡迎使用台股雷達</h2>
-    <p>
-      本工具使用 Claude AI 即時搜尋並分析台灣股市資料，每天一鍵更新。<br>
-      需要一組 <strong style="color:var(--text);">Anthropic API Key</strong> 才能開始使用。
-    </p>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1.25rem;font-size:12px;color:var(--text2);line-height:1.9;">
-      <strong style="color:var(--text);">如何取得 API Key？</strong><br>
-      1. 前往 <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a> 註冊帳號<br>
-      2. 進入 <strong style="color:var(--text);">API Keys</strong> 頁面 → 點擊「Create Key」<br>
-      3. 複製 Key（格式：<code style="font-family:var(--mono);color:var(--accent);">sk-ant-...</code>）<br>
-      4. 貼到下方輸入框並點擊「開始使用」
+<!-- ══════════════════ PRACTICE SCREEN ══════════════════ -->
+<div id="practice-screen" class="screen">
+  <button class="back-btn" id="practice-back">← Back</button>
+
+  <div class="topic-banner">
+    <div class="big-emoji" id="banner-emoji"></div>
+    <div>
+      <div class="topic-label">Topic</div>
+      <p id="banner-prompt"></p>
     </div>
-    <div class="input-group">
-      <input type="password" class="api-input" id="setupApiKey" placeholder="貼上你的 Anthropic API Key (sk-ant-...)">
-      <button class="btn btn-accent" onclick="startDashboard()">開始使用 →</button>
-    </div>
-    <p class="hint">🔒 API Key 僅儲存於你的瀏覽器 localStorage，不會上傳至任何伺服器。</p>
   </div>
+
+  <div class="mic-area" id="mic-area">
+    <div class="ripple ripple-1"></div>
+    <div class="ripple ripple-2"></div>
+    <button class="mic-btn" id="mic-btn">🎙</button>
+  </div>
+
+  <div class="rec-status" id="rec-status">Tap to start recording</div>
+
+  <div class="transcript-box">
+    <div class="box-label">Your Speech</div>
+    <div id="transcript-text">
+      <span id="final-text"></span>
+      <span id="interim-text"></span>
+      <span id="transcript-placeholder">Start speaking and your words will appear here...</span>
+    </div>
+  </div>
+
+  <button class="feedback-btn" id="feedback-btn">Get AI Feedback ✨</button>
 </div>
 
-<!-- MAIN DASHBOARD -->
-<main class="dashboard" id="mainDashboard">
-  <div class="dash-header">
-    <div>
-      <h2>今日市場總覽</h2>
-      <p id="dataTimestamp">資料更新時間：尚未載入</p>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-outline" id="refreshBtn" onclick="loadAll()">
-        🔄 更新今日資料
-      </button>
-    </div>
-  </div>
-
-  <div class="error-msg" id="errorMsg"></div>
-
-  <div id="loadingSection" class="loading-state" style="display:none;">
-    <div class="loader"></div>
-    <div>
-      <div class="loading-text">Claude AI 正在分析...</div>
-      <div class="loading-step" id="loadingStep">初始化中</div>
-    </div>
-  </div>
-
-  <div id="dashContent" style="display:none;">
-    <!-- MARKET METRICS -->
-    <div class="section-label">大盤指標</div>
-    <div class="metrics-grid" id="metricsGrid">
-      <div class="metric-card"><div class="metric-label">加權指數</div><div class="metric-val" id="m-twii">—</div><div class="metric-sub" id="m-twii-chg">—</div></div>
-      <div class="metric-card"><div class="metric-label">成交量</div><div class="metric-val" id="m-vol">—</div><div class="metric-sub">億元</div></div>
-      <div class="metric-card"><div class="metric-label">上漲 / 下跌</div><div class="metric-val" id="m-updown">—</div><div class="metric-sub" id="m-flat">—</div></div>
-      <div class="metric-card"><div class="metric-label">外資買賣超</div><div class="metric-val" id="m-foreign">—</div><div class="metric-sub" id="m-foreign-chg">億元</div></div>
-      <div class="metric-card"><div class="metric-label">投信買賣超</div><div class="metric-val" id="m-itrust">—</div><div class="metric-sub" style="color:var(--text3);">億元</div></div>
-      <div class="metric-card"><div class="metric-label">自營商</div><div class="metric-val" id="m-dealer">—</div><div class="metric-sub" style="color:var(--text3);">億元</div></div>
-    </div>
-
-    <!-- STOCK FILTERS -->
-    <div class="section-label" style="margin-top:1.5rem;">AI 今日精選</div>
-    <div class="filters" id="sectorFilters">
-      <button class="filter-pill active" onclick="filterSector(this,'all')">全部</button>
-      <button class="filter-pill" onclick="filterSector(this,'semi')">半導體</button>
-      <button class="filter-pill" onclick="filterSector(this,'ai')">AI / 伺服器</button>
-      <button class="filter-pill" onclick="filterSector(this,'finance')">金融</button>
-      <button class="filter-pill" onclick="filterSector(this,'consumer')">消費電子</button>
-      <button class="filter-pill" onclick="filterSector(this,'trad')">傳產 / 其他</button>
-    </div>
-
-    <!-- STOCKS GRID -->
-    <div class="stocks-grid" id="stocksGrid"></div>
-
-    <!-- ANALYSIS PANEL -->
-    <div class="analysis-panel" id="analysisPanel" style="display:none;">
-      <div class="analysis-header">
-        <div>
-          <div class="analysis-title" id="aTitle">—</div>
-          <div class="analysis-sector" id="aSector">—</div>
-        </div>
-        <div style="text-align:right;">
-          <div class="analysis-price" id="aPrice">—</div>
-          <div class="analysis-price-chg" id="aPriceChg">—</div>
-        </div>
-      </div>
-      <div class="analysis-body">
-        <div class="analysis-col">
-          <div class="section-label" style="margin-bottom:10px;">財務指標</div>
-          <div class="indicators" id="indicators"></div>
-        </div>
-        <div class="analysis-col">
-          <div class="section-label" style="margin-bottom:10px;">AI 分析理由</div>
-          <ul class="reasons" id="reasons"></ul>
-        </div>
-      </div>
-      <div class="chart-section">
-        <div class="section-label" style="margin-bottom:10px;">近10日走勢（示意）</div>
-        <div class="chart-wrap">
-          <canvas id="priceChart" role="img" aria-label="個股近期收盤走勢圖"></canvas>
-        </div>
-      </div>
-      <div class="analysis-actions">
-        <button class="btn btn-accent" onclick="askDeepDive()">🔍 深入分析此股票</button>
-        <button class="btn btn-outline" onclick="askNews()">📰 搜尋最新消息</button>
-        <button class="btn btn-outline" onclick="askRisk()">⚠️ 風險評估</button>
-      </div>
-    </div>
-
-    <!-- AI MARKET SUMMARY -->
-    <div class="section-label" style="margin-top:0.5rem;">AI 今日市場摘要</div>
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem;">
-      <p id="marketSummary" style="font-size:13px;color:var(--text2);line-height:1.9;">尚未載入</p>
-    </div>
-  </div>
-</main>
-
-<footer>
-  <div>台股雷達 · AI 驅動個股分析儀表板</div>
-  <div>⚠ 本站資料由 Claude AI 即時分析生成，僅供參考，不構成任何投資建議。</div>
-  <div>投資前請做好功課，並評估個人風險承受能力。</div>
-</footer>
+<!-- ══════════════════ FEEDBACK SCREEN ══════════════════ -->
+<div id="feedback-screen" class="screen">
+  <button class="back-btn" id="feedback-back">← Try Again</button>
+  <div id="feedback-body"></div>
+</div>
 
 <script>
-/* ────────── STATE ────────── */
-let apiKey = '';
-let allStocks = [];
-let selectedStock = null;
-let currentSector = 'all';
-let chartInstance = null;
+// ── Data ──────────────────────────────────────────────
+const TOPICS = [
+  { id:1, emoji:"🌅", title:"Daily Routine",   prompt:"Describe your typical morning routine. What do you do when you wake up?" },
+  { id:2, emoji:"🍜", title:"Favorite Food",   prompt:"Talk about your favorite food or dish. Why do you love it so much?" },
+  { id:3, emoji:"✈️", title:"Dream Travel",    prompt:"Describe a place you would love to visit someday. What would you do there?" },
+  { id:4, emoji:"🎬", title:"A Movie/Show",    prompt:"Tell me about a movie or TV show you recently watched. What was it about?" },
+  { id:5, emoji:"💼", title:"Work or Study",   prompt:"Describe what you do for work or study. What do you enjoy most about it?" },
+  { id:6, emoji:"🌟", title:"A Life Goal",     prompt:"Share one important goal you have in life. How do you plan to achieve it?" },
+  { id:7, emoji:"🎵", title:"Music You Love",  prompt:"Talk about music you enjoy. What kind of music moves you and why?" },
+  { id:8, emoji:"🐾", title:"Pets or Animals", prompt:"Do you have a pet? Or what animal would you love to have? Tell me about it." },
+];
 
-/* ────────── INIT ────────── */
-document.addEventListener('DOMContentLoaded', () => {
-  updateDate();
-  apiKey = localStorage.getItem('tw_stock_api_key') || '';
-  if (apiKey) {
-    showDashboard();
-  }
-  setInterval(updateDate, 60000);
+// ── State ─────────────────────────────────────────────
+let selectedTopic  = null;
+let selectedLevel  = "Intermediate";
+let isRecording    = false;
+let finalTranscript = "";
+let recordingTime  = 0;
+let timerInterval  = null;
+let recognition    = null;
+let interimSnapshot = "";
+
+// ── Helpers ───────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const fmt = s => `${pad(Math.floor(s/60))}:${pad(s%60)}`;
+
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(`${name}-screen`).classList.add("active");
+}
+
+// ── Build Topic Grid ──────────────────────────────────
+const grid = $("topic-grid");
+TOPICS.forEach(t => {
+  const card = document.createElement("div");
+  card.className = "topic-card";
+  card.dataset.id = t.id;
+  card.innerHTML = `<div class="emoji">${t.emoji}</div><div class="label">${t.title}</div>`;
+  card.addEventListener("click", () => selectTopic(t));
+  grid.appendChild(card);
 });
 
-function updateDate() {
-  const now = new Date();
-  const opts = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
-  document.getElementById('todayDate').textContent = now.toLocaleDateString('zh-TW', opts);
+function selectTopic(t) {
+  selectedTopic = t;
+  document.querySelectorAll(".topic-card").forEach(c => c.classList.toggle("selected", +c.dataset.id === t.id));
+  $("prompt-text").textContent = `"${t.prompt}"`;
+  $("prompt-preview").style.display = "block";
+  const btn = $("start-btn");
+  btn.classList.add("ready");
+  btn.textContent = "Start Practice →";
 }
 
-/* ────────── SETUP ────────── */
-function startDashboard() {
-  const key = document.getElementById('setupApiKey').value.trim();
-  if (!key || !key.startsWith('sk-ant-')) {
-    alert('請輸入有效的 Anthropic API Key（格式：sk-ant-...）');
-    return;
-  }
-  apiKey = key;
-  localStorage.setItem('tw_stock_api_key', key);
-  showDashboard();
-}
-
-function showDashboard() {
-  document.getElementById('setupSection').style.display = 'none';
-  document.getElementById('mainDashboard').classList.add('visible');
-}
-
-/* ────────── SETTINGS ────────── */
-function openSettings() {
-  document.getElementById('settingsApiKey').value = apiKey;
-  document.getElementById('settingsOverlay').classList.add('open');
-}
-function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('open');
-}
-function saveSettings() {
-  const key = document.getElementById('settingsApiKey').value.trim();
-  if (key && !key.startsWith('sk-ant-')) {
-    alert('格式不正確，請輸入 sk-ant-... 格式的 Key');
-    return;
-  }
-  if (key) {
-    apiKey = key;
-    localStorage.setItem('tw_stock_api_key', key);
-    showDashboard();
-  }
-  closeSettings();
-}
-function clearKey() {
-  if (!confirm('確定要清除 API Key？清除後需重新輸入。')) return;
-  apiKey = '';
-  localStorage.removeItem('tw_stock_api_key');
-  closeSettings();
-  document.getElementById('mainDashboard').classList.remove('visible');
-  document.getElementById('setupSection').style.display = 'block';
-}
-
-/* ────────── API CALL ────────── */
-async function callClaude(userPrompt, systemPrompt) {
-  if (!apiKey) throw new Error('尚未設定 API Key');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: systemPrompt || '你是台灣股市專業分析師。請使用 web search 取得最新資料後，只回傳有效 JSON，不要有任何 markdown 或說明文字。',
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      messages: [{ role: 'user', content: userPrompt }]
-    })
+// ── Level buttons ─────────────────────────────────────
+document.querySelectorAll(".level-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".level-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedLevel = btn.dataset.level;
   });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error('API 錯誤 ' + res.status + ': ' + errText.slice(0, 200));
-  }
-  const data = await res.json();
-  const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('');
-  if (!text) throw new Error('API 回傳空白結果，可能是速率限制，請稍後再試。');
-  const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-  try {
-    return JSON.parse(clean);
-  } catch (e) {
-    const match = clean.match(/\{[\s\S]*\}/);
-    if (match) return JSON.parse(match[0]);
-    throw new Error('無法解析 AI 回傳的資料格式');
-  }
-}
+});
 
-/* ────────── LOAD ALL ────────── */
-async function loadAll() {
-  setLoading(true, '正在查詢大盤即時資料...');
-  showError('');
+// ── Start button ──────────────────────────────────────
+$("start-btn").addEventListener("click", () => {
+  if (!selectedTopic) return;
+  // populate practice banner
+  $("banner-emoji").textContent = selectedTopic.emoji;
+  $("banner-prompt").textContent = selectedTopic.prompt;
+  // reset transcript
+  finalTranscript = "";
+  interimSnapshot = "";
+  $("final-text").textContent = "";
+  $("interim-text").textContent = "";
+  $("transcript-placeholder").style.display = "inline";
+  $("feedback-btn").style.display = "none";
+  showScreen("practice");
+});
 
-  const dot = document.getElementById('statusDot');
-  dot.className = 'status-dot';
+// ── Back buttons ──────────────────────────────────────
+$("practice-back").addEventListener("click", () => { stopRecording(); showScreen("home"); });
+$("feedback-back").addEventListener("click", () => {
+  $("feedback-body").innerHTML = "";
+  // reset transcript for another try
+  finalTranscript = "";
+  interimSnapshot = "";
+  $("final-text").textContent = "";
+  $("interim-text").textContent = "";
+  $("transcript-placeholder").style.display = "inline";
+  $("feedback-btn").style.display = "none";
+  showScreen("practice");
+});
 
-  try {
-    const today = new Date().toLocaleDateString('zh-TW');
+// ── Recording ─────────────────────────────────────────
+$("mic-btn").addEventListener("click", () => isRecording ? stopRecording() : startRecording());
 
-    // Step 1: Market data
-    setStep('搜尋大盤指數與三大法人資料...');
-    const market = await callClaude(
-      `請搜尋今天 ${today} 台灣股市最新大盤數據，回傳JSON：
-{"twii":"加權指數如22384","twiiChange":"+/-xxx","twiiPct":"+/-x.xx%",
-"vol":"成交量億元數字","upCount":"上漲家數","dnCount":"下跌家數","flat":"平盤家數",
-"foreignBuy":"外資買賣超億元（正買超負賣超）","itrust":"投信買賣超億元","dealer":"自營商億元",
-"date":"${today}","summary":"今日市場30字摘要，用繁體中文"}`
-    );
-    updateMarketMetrics(market);
+function startRecording() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("Your browser doesn't support speech recognition. Please try Chrome."); return; }
 
-    // Step 2: Stock picks
-    setStep('Claude AI 分析今日熱門個股...');
-    const picks = await callClaude(
-      `今天 ${today} 台灣股市，請搜尋最新消息後，推薦6檔值得關注個股（涵蓋科技/半導體/金融/其他）。
-回傳JSON（只有JSON）：
-{"stocks":[
-  {"code":"股票代號","name":"公司名稱","sector":"semi或ai或finance或consumer或trad",
-   "price":"收盤價（數字）","change":"漲跌數字（帶+/-）","pct":"漲跌%（帶+/-）",
-   "tag":"buy或watch或hot","tagLabel":"強力買進/買進/觀察/熱門",
-   "pe":"本益比","pb":"股價淨值比","yield":"殖利率%","rsi":"RSI整數",
-   "reasons":["推薦理由1","推薦理由2","推薦理由3"]}
-]}`
-    );
-    allStocks = picks.stocks || [];
+  finalTranscript = "";
+  interimSnapshot = "";
+  recordingTime = 0;
+  $("final-text").textContent = "";
+  $("interim-text").textContent = "";
+  $("transcript-placeholder").style.display = "none";
+  $("feedback-btn").style.display = "none";
 
-    // Step 3: Summary
-    setStep('生成今日市場摘要...');
-    if (market.summary) {
-      document.getElementById('marketSummary').textContent = market.summary;
+  recognition = new SR();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+
+  recognition.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const txt = e.results[i][0].transcript;
+      if (e.results[i].isFinal) { finalTranscript += txt + " "; }
+      else { interim += txt; }
     }
+    interimSnapshot = interim;
+    $("final-text").textContent = finalTranscript;
+    $("interim-text").textContent = interim;
+    $("transcript-placeholder").style.display = "none";
+  };
 
-    renderStocks();
-    document.getElementById('dashContent').style.display = 'block';
-    if (allStocks.length > 0) selectStock(allStocks[0].code);
+  recognition.onerror = e => { if (e.error !== "aborted") console.error("Speech error:", e.error); };
+  recognition.start();
 
-    document.getElementById('dataTimestamp').textContent = '資料更新時間：' + new Date().toLocaleTimeString('zh-TW');
-    dot.className = 'status-dot live';
+  isRecording = true;
+  $("mic-btn").classList.add("recording");
+  $("mic-btn").textContent = "⏹";
+  $("mic-area").classList.add("recording");
+  $("rec-status").classList.add("active");
 
-  } catch(e) {
-    showError('載入失敗：' + e.message);
-    dot.className = 'status-dot';
-  } finally {
-    setLoading(false);
-  }
+  timerInterval = setInterval(() => {
+    recordingTime++;
+    $("rec-status").textContent = `● REC ${fmt(recordingTime)}`;
+  }, 1000);
 }
 
-/* ────────── MARKET METRICS ── */
-function updateMarketMetrics(m) {
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
-  set('m-twii', m.twii);
-  const chgEl = document.getElementById('m-twii-chg');
-  if (chgEl) {
-    chgEl.textContent = (m.twiiChange || '') + ' ' + (m.twiiPct || '');
-    chgEl.className = 'metric-sub ' + (String(m.twiiChange || '').startsWith('+') ? 'up' : 'down');
-  }
-  set('m-vol', m.vol);
-  set('m-updown', (m.upCount || '—') + ' / ' + (m.dnCount || '—'));
-  set('m-flat', '平 ' + (m.flat || '—') + ' 家');
-  set('m-foreign', m.foreignBuy);
-  const fc = document.getElementById('m-foreign-chg');
-  if (fc) { fc.textContent = parseFloat(m.foreignBuy || 0) >= 0 ? '▲ 買超' : '▼ 賣超'; fc.className = parseFloat(m.foreignBuy || 0) >= 0 ? 'metric-sub up' : 'metric-sub down'; }
-  set('m-itrust', m.itrust);
-  set('m-dealer', m.dealer);
+function stopRecording() {
+  if (recognition) { recognition.stop(); recognition = null; }
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  isRecording = false;
+  $("mic-btn").classList.remove("recording");
+  $("mic-btn").textContent = "🎙";
+  $("mic-area").classList.remove("recording");
+  $("rec-status").classList.remove("active");
+  $("rec-status").textContent = "Tap to start recording";
+
+  const hasText = (finalTranscript + interimSnapshot).trim().length > 0;
+  $("feedback-btn").style.display = hasText ? "inline-block" : "none";
 }
 
-/* ────────── STOCKS ────────── */
-function filterSector(el, sector) {
-  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  currentSector = sector;
-  renderStocks();
-}
+// ── Get Feedback ──────────────────────────────────────
+$("feedback-btn").addEventListener("click", getFeedback);
 
-function renderStocks() {
-  const filtered = currentSector === 'all' ? allStocks : allStocks.filter(s => s.sector === currentSector);
-  document.getElementById('stocksGrid').innerHTML = filtered.map(s => {
-    const isUp = !String(s.change || '').startsWith('-');
-    return `<div class="stock-card tag-${s.tag || 'watch'}${selectedStock && s.code === selectedStock.code ? ' selected' : ''}" onclick="selectStock('${s.code}')">
-      <div class="stock-top">
-        <span class="stock-code">${s.code}</span>
-        <span class="stock-tag tag-${s.tag || 'watch'}">${s.tagLabel || s.tag}</span>
-      </div>
-      <div class="stock-name">${s.name}</div>
-      <div class="stock-price">NT$ ${parseFloat(s.price || 0).toLocaleString()}</div>
-      <div class="stock-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${s.change} (${s.pct}%)</div>
+async function getFeedback() {
+  const fullText = (finalTranscript + " " + interimSnapshot).trim();
+  if (!fullText || fullText.length < 10) { alert("Please record at least a few sentences first!"); return; }
+
+  showScreen("feedback");
+  $("feedback-body").innerHTML = `
+    <div class="loading-box">
+      <div class="loading-icon">🤔</div>
+      <p>Analyzing your speech...</p>
     </div>`;
-  }).join('');
-}
 
-function selectStock(code) {
-  selectedStock = allStocks.find(s => s.code === code);
-  if (!selectedStock) return;
-  renderStocks();
-  const panel = document.getElementById('analysisPanel');
-  panel.style.display = 'block';
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const systemPrompt = `你是一位親切、有耐心的英文口說教練，專門幫助台灣學生改善英文口說能力。請用繁體中文提供所有回饋說明，並附上具體的英文範例句子。
 
-  const isUp = !String(selectedStock.change || '').startsWith('-');
-  document.getElementById('aTitle').textContent = selectedStock.code + ' ' + selectedStock.name;
-  document.getElementById('aSector').textContent = selectedStock.sector + '　個股分析';
-  document.getElementById('aPrice').textContent = 'NT$ ' + parseFloat(selectedStock.price || 0).toLocaleString();
-  document.getElementById('aPrice').className = 'analysis-price ' + (isUp ? 'up' : 'down');
-  document.getElementById('aPriceChg').textContent = (isUp ? '▲ +' : '▼ ') + selectedStock.change + ' (' + selectedStock.pct + '%)';
-  document.getElementById('aPriceChg').className = 'analysis-price-chg ' + (isUp ? 'up' : 'down');
+請只回傳 JSON 格式，不要有任何 markdown、說明文字或前言。
 
-  document.getElementById('indicators').innerHTML = [
-    { label: '本益比 P/E', val: selectedStock.pe || '—' },
-    { label: '股價淨值比', val: selectedStock.pb || '—' },
-    { label: '殖利率', val: (selectedStock.yield || '—') + '%' },
-    { label: 'RSI (14)', val: selectedStock.rsi || '—' }
-  ].map(i => `<div class="ind"><div class="ind-label">${i.label}</div><div class="ind-val">${i.val}</div></div>`).join('');
+回傳以下 JSON 結構：
+{
+  "overallScore": <1-10的數字>,
+  "encouragement": "<用繁體中文給一句具體、溫暖的鼓勵>",
+  "fluency": { "score": <1-10>, "comment": "<用繁體中文說明流暢度表現>" },
+  "vocabulary": {
+    "score": <1-10>,
+    "comment": "<用繁體中文說明用字遣詞的問題或優點>",
+    "betterExpressions": [
+      { "original": "<學生說的英文片語>", "better": "<更自然的英文說法>", "reason": "<用繁體中文解釋>" }
+    ]
+  },
+  "grammar": {
+    "score": <1-10>,
+    "comment": "<用繁體中文說明文法問題>",
+    "corrections": [
+      { "wrong": "<學生說的錯誤句子>", "correct": "<正確英文句子>", "explanation": "<用繁體中文解釋錯在哪>" }
+    ]
+  },
+  "content": { "score": <1-10>, "comment": "<用繁體中文說明內容是否切題、豐富>" },
+  "betterVersion": "<用繁體中文介紹：如果要讓這段話說得更完整自然，可以這樣說 —— 然後給一段示範英文（2-4句）>",
+  "tipOfTheDay": "<用繁體中文給一個具體可執行的口說練習小撇步>"
+}`;
 
-  document.getElementById('reasons').innerHTML = (selectedStock.reasons || []).map(r =>
-    `<li><span class="reasons-dot">●</span>${r}</li>`
-  ).join('');
-
-  renderChart();
-}
-
-function renderChart() {
-  const ctx = document.getElementById('priceChart').getContext('2d');
-  if (chartInstance) chartInstance.destroy();
-  const base = parseFloat(selectedStock.price || 100);
-  const pts = Array.from({length: 10}, (_, i) => {
-    const noise = (Math.random() - 0.5) * base * 0.06;
-    return +(base * 0.95 + noise + (i / 10) * base * 0.05).toFixed(1);
-  });
-  pts[9] = base;
-  const isUp = !String(selectedStock.change || '').startsWith('-');
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: ['D-9','D-8','D-7','D-6','D-5','D-4','D-3','D-2','昨','今'],
-      datasets: [{
-        label: '收盤價',
-        data: pts,
-        borderColor: isUp ? '#39d98a' : '#ff5f57',
-        backgroundColor: isUp ? 'rgba(57,217,138,0.07)' : 'rgba(255,95,87,0.07)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-        pointBackgroundColor: isUp ? '#39d98a' : '#ff5f57',
-        borderWidth: 2
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: c => 'NT$ ' + c.raw } }
-      },
-      scales: {
-        x: { ticks: { color: '#555b6e', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y: { ticks: { color: '#555b6e', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
-      }
-    }
-  });
-}
-
-/* ────────── AI DEEP DIVES ── */
-function askDeepDive() {
-  if (!selectedStock) return;
-  const q = `請深入分析 ${selectedStock.code} ${selectedStock.name}，搜尋今日最新消息，涵蓋：\n1. 近期基本面（營收、獲利趨勢）\n2. 技術面（均線、RSI、支撐壓力）\n3. 籌碼面（外資/投信動向）\n4. 目標價區間\n5. 主要風險提示\n請給出具體操作建議。`;
-  openChatDialog(q);
-}
-function askNews() {
-  if (!selectedStock) return;
-  openChatDialog(`請搜尋 ${selectedStock.code} ${selectedStock.name} 最近7天的重要新聞和公司公告，整理重點摘要。`);
-}
-function askRisk() {
-  if (!selectedStock) return;
-  openChatDialog(`請分析投資 ${selectedStock.code} ${selectedStock.name} 的主要風險因素，包含產業風險、公司特定風險和總體經濟風險。`);
-}
-
-function openChatDialog(prompt) {
-  const msg = encodeURIComponent(prompt);
-  window.open('https://claude.ai/new?q=' + msg, '_blank');
-}
-
-/* ────────── UI HELPERS ────────── */
-function setLoading(show, msg) {
-  const sec = document.getElementById('loadingSection');
-  const btn = document.getElementById('refreshBtn');
-  if (show) {
-    sec.style.display = 'flex';
-    document.getElementById('dashContent').style.display = 'none';
-    if (btn) btn.disabled = true;
-  } else {
-    sec.style.display = 'none';
-    if (btn) btn.disabled = false;
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{
+          role: "user",
+          content: `學生程度：${selectedLevel}\n練習題目：「${selectedTopic.prompt}」\n學生的回答：「${fullText}」\n\n請分析這段英文口說並以繁體中文回饋，回傳 JSON。`
+        }]
+      })
+    });
+    const data = await res.json();
+    const raw = (data.content || []).map(b => b.text || "").join("");
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const fb = JSON.parse(clean);
+    renderFeedback(fb);
+  } catch(err) {
+    $("feedback-body").innerHTML = `<p class="error-msg">Could not load feedback. Please try again.</p>`;
   }
-  if (msg) document.querySelector('.loading-text').textContent = msg;
 }
-function setStep(txt) {
-  document.getElementById('loadingStep').textContent = txt;
+
+// ── Render Feedback ───────────────────────────────────
+function renderFeedback(fb) {
+  const categories = [
+    { key:"fluency",    label:"🗣 流暢度",   color:"#4cc9f0" },
+    { key:"vocabulary", label:"📚 用字遣詞", color:"#7b5ea7" },
+    { key:"grammar",    label:"✏️ 文法",     color:"#f7c948" },
+    { key:"content",    label:"💬 內容表達", color:"#56cfad" },
+  ];
+
+  let html = `
+  <div class="feedback-content">
+    <div class="score-hero">
+      <div class="score-number grad-text playfair">${fb.overallScore}<span>/10</span></div>
+      <p>${esc(fb.encouragement)}</p>
+    </div>`;
+
+  categories.forEach(({ key, label, color }) => {
+    const d = fb[key];
+    if (!d) return;
+    html += `
+    <div class="cat-card">
+      <div class="cat-header">
+        <span class="cat-name">${label}</span>
+        <span class="cat-score" style="color:${color}">${d.score}/10</span>
+      </div>
+      <div class="score-bar-bg">
+        <div class="score-bar-fill" style="width:${d.score*10}%;background:${color}"></div>
+      </div>
+      <p class="cat-comment">${esc(d.comment)}</p>`;
+
+    if (d.betterExpressions?.length) {
+      html += `<div class="sub-label" style="color:#7b5ea7">更自然的說法</div>`;
+      d.betterExpressions.forEach(e => {
+        html += `
+        <div class="chip chip-vocab">
+          <div class="chip-row">
+            <span class="chip-wrong">${esc(e.original)}</span>
+            <span class="chip-arrow">→</span>
+            <span class="chip-right">${esc(e.better)}</span>
+          </div>
+          <div class="chip-reason">💡 ${esc(e.reason)}</div>
+        </div>`;
+      });
+    }
+
+    if (d.corrections?.length) {
+      html += `<div class="sub-label" style="color:#f7c948">文法修正</div>`;
+      d.corrections.forEach(c => {
+        html += `
+        <div class="chip chip-grammar">
+          <div class="chip-row">
+            <span class="chip-wrong">${esc(c.wrong)}</span>
+            <span class="chip-arrow">→</span>
+            <span class="chip-right">${esc(c.correct)}</span>
+          </div>
+          <div class="chip-reason">📝 ${esc(c.explanation)}</div>
+        </div>`;
+      });
+    }
+
+    html += `</div>`;
+  });
+
+  if (fb.betterVersion) {
+    html += `
+    <div class="better-version">
+      <div class="sub-label" style="color:#56cfad;margin-top:0">✨ 示範：這樣說更棒！</div>
+      <p>${esc(fb.betterVersion)}</p>
+    </div>`;
+  }
+
+  if (fb.tipOfTheDay) {
+    html += `
+    <div class="tip-box">
+      <div class="sub-label" style="color:#f7c948;margin-top:0">今日練習小撇步</div>
+      <p>🌱 ${esc(fb.tipOfTheDay)}</p>
+    </div>`;
+  }
+
+  html += `<button class="again-btn" id="again-btn">Practice Again 🎙</button></div>`;
+  $("feedback-body").innerHTML = html;
+
+  $("again-btn").addEventListener("click", () => {
+    $("feedback-body").innerHTML = "";
+    finalTranscript = "";
+    interimSnapshot = "";
+    $("final-text").textContent = "";
+    $("interim-text").textContent = "";
+    $("transcript-placeholder").style.display = "inline";
+    $("feedback-btn").style.display = "none";
+    showScreen("practice");
+  });
 }
-function showError(msg) {
-  const el = document.getElementById('errorMsg');
-  el.textContent = msg ? '⚠ ' + msg : '';
-  el.style.display = msg ? 'block' : 'none';
+
+// ── Escape HTML ───────────────────────────────────────
+function esc(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/\n/g,"<br>");
 }
 </script>
-
 </body>
 </html>
