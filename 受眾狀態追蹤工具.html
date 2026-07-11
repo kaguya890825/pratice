@@ -1,0 +1,1029 @@
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  :root{
+    --paper:#F6F7F3;
+    --paper-raised:#FFFFFF;
+    --ink:#1E2723;
+    --ink-soft:#5C685F;
+    --line:#D9DED3;
+    --line-strong:#B9C2B4;
+    --teal:#2A6F6F;
+    --teal-deep:#1D4F4F;
+    --amber:#9A6B1E;
+    --amber-bg:#FBF1DF;
+    --match:#2F7A4E;
+    --match-bg:#E7F3EA;
+    --nomatch:#B5533C;
+    --nomatch-bg:#FBEAE5;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .wrap{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      linear-gradient(var(--line) 1px, transparent 1px) 0 0/100% 28px,
+      var(--paper);
+    background-attachment:local;
+    padding:32px 20px 60px;
+    min-height:100%;
+  }
+  .container{max-width:960px;margin:0 auto;}
+
+  .header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.14em;
+    color:var(--teal-deep);
+    text-transform:uppercase;
+    display:flex;align-items:center;gap:8px;
+  }
+  .eyebrow::before{content:'';width:16px;height:1px;background:var(--teal-deep);display:inline-block;}
+  h1{
+    font-size:28px;
+    line-height:1.25;
+    margin:8px 0 6px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:14px;line-height:1.6;max-width:620px;}
+
+  .card{
+    background:var(--paper-raised);
+    border:1px solid var(--line-strong);
+    border-radius:3px;
+    padding:22px 22px 24px;
+    margin-bottom:16px;
+    position:relative;
+  }
+  .card.disabled{opacity:0.45;pointer-events:none;}
+  .step-label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--teal-deep);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    margin-bottom:4px;
+    display:block;
+  }
+  .card h2{font-size:16px;margin:0 0 4px;font-weight:600;}
+  .card .card-hint{font-size:12px;color:var(--ink-soft);margin:0 0 14px;}
+
+  .drop-row{display:flex;gap:14px;flex-wrap:wrap;}
+  .dropzone{
+    flex:1 1 260px;
+    border:1.5px dashed var(--line-strong);
+    border-radius:3px;
+    padding:18px 16px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+    background:var(--paper);
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--teal); background:#EEF5F3;}
+  .dropzone input{display:none;}
+  .dz-icon{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.06em;}
+  .dz-title{font-weight:600;font-size:14px;margin:6px 0 4px;}
+  .dz-hint{font-size:12px;color:var(--ink-soft);}
+  .dz-file{
+    margin-top:10px;
+    font-family:var(--mono);
+    font-size:12px;
+    background:var(--match-bg);
+    color:var(--match);
+    border-radius:3px;
+    padding:6px 8px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .dz-file .rows{color:var(--ink-soft);}
+  .dz-error{
+    margin-top:10px;
+    font-family:var(--mono);
+    font-size:12px;
+    background:var(--nomatch-bg);
+    color:var(--nomatch);
+    border-radius:3px;
+    padding:6px 8px;
+  }
+
+  .toggle-row{
+    display:flex;align-items:center;gap:10px;
+    margin-top:14px;padding-top:14px;border-top:1px solid var(--line);
+  }
+  .toggle-row label{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .toggle-row input{width:auto;}
+
+  label.field-label{
+    font-size:12px;
+    color:var(--ink-soft);
+    display:block;
+    margin-bottom:5px;
+    font-weight:500;
+  }
+  select, input[type=text], input[type=url], input[type=date]{
+    font-family:var(--sans);
+    font-size:13px;
+    padding:8px 10px;
+    border:1px solid var(--line-strong);
+    border-radius:3px;
+    background:#fff;
+    color:var(--ink);
+    width:100%;
+  }
+  select:focus, input:focus{outline:2px solid var(--teal); outline-offset:1px;}
+
+  .subsection{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);}
+  .subsection:first-child{margin-top:0;padding-top:0;border-top:none;}
+  .subsection-title{font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .subsection-title .tag{
+    font-family:var(--mono);font-size:10px;background:var(--paper);border:1px solid var(--line-strong);
+    border-radius:20px;padding:2px 8px;color:var(--ink-soft);font-weight:500;
+  }
+
+  .key-row{display:flex;gap:12px;align-items:end;margin-bottom:10px;flex-wrap:wrap;}
+  .key-row .col{flex:1 1 220px;}
+  .key-row .arrow{
+    font-family:var(--mono);color:var(--teal);font-size:16px;
+    padding-bottom:9px;
+  }
+  .key-row .remove{
+    font-family:var(--mono);font-size:11px;color:var(--nomatch);
+    background:none;border:1px solid var(--nomatch);border-radius:3px;
+    padding:8px 10px;cursor:pointer;height:36px;
+  }
+  .add-key{
+    font-family:var(--mono);font-size:12px;color:var(--teal-deep);
+    background:none;border:1px dashed var(--line-strong);border-radius:3px;
+    padding:7px 12px;cursor:pointer;margin-top:2px;
+  }
+  .add-key:hover{border-color:var(--teal);}
+
+  .checklist{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:6px;}
+  .checklist label{
+    font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;
+    background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:5px 9px;
+  }
+  .checklist input{width:auto;}
+
+  .opt-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:10px 18px;
+    margin-top:16px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+  }
+  .opt{display:flex;align-items:flex-start;gap:8px;}
+  .opt input{width:auto;margin-top:2px;}
+  .opt .opt-text{font-size:13px;}
+  .opt .opt-text .d{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px;}
+
+  .radio-row{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;}
+  .radio-opt{display:flex;align-items:flex-start;gap:8px;font-size:13px;flex:1 1 240px;}
+  .radio-opt input{margin-top:3px;}
+  .radio-opt .d{display:block;font-size:11px;color:var(--ink-soft);margin-top:1px;}
+
+  .date-row{display:flex;gap:14px;flex-wrap:wrap;}
+  .date-row .col{flex:1 1 200px;}
+  .fetch-time{
+    font-family:var(--mono);font-size:12px;color:var(--ink-soft);
+    background:var(--paper);border:1px solid var(--line);border-radius:3px;
+    padding:8px 10px;margin-top:4px;
+  }
+
+  .btn{
+    font-family:var(--mono);
+    font-size:13px;
+    letter-spacing:.02em;
+    background:var(--teal-deep);
+    color:#fff;
+    border:none;
+    border-radius:3px;
+    padding:11px 20px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .btn:hover{background:var(--teal);}
+  .btn:disabled{background:#B9C2B4;cursor:not-allowed;}
+  .btn.secondary{
+    background:none;color:var(--teal-deep);border:1px solid var(--teal-deep);
+  }
+  .btn.secondary:hover{background:#EEF5F3;}
+  .btn.amber{background:var(--amber);}
+  .btn.amber:hover{background:#7F5A16;}
+
+  .run-row{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap;}
+  .run-note{font-size:12px;color:var(--ink-soft);}
+
+  .stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+  .stat{
+    flex:1 1 140px;
+    border:1px solid var(--line-strong);
+    border-radius:3px;
+    padding:14px 16px;
+    background:var(--paper-raised);
+  }
+  .stat .num{font-family:var(--mono);font-size:22px;font-weight:600;}
+  .stat .lbl{font-size:11px;color:var(--ink-soft);margin-top:2px;letter-spacing:.02em;}
+  .stat.match .num{color:var(--match);}
+  .stat.nomatch .num{color:var(--nomatch);}
+  .stat.amber .num{color:var(--amber);}
+
+  .filter-row{display:flex;align-items:end;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .filter-row .col{flex:1 1 260px;}
+
+  .result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+  .result-title{font-weight:600;font-size:14px;}
+  .dl-buttons{display:flex;gap:8px;flex-wrap:wrap;}
+  .dl-btn{
+    font-family:var(--mono);font-size:11px;
+    border:1px solid var(--line-strong);background:#fff;
+    padding:7px 12px;border-radius:3px;cursor:pointer;color:var(--ink);
+  }
+  .dl-btn:hover{border-color:var(--teal);color:var(--teal-deep);}
+
+  .table-scroll{
+    border:1px solid var(--line-strong);
+    border-radius:3px;
+    overflow:auto;
+    max-height:320px;
+  }
+  table{border-collapse:collapse;width:100%;font-size:12px;font-family:var(--mono);}
+  th,td{
+    padding:7px 10px;text-align:left;white-space:nowrap;
+    border-bottom:1px solid var(--line);
+  }
+  th{
+    background:var(--paper);position:sticky;top:0;
+    color:var(--ink-soft);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.04em;
+  }
+  tr:last-child td{border-bottom:none;}
+  .preview-note{font-size:11px;color:var(--ink-soft);margin-top:6px;font-family:var(--mono);}
+
+  .error-banner{
+    background:var(--nomatch-bg);color:var(--nomatch);
+    border:1px solid var(--nomatch);border-radius:3px;
+    padding:10px 14px;font-size:13px;margin-bottom:14px;
+  }
+  .info-banner{
+    background:var(--match-bg);color:var(--match);
+    border:1px solid var(--match);border-radius:3px;
+    padding:10px 14px;font-size:13px;margin-bottom:14px;
+    font-family:var(--mono);
+  }
+
+  details.howto{
+    background:var(--paper);border:1px solid var(--line);border-radius:3px;
+    padding:12px 14px;margin-bottom:16px;
+  }
+  details.howto summary{
+    cursor:pointer;font-size:13px;font-weight:600;color:var(--teal-deep);
+  }
+  details.howto ol{margin:12px 0 0;padding-left:20px;font-size:13px;line-height:1.8;}
+  .code-block{
+    position:relative;margin-top:10px;
+  }
+  .code-block pre{
+    background:#1E2723;color:#E7F3EA;
+    font-family:var(--mono);font-size:11.5px;line-height:1.6;
+    padding:14px 16px;border-radius:3px;overflow-x:auto;margin:0;
+  }
+  .copy-btn{
+    position:absolute;top:8px;right:8px;
+    font-family:var(--mono);font-size:10px;
+    background:rgba(255,255,255,0.1);color:#E7F3EA;border:1px solid rgba(255,255,255,0.25);
+    border-radius:3px;padding:4px 8px;cursor:pointer;
+  }
+  .copy-btn:hover{background:rgba(255,255,255,0.2);}
+
+  .sync-row{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-top:14px;}
+  .sync-row .col{flex:1 1 320px;}
+  .sync-status{
+    margin-top:12px;font-family:var(--mono);font-size:12px;
+    padding:10px 12px;border-radius:3px;display:none;
+  }
+  .sync-status.ok{display:block;background:var(--match-bg);color:var(--match);}
+  .sync-status.fail{display:block;background:var(--nomatch-bg);color:var(--nomatch);}
+  .sync-status.loading{display:block;background:var(--paper);color:var(--ink-soft);border:1px solid var(--line);}
+
+  .reset-row{text-align:right;margin-top:6px;}
+  .reset-row button{
+    font-family:var(--mono);font-size:11px;color:var(--ink-soft);
+    background:none;border:none;cursor:pointer;text-decoration:underline;
+  }
+
+  @media (max-width:520px){
+    h1{font-size:22px;}
+    .card{padding:16px;}
+    .stat{flex:1 1 100%;}
+  }
+</style>
+
+<div class="wrap">
+  <div class="container">
+    <div class="header">
+      <span class="eyebrow">Match · Track · Sync</span>
+      <h1>受眾狀態追蹤工具</h1>
+      <p class="sub">上傳受眾名單，同時比對訂單明細與用券狀況，標記觀察區間與資料撈取時間，最後可以一鍵把結果條列式同步到 Google Sheet，方便長期追蹤。</p>
+    </div>
+
+    <!-- STEP 1: upload -->
+    <div class="card" id="step1">
+      <span class="step-label">Step 01</span>
+      <h2>上傳資料</h2>
+      <p class="card-hint">受眾名單與訂單明細為必填，用券明細可選填。</p>
+      <div class="drop-row">
+        <div class="dropzone" id="dz-audience">
+          <input type="file" id="file-audience" accept=".xlsx,.xls,.csv">
+          <div class="dz-icon">[ .xlsx / .csv ]</div>
+          <div class="dz-title">指定受眾名單</div>
+          <div class="dz-hint">點擊或拖曳檔案到這裡</div>
+          <div id="audience-status"></div>
+        </div>
+        <div class="dropzone" id="dz-order">
+          <input type="file" id="file-order" accept=".xlsx,.xls,.csv">
+          <div class="dz-icon">[ .xlsx / .csv ]</div>
+          <div class="dz-title">訂單明細</div>
+          <div class="dz-hint">點擊或拖曳檔案到這裡</div>
+          <div id="order-status"></div>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label><input type="checkbox" id="enable-coupon"> 同時比對「用券狀況」</label>
+      </div>
+      <div class="drop-row" id="coupon-drop-row" style="display:none; margin-top:12px;">
+        <div class="dropzone" id="dz-coupon">
+          <input type="file" id="file-coupon" accept=".xlsx,.xls,.csv">
+          <div class="dz-icon">[ .xlsx / .csv ]</div>
+          <div class="dz-title">用券明細</div>
+          <div class="dz-hint">點擊或拖曳檔案到這裡</div>
+          <div id="coupon-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: configure -->
+    <div class="card disabled" id="step2">
+      <span class="step-label">Step 02</span>
+      <h2>設定比對欄位</h2>
+      <p class="card-hint">受眾名單的欄位要對應到訂單／用券明細的哪個欄位，才能判斷是同一個人。</p>
+
+      <div class="subsection">
+        <div class="subsection-title">訂單明細比對 <span class="tag">必填</span></div>
+        <div id="key-rows-order"></div>
+        <button class="add-key" data-target="order" type="button">+ 新增比對欄位</button>
+        <div style="margin-top:12px;">
+          <label class="field-label">要一併帶出的訂單欄位（選填，例如訂單日期、金額）</label>
+          <div class="checklist" id="extra-cols-order"></div>
+        </div>
+      </div>
+
+      <div class="subsection" id="coupon-config-section" style="display:none;">
+        <div class="subsection-title">用券明細比對 <span class="tag">選填已啟用</span></div>
+        <div id="key-rows-coupon"></div>
+        <button class="add-key" data-target="coupon" type="button">+ 新增比對欄位</button>
+        <div style="margin-top:12px;">
+          <label class="field-label">要一併帶出的用券欄位（選填，例如券別、使用時間）</label>
+          <div class="checklist" id="extra-cols-coupon"></div>
+        </div>
+      </div>
+
+      <div class="opt-grid">
+        <label class="opt">
+          <input type="checkbox" id="opt-trim" checked>
+          <span class="opt-text">去除頭尾空白<span class="d">避免因多餘空格造成比對失敗</span></span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="opt-case" checked>
+          <span class="opt-text">忽略英文大小寫<span class="d">Email 常見大小寫不一致</span></span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="opt-digits">
+          <span class="opt-text">只比對數字<span class="d">適合手機號碼，自動去除符號</span></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- STEP 3: observation window -->
+    <div class="card disabled" id="step3">
+      <span class="step-label">Step 03</span>
+      <h2>觀察區間</h2>
+      <p class="card-hint">用來標記這次比對是在觀察哪一段期間的資料，會一併記錄在結果與 Google Sheet 中。</p>
+      <div class="date-row">
+        <div class="col">
+          <label class="field-label">觀察起始日</label>
+          <input type="date" id="obs-start">
+        </div>
+        <div class="col">
+          <label class="field-label">觀察結束日</label>
+          <input type="date" id="obs-end">
+        </div>
+        <div class="col">
+          <label class="field-label">資料撈取時間（執行比對時自動記錄）</label>
+          <div class="fetch-time" id="fetch-time-preview">尚未執行</div>
+        </div>
+      </div>
+
+      <div class="radio-row">
+        <label class="radio-opt">
+          <input type="radio" name="mode" value="merge_first" checked>
+          <span>每位受眾一列<span class="d">標記是否有比對到訂單／用券，附上第一筆比對到的資料</span></span>
+        </label>
+        <label class="radio-opt">
+          <input type="radio" name="mode" value="expand_all">
+          <span>展開所有比對到的訂單<span class="d">同一人有幾筆訂單就輸出幾列（用券仍取第一筆狀態）</span></span>
+        </label>
+      </div>
+
+      <div class="run-row">
+        <button class="btn" id="run-btn" disabled>執行比對</button>
+        <span class="run-note" id="run-note"></span>
+      </div>
+    </div>
+
+    <!-- STEP 4: results -->
+    <div id="results-wrap"></div>
+
+    <!-- STEP 5: sheet sync -->
+    <div class="card" id="sync-card" style="display:none;">
+      <span class="step-label">Step 05</span>
+      <h2>同步到 Google Sheet</h2>
+      <p class="card-hint">用 Google Apps Script 建立一個「Web App」網址，工具會把目前篩選出的結果，以條列式附加寫入到你的 Google Sheet，每次執行都是新增一批（含資料撈取時間、觀察區間），方便累積歷史紀錄。</p>
+
+      <details class="howto">
+        <summary>還沒設定過？點這裡看 5 步驟設定教學</summary>
+        <ol>
+          <li>打開你要記錄結果的 Google Sheet，點選選單「擴充功能 → Apps Script」</li>
+          <li>把預設程式碼全部刪除，貼上下面這段程式碼</li>
+          <li>點右上角「部署 → 新增部署作業」，類型選「網頁應用程式」</li>
+          <li>「執行身分」選你自己，「誰可以存取」選「任何人」，然後部署</li>
+          <li>複製產生的「網頁應用程式網址」，貼到下面的欄位</li>
+        </ol>
+        <div class="code-block">
+          <button class="copy-btn" id="copy-script-btn" type="button">複製程式碼</button>
+          <pre id="apps-script-code">function doPost(e) {
+  var sheetName = '比對紀錄';
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+
+  var payload = JSON.parse(e.postData.contents);
+  var rows = payload.rows || [];
+  if (rows.length === 0) {
+    return ContentService.createTextOutput(JSON.stringify({ok: true, added: 0}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(Object.keys(rows[0]));
+  }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var lines = rows.map(function (row) {
+    return headers.map(function (h) {
+      return row[h] !== undefined ? row[h] : '';
+    });
+  });
+  sheet.getRange(sheet.getLastRow() + 1, 1, lines.length, headers.length).setValues(lines);
+
+  return ContentService.createTextOutput(JSON.stringify({ok: true, added: rows.length}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+        </div>
+      </details>
+
+      <div class="sync-row">
+        <div class="col">
+          <label class="field-label">Google Apps Script 網頁應用程式網址</label>
+          <input type="url" id="sheet-url" placeholder="https://script.google.com/macros/s/xxxx/exec">
+        </div>
+        <button class="btn amber" id="sync-btn">上傳目前結果到 Google Sheet</button>
+      </div>
+      <div class="sync-status" id="sync-status"></div>
+    </div>
+
+    <div class="reset-row" id="reset-row" style="display:none;">
+      <button id="reset-btn">重新開始 / 清除所有資料</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const state = {
+    audience: null,
+    order: null,
+    coupon: null,
+    couponEnabled: false,
+    orderKeyPairs: [],
+    couponKeyPairs: [],
+    orderExtraCols: [],
+    couponExtraCols: [],
+    lastResultRows: [],
+    lastFilteredRows: [],
+  };
+
+  // ---------- file parsing ----------
+  function parseFile(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try{
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, {type:'array'});
+          const firstSheet = wb.SheetNames[0];
+          const ws = wb.Sheets[firstSheet];
+          const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+          if(!rows.length){
+            reject('檔案是空的，或找不到資料列。');
+            return;
+          }
+          const headers = Object.keys(rows[0]);
+          resolve({name: file.name, headers, rows});
+        }catch(err){
+          reject('無法讀取這個檔案，請確認格式是 .xlsx / .xls / .csv。');
+        }
+      };
+      reader.onerror = () => reject('讀取檔案時發生錯誤。');
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function setupDropzone(dzId, inputId, statusId, onFile){
+    const dz = document.getElementById(dzId);
+    const input = document.getElementById(inputId);
+    const status = document.getElementById(statusId);
+
+    dz.addEventListener('click', () => input.click());
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault(); dz.classList.remove('drag');
+      if(e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', () => {
+      if(input.files[0]) handle(input.files[0]);
+    });
+
+    function handle(file){
+      status.innerHTML = '<div class="dz-hint">讀取中…</div>';
+      parseFile(file).then(result => {
+        status.innerHTML = `<div class="dz-file">✓ ${escapeHtml(result.name)} <span class="rows">· ${result.rows.length.toLocaleString()} 列</span></div>`;
+        onFile(result);
+      }).catch(errMsg => {
+        status.innerHTML = `<div class="dz-error">${escapeHtml(errMsg)}</div>`;
+      });
+    }
+  }
+
+  setupDropzone('dz-audience','file-audience','audience-status', (result) => {
+    state.audience = result;
+    afterFileLoaded();
+  });
+  setupDropzone('dz-order','file-order','order-status', (result) => {
+    state.order = result;
+    afterFileLoaded();
+  });
+  setupDropzone('dz-coupon','file-coupon','coupon-status', (result) => {
+    state.coupon = result;
+    afterFileLoaded();
+  });
+
+  document.getElementById('enable-coupon').addEventListener('change', (e) => {
+    state.couponEnabled = e.target.checked;
+    document.getElementById('coupon-drop-row').style.display = state.couponEnabled ? 'flex' : 'none';
+    document.getElementById('coupon-config-section').style.display = state.couponEnabled ? 'block' : 'none';
+    if(!state.couponEnabled){
+      state.coupon = null;
+      document.getElementById('coupon-status').innerHTML = '';
+    }
+    afterFileLoaded();
+  });
+
+  function afterFileLoaded(){
+    const readyForStep2 = state.audience && state.order && (!state.couponEnabled || state.coupon);
+    document.getElementById('step2').classList.toggle('disabled', !readyForStep2);
+    document.getElementById('step3').classList.toggle('disabled', !readyForStep2);
+    document.getElementById('run-btn').disabled = !readyForStep2;
+
+    if(readyForStep2){
+      if(state.orderKeyPairs.length === 0) addKeyRow('order');
+      renderExtraCols('order');
+      if(state.couponEnabled){
+        if(state.couponKeyPairs.length === 0) addKeyRow('coupon');
+        renderExtraCols('coupon');
+      }
+    }
+  }
+
+  // ---------- key column rows ----------
+  function targetData(target){
+    return target === 'order'
+      ? {file: state.order, pairs: state.orderKeyPairs, container: document.getElementById('key-rows-order')}
+      : {file: state.coupon, pairs: state.couponKeyPairs, container: document.getElementById('key-rows-coupon')};
+  }
+
+  function addKeyRow(target){
+    const t = targetData(target);
+    if(!t.file) return;
+    const idx = t.pairs.length;
+    t.pairs.push({a: state.audience.headers[idx] || state.audience.headers[0], o: t.file.headers[idx] || t.file.headers[0]});
+    renderKeyRows(target);
+  }
+
+  function renderKeyRows(target){
+    const t = targetData(target);
+    const container = t.container;
+    container.innerHTML = '';
+    t.pairs.forEach((pair, i) => {
+      const row = document.createElement('div');
+      row.className = 'key-row';
+      row.innerHTML = `
+        <div class="col">
+          <label class="field-label">受眾名單欄位 ${i===0?'':'#'+(i+1)}</label>
+          <select data-i="${i}" data-side="a"></select>
+        </div>
+        <div class="arrow">=</div>
+        <div class="col">
+          <label class="field-label">${target==='order'?'訂單明細':'用券明細'}欄位 ${i===0?'':'#'+(i+1)}</label>
+          <select data-i="${i}" data-side="o"></select>
+        </div>
+        ${t.pairs.length > 1 ? `<button class="remove" data-remove="${i}" type="button">移除</button>` : ''}
+      `;
+      container.appendChild(row);
+
+      const selA = row.querySelector('select[data-side="a"]');
+      const selO = row.querySelector('select[data-side="o"]');
+      fillSelect(selA, state.audience.headers, pair.a);
+      fillSelect(selO, t.file.headers, pair.o);
+      selA.addEventListener('change', () => { pair.a = selA.value; });
+      selO.addEventListener('change', () => { pair.o = selO.value; });
+    });
+
+    container.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.getAttribute('data-remove'), 10);
+        t.pairs.splice(i, 1);
+        renderKeyRows(target);
+      });
+    });
+  }
+
+  function fillSelect(sel, headers, selected){
+    sel.innerHTML = headers.map(h => `<option value="${escapeHtml(h)}" ${h===selected?'selected':''}>${escapeHtml(h)}</option>`).join('');
+  }
+
+  document.querySelectorAll('.add-key').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-target');
+      const t = targetData(target);
+      if(t.pairs.length >= 4) return;
+      addKeyRow(target);
+    });
+  });
+
+  function renderExtraCols(target){
+    const t = targetData(target);
+    const containerId = target === 'order' ? 'extra-cols-order' : 'extra-cols-coupon';
+    const container = document.getElementById(containerId);
+    const selectedArr = target === 'order' ? state.orderExtraCols : state.couponExtraCols;
+    container.innerHTML = t.file.headers.map(h => `
+      <label>
+        <input type="checkbox" value="${escapeHtml(h)}" ${selectedArr.includes(h)?'checked':''}>
+        ${escapeHtml(h)}
+      </label>
+    `).join('');
+    container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const arr = target === 'order' ? state.orderExtraCols : state.couponExtraCols;
+        const v = cb.value;
+        const idx = arr.indexOf(v);
+        if(cb.checked && idx === -1) arr.push(v);
+        if(!cb.checked && idx !== -1) arr.splice(idx, 1);
+      });
+    });
+  }
+
+  // ---------- matching ----------
+  function normalize(value, opts){
+    let s = (value === null || value === undefined) ? '' : String(value);
+    if(opts.trim) s = s.trim();
+    if(opts.digits) s = s.replace(/\D/g, '');
+    if(opts.caseInsensitive) s = s.toLowerCase();
+    return s;
+  }
+
+  function buildKey(row, cols, opts){
+    return cols.map(c => normalize(row[c], opts)).join('\u0001');
+  }
+
+  function buildMap(fileRows, oCols, opts){
+    const map = new Map();
+    for(const row of fileRows){
+      const key = buildKey(row, oCols, opts);
+      if(key === '') continue;
+      if(!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return map;
+  }
+
+  document.getElementById('run-btn').addEventListener('click', runMatch);
+
+  function nowStr(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function runMatch(){
+    const resultsWrap = document.getElementById('results-wrap');
+    resultsWrap.innerHTML = '';
+    document.getElementById('sync-card').style.display = 'none';
+
+    if(!state.audience || !state.order){ return; }
+
+    const opts = {
+      trim: document.getElementById('opt-trim').checked,
+      caseInsensitive: document.getElementById('opt-case').checked,
+      digits: document.getElementById('opt-digits').checked,
+    };
+    const mode = document.querySelector('input[name=mode]:checked').value;
+
+    const aOrderCols = state.orderKeyPairs.map(p => p.a);
+    const oCols = state.orderKeyPairs.map(p => p.o);
+    if(aOrderCols.some(c=>!c) || oCols.some(c=>!c)){
+      resultsWrap.innerHTML = '<div class="error-banner">請確認訂單比對欄位都已選擇。</div>';
+      return;
+    }
+
+    let aCouponCols = [], cCols = [];
+    if(state.couponEnabled){
+      aCouponCols = state.couponKeyPairs.map(p => p.a);
+      cCols = state.couponKeyPairs.map(p => p.o);
+      if(aCouponCols.some(c=>!c) || cCols.some(c=>!c)){
+        resultsWrap.innerHTML = '<div class="error-banner">請確認用券比對欄位都已選擇。</div>';
+        return;
+      }
+    }
+
+    const orderMap = buildMap(state.order.rows, oCols, opts);
+    const couponMap = state.couponEnabled ? buildMap(state.coupon.rows, cCols, opts) : null;
+
+    const fetchTime = nowStr();
+    document.getElementById('fetch-time-preview').textContent = fetchTime;
+    const obsStart = document.getElementById('obs-start').value || '（未設定）';
+    const obsEnd = document.getElementById('obs-end').value || '（未設定）';
+
+    const resultRows = [];
+
+    for(const aRow of state.audience.rows){
+      const orderKey = buildKey(aRow, aOrderCols, opts);
+      const orderHits = orderKey !== '' ? orderMap.get(orderKey) : undefined;
+
+      let couponHits;
+      if(state.couponEnabled){
+        const couponKey = buildKey(aRow, aCouponCols, opts);
+        couponHits = couponKey !== '' ? couponMap.get(couponKey) : undefined;
+      }
+
+      const baseExtras = {};
+      baseExtras['訂單_比對狀態'] = orderHits && orderHits.length ? '有' : '無';
+      baseExtras['訂單_比對筆數'] = orderHits ? orderHits.length : 0;
+      state.orderExtraCols.forEach(h => {
+        baseExtras['訂單_' + h] = orderHits && orderHits.length ? orderHits[0][h] : '';
+      });
+      if(state.couponEnabled){
+        baseExtras['用券_比對狀態'] = couponHits && couponHits.length ? '有' : '無';
+        baseExtras['用券_比對筆數'] = couponHits ? couponHits.length : 0;
+        state.couponExtraCols.forEach(h => {
+          baseExtras['用券_' + h] = couponHits && couponHits.length ? couponHits[0][h] : '';
+        });
+      }
+      baseExtras['資料撈取時間'] = fetchTime;
+      baseExtras['觀察起始日'] = obsStart;
+      baseExtras['觀察結束日'] = obsEnd;
+
+      if(mode === 'expand_all' && orderHits && orderHits.length){
+        orderHits.forEach(hit => {
+          const merged = {...aRow, ...baseExtras};
+          state.orderExtraCols.forEach(h => { merged['訂單_' + h] = hit[h]; });
+          resultRows.push(merged);
+        });
+      } else {
+        resultRows.push({...aRow, ...baseExtras});
+      }
+    }
+
+    state.lastResultRows = resultRows;
+    renderResults(resultRows);
+    document.getElementById('reset-row').style.display = 'block';
+    document.getElementById('sync-card').style.display = 'block';
+  }
+
+  function renderResults(rows){
+    const wrap = document.getElementById('results-wrap');
+
+    const total = rows.length;
+    const orderMatched = rows.filter(r => r['訂單_比對狀態'] === '有').length;
+    const orderNoMatch = total - orderMatched;
+    const couponMatched = state.couponEnabled ? rows.filter(r => r['用券_比對狀態'] === '有').length : null;
+
+    let statsHtml = `
+      <div class="stat">
+        <div class="num">${total.toLocaleString()}</div>
+        <div class="lbl">總列數</div>
+      </div>
+      <div class="stat match">
+        <div class="num">${orderMatched.toLocaleString()}</div>
+        <div class="lbl">有訂單</div>
+      </div>
+      <div class="stat nomatch">
+        <div class="num">${orderNoMatch.toLocaleString()}</div>
+        <div class="lbl">無訂單</div>
+      </div>
+    `;
+    if(state.couponEnabled){
+      statsHtml += `
+      <div class="stat amber">
+        <div class="num">${couponMatched.toLocaleString()}</div>
+        <div class="lbl">有用券</div>
+      </div>`;
+    }
+
+    const filterOptions = [
+      {v:'all', l:'全部受眾'},
+      {v:'order_yes', l:'有訂單'},
+      {v:'order_no', l:'無訂單'},
+    ];
+    if(state.couponEnabled){
+      filterOptions.push({v:'coupon_yes', l:'有用券'});
+      filterOptions.push({v:'order_yes_coupon_no', l:'有訂單但沒用券'});
+    }
+
+    wrap.innerHTML = `
+      <div class="card">
+        <span class="step-label">Step 04</span>
+        <h2>比對結果</h2>
+        <div class="stats">${statsHtml}</div>
+
+        <div class="filter-row">
+          <div class="col">
+            <label class="field-label">篩選要預覽 / 下載 / 同步的名單</label>
+            <select id="filter-select">
+              ${filterOptions.map(o => `<option value="${o.v}">${o.l}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="result-head">
+          <div class="result-title" id="filtered-count"></div>
+          <div class="dl-buttons">
+            <button class="dl-btn" id="dl-xlsx">下載 .xlsx</button>
+            <button class="dl-btn" id="dl-csv">下載 .csv</button>
+          </div>
+        </div>
+        <div class="table-scroll" id="table-scroll"></div>
+        <div class="preview-note" id="preview-note"></div>
+      </div>
+    `;
+
+    const filterSelect = document.getElementById('filter-select');
+    filterSelect.addEventListener('change', () => applyFilter(rows, filterSelect.value));
+    applyFilter(rows, 'all');
+
+    document.getElementById('dl-xlsx').addEventListener('click', () => downloadRows(state.lastFilteredRows, '受眾狀態總表', 'xlsx'));
+    document.getElementById('dl-csv').addEventListener('click', () => downloadRows(state.lastFilteredRows, '受眾狀態總表', 'csv'));
+  }
+
+  function applyFilter(rows, filterVal){
+    let filtered = rows;
+    if(filterVal === 'order_yes') filtered = rows.filter(r => r['訂單_比對狀態'] === '有');
+    else if(filterVal === 'order_no') filtered = rows.filter(r => r['訂單_比對狀態'] === '無');
+    else if(filterVal === 'coupon_yes') filtered = rows.filter(r => r['用券_比對狀態'] === '有');
+    else if(filterVal === 'order_yes_coupon_no') filtered = rows.filter(r => r['訂單_比對狀態'] === '有' && r['用券_比對狀態'] === '無');
+
+    state.lastFilteredRows = filtered;
+    document.getElementById('filtered-count').textContent = `目前篩選：${filtered.length.toLocaleString()} 筆`;
+
+    const headers = filtered.length ? Object.keys(filtered[0]) : (rows.length ? Object.keys(rows[0]) : []);
+    const previewRows = filtered.slice(0, 15);
+    const tableScroll = document.getElementById('table-scroll');
+    if(filtered.length){
+      tableScroll.innerHTML = `
+        <table>
+          <thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${previewRows.map(r => `<tr>${headers.map(h=>`<td>${escapeHtml(r[h])}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+      document.getElementById('preview-note').textContent = `預覽前 ${previewRows.length} 筆，完整資料請下載或同步`;
+    } else {
+      tableScroll.innerHTML = '';
+      document.getElementById('preview-note').textContent = '（此篩選條件下沒有資料）';
+    }
+  }
+
+  function downloadRows(rows, baseName, type){
+    if(!rows.length){
+      alert('目前篩選結果沒有資料可以下載。');
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    if(type === 'xlsx'){
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, baseName.slice(0,28));
+      const out = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      triggerDownload(new Blob([out], {type:'application/octet-stream'}), `${baseName}.xlsx`);
+    } else {
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      const csvWithBom = '\uFEFF' + csv;
+      triggerDownload(new Blob([csvWithBom], {type:'text/csv;charset=utf-8;'}), `${baseName}.csv`);
+    }
+  }
+
+  function triggerDownload(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ---------- copy apps script code ----------
+  document.getElementById('copy-script-btn').addEventListener('click', () => {
+    const code = document.getElementById('apps-script-code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const btn = document.getElementById('copy-script-btn');
+      const original = btn.textContent;
+      btn.textContent = '已複製 ✓';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }).catch(() => {
+      alert('複製失敗，請手動選取程式碼複製。');
+    });
+  });
+
+  // ---------- sync to google sheet ----------
+  document.getElementById('sync-btn').addEventListener('click', async () => {
+    const url = document.getElementById('sheet-url').value.trim();
+    const statusEl = document.getElementById('sync-status');
+    if(!url){
+      statusEl.className = 'sync-status fail';
+      statusEl.textContent = '請先貼上 Google Apps Script 的網頁應用程式網址。';
+      return;
+    }
+    if(!state.lastFilteredRows.length){
+      statusEl.className = 'sync-status fail';
+      statusEl.textContent = '目前篩選結果沒有資料，無法同步。';
+      return;
+    }
+
+    statusEl.className = 'sync-status loading';
+    statusEl.textContent = `同步中… 正在上傳 ${state.lastFilteredRows.length.toLocaleString()} 筆資料`;
+
+    try{
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({rows: state.lastFilteredRows}),
+      });
+      const text = await resp.text();
+      let parsed;
+      try{ parsed = JSON.parse(text); }catch(e){ parsed = null; }
+
+      if(parsed && parsed.ok){
+        statusEl.className = 'sync-status ok';
+        statusEl.textContent = `✓ 成功新增 ${parsed.added.toLocaleString()} 筆到 Google Sheet`;
+      } else {
+        statusEl.className = 'sync-status fail';
+        statusEl.textContent = '上傳完成但回應格式異常，請檢查 Apps Script 是否正確部署，或查看 Sheet 是否已新增資料。';
+      }
+    }catch(err){
+      statusEl.className = 'sync-status fail';
+      statusEl.textContent = '同步失敗：無法連線到這個網址，請確認網址正確、部署權限是「任何人」，並確認網路允許存取 script.google.com。';
+    }
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    location.reload();
+  });
+
+})();
+</script>
