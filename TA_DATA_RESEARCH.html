@@ -445,6 +445,13 @@
         </label>
       </div>
 
+      <div class="subsection">
+        <div class="subsection-title">儀表板彙總欄位 <span class="tag">選填</span></div>
+        <p class="card-hint" style="margin-top:-4px;">除了不重複受眾總計之外，還想在儀表板上看到哪些欄位的加總／平均／筆數？</p>
+        <div id="dash-field-rows"></div>
+        <button class="add-key" id="add-dash-field-btn" type="button">+ 新增彙總欄位</button>
+      </div>
+
       <div class="run-row">
         <button class="btn" id="run-btn" disabled>執行比對</button>
         <span class="run-note" id="run-note"></span>
@@ -539,6 +546,7 @@ function doPost(e) {
     couponKeyPairs: [],
     orderExtraCols: [],
     couponExtraCols: [],
+    dashboardFields: [],
     lastResultRows: [],
     lastFilteredRows: [],
   };
@@ -637,6 +645,7 @@ function doPost(e) {
         if(state.couponKeyPairs.length === 0) addKeyRow('coupon');
         renderExtraCols('coupon');
       }
+      renderDashFieldRows();
     }
   }
 
@@ -724,8 +733,120 @@ function doPost(e) {
         const idx = arr.indexOf(v);
         if(cb.checked && idx === -1) arr.push(v);
         if(!cb.checked && idx !== -1) arr.splice(idx, 1);
+        renderDashFieldRows();
       });
     });
+  }
+
+  // ---------- dashboard summary fields ----------
+  const AGG_OPTIONS = [
+    {v:'sum', l:'加總'},
+    {v:'avg', l:'平均'},
+    {v:'median', l:'中位數'},
+    {v:'mode', l:'眾數'},
+    {v:'count', l:'筆數（不含空白）'},
+    {v:'unique', l:'不重複筆數'},
+  ];
+
+  function availableDashboardColumns(){
+    const cols = [];
+    if(state.audience) cols.push(...state.audience.headers);
+    state.orderExtraCols.forEach(h => cols.push('訂單_' + h));
+    if(state.couponEnabled) state.couponExtraCols.forEach(h => cols.push('用券_' + h));
+    return cols;
+  }
+
+  function addDashField(){
+    const cols = availableDashboardColumns();
+    if(!cols.length) return;
+    state.dashboardFields.push({col: cols[0], agg: 'sum'});
+    renderDashFieldRows();
+  }
+
+  function renderDashFieldRows(){
+    const container = document.getElementById('dash-field-rows');
+    const cols = availableDashboardColumns();
+    container.innerHTML = '';
+    state.dashboardFields.forEach((field, i) => {
+      if(!cols.includes(field.col)) field.col = cols[0] || '';
+      const row = document.createElement('div');
+      row.className = 'key-row';
+      row.innerHTML = `
+        <div class="col">
+          <label class="field-label">欄位</label>
+          <select data-i="${i}" data-role="col"></select>
+        </div>
+        <div class="col">
+          <label class="field-label">彙總方式</label>
+          <select data-i="${i}" data-role="agg"></select>
+        </div>
+        <button class="remove" data-remove="${i}" type="button">移除</button>
+      `;
+      container.appendChild(row);
+      const selCol = row.querySelector('select[data-role="col"]');
+      const selAgg = row.querySelector('select[data-role="agg"]');
+      selCol.innerHTML = cols.map(c => `<option value="${escapeHtml(c)}" ${c===field.col?'selected':''}>${escapeHtml(c)}</option>`).join('');
+      selAgg.innerHTML = AGG_OPTIONS.map(o => `<option value="${o.v}" ${o.v===field.agg?'selected':''}>${o.l}</option>`).join('');
+      selCol.addEventListener('change', () => { field.col = selCol.value; });
+      selAgg.addEventListener('change', () => { field.agg = selAgg.value; });
+    });
+    container.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.getAttribute('data-remove'), 10);
+        state.dashboardFields.splice(i, 1);
+        renderDashFieldRows();
+      });
+    });
+  }
+
+  document.getElementById('add-dash-field-btn').addEventListener('click', () => {
+    if(state.dashboardFields.length >= 8) return;
+    addDashField();
+  });
+
+  function computeAgg(rows, col, agg){
+    if(agg === 'unique'){
+      const set = new Set();
+      rows.forEach(r => {
+        const v = (r[col] === undefined || r[col] === null) ? '' : String(r[col]).trim().toLowerCase();
+        if(v !== '') set.add(v);
+      });
+      return set.size;
+    }
+    if(agg === 'count'){
+      return rows.filter(r => r[col] !== undefined && r[col] !== null && String(r[col]).trim() !== '').length;
+    }
+    const nums = rows.map(r => parseFloat(r[col])).filter(n => !isNaN(n));
+    if(agg === 'sum'){
+      const total = nums.reduce((a,b) => a+b, 0);
+      return Math.round(total * 100) / 100;
+    }
+    if(agg === 'avg'){
+      if(!nums.length) return 0;
+      const total = nums.reduce((a,b) => a+b, 0);
+      return Math.round((total / nums.length) * 100) / 100;
+    }
+    if(agg === 'median'){
+      if(!nums.length) return 0;
+      const sorted = [...nums].sort((a,b) => a-b);
+      const mid = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+      return Math.round(median * 100) / 100;
+    }
+    if(agg === 'mode'){
+      const freq = new Map();
+      rows.forEach(r => {
+        const v = (r[col] === undefined || r[col] === null) ? '' : String(r[col]).trim();
+        if(v === '') return;
+        freq.set(v, (freq.get(v) || 0) + 1);
+      });
+      let best = '（無資料）', bestCount = 0;
+      for(const [k, c] of freq){
+        if(c > bestCount){ best = k; bestCount = c; }
+      }
+      return best;
+    }
+    return 0;
   }
 
   // ---------- matching ----------
@@ -881,21 +1002,43 @@ function doPost(e) {
         <div class="lbl">不重複・有用券</div>
       </div>`;
     }
+
+    const customAggs = state.dashboardFields
+      .filter(f => f.col)
+      .map(f => ({...f, value: computeAgg(rows, f.col, f.agg)}));
+
+    customAggs.forEach(f => {
+      const aggLabel = AGG_OPTIONS.find(o => o.v === f.agg).l;
+      const displayVal = (f.agg === 'mode') ? escapeHtml(f.value) : Number(f.value).toLocaleString();
+      statsHtml += `
+      <div class="stat">
+        <div class="num">${displayVal}</div>
+        <div class="lbl">${escapeHtml(f.col)}・${aggLabel}</div>
+      </div>`;
+    });
+
     document.getElementById('dash-stats').innerHTML = statsHtml;
+
+    const extraHeaders = customAggs.map(f => `${f.col}（${AGG_OPTIONS.find(o=>o.v===f.agg).l}）`);
+    const extraCells = customAggs.map(f => {
+      const displayVal = (f.agg === 'mode') ? escapeHtml(f.value) : Number(f.value).toLocaleString();
+      return `<td>${displayVal}</td>`;
+    }).join('');
 
     document.getElementById('dash-table').innerHTML = `
       <table>
-        <thead><tr><th>資料撈取日期</th><th>不重複受眾總計</th><th>不重複・有訂單</th>${state.couponEnabled ? '<th>不重複・有用券</th>' : ''}</tr></thead>
+        <thead><tr><th>資料撈取日期</th><th>不重複受眾總計</th><th>不重複・有訂單</th>${state.couponEnabled ? '<th>不重複・有用券</th>' : ''}${extraHeaders.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
         <tbody>
           <tr>
             <td>${escapeHtml(fetchDate)}</td>
             <td>${totalUnique.toLocaleString()}</td>
             <td>${orderUnique.toLocaleString()}</td>
             ${state.couponEnabled ? `<td>${couponUnique.toLocaleString()}</td>` : ''}
+            ${extraCells}
           </tr>
         </tbody>
       </table>
-      <div class="preview-note">同步到 Google Sheet 時，這一列彙總數字會一併寫入「比對彙總」分頁，可在 Sheet 中累積每次的趨勢。</div>
+      <div class="preview-note">同步到 Google Sheet 時，這一列彙總數字（含你自訂的彙總欄位）會一併寫入「比對彙總」分頁，可在 Sheet 中累積每次的趨勢。</div>
     `;
 
     state.lastDashboardRow = {
@@ -907,6 +1050,10 @@ function doPost(e) {
       '不重複_有訂單': orderUnique,
       '不重複_有用券': state.couponEnabled ? couponUnique : '',
     };
+    customAggs.forEach(f => {
+      const aggLabel = AGG_OPTIONS.find(o => o.v === f.agg).l;
+      state.lastDashboardRow[`${f.col}_${aggLabel}`] = f.value;
+    });
   }
 
   function renderResults(rows){
