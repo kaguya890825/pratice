@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>合併簿 — Excel 合併與線上編輯工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: repeating-linear-gradient(#F2ECDF, #F2ECDF 27px, #E7DFC9 28px), #F2ECDF;
+    font-family: 'Noto Sans TC', sans-serif;
+    color: #1F2A44;
+    padding: 32px 20px 60px;
+  }
+  ::selection { background: #B23A2E33; }
+  .wrap { max-width: 1240px; margin: 0 auto; }
+
+  /* header */
+  header { display: flex; align-items: center; gap: 18px; max-width: 1040px; margin: 0 auto 28px; }
+  .stamp-badge {
+    width: 62px; height: 62px; border-radius: 50%;
+    border: 2.5px dashed #B23A2E;
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-8deg); flex-shrink: 0; mix-blend-mode: multiply;
+  }
+  .stamp-badge span { font-family: 'Zilla Slab', serif; font-weight: 700; font-size: 26px; color: #B23A2E; }
+  h1 { font-family: 'Zilla Slab', serif; font-size: 30px; font-weight: 700; margin: 0; letter-spacing: 0.5px; }
+  .subtitle { margin: 4px 0 0; color: #6B6355; font-size: 14.5px; }
+
+  /* drop zone */
+  .drop-zone {
+    max-width: 1040px; margin: 0 auto 20px;
+    border: 2px dashed #C9BFA6; border-radius: 10px;
+    padding: 38px 20px; display: flex; flex-direction: column;
+    align-items: center; gap: 6px; text-align: center;
+    background: #F9F5EA; transition: border-color .2s ease, background .2s ease;
+    cursor: pointer;
+  }
+  .drop-zone.drag-over { border-color: #B23A2E; background: #F7EFE0; }
+  .drop-zone p { margin: 6px 0 0; font-size: 15px; color: #3A3323; }
+  .drop-zone .hint { margin: 0; font-size: 12.5px; color: #8A7F66; }
+  .link-btn {
+    background: none; border: none; color: #B23A2E; font-weight: 600;
+    font-size: 15px; cursor: pointer; text-decoration: underline; padding: 0 4px;
+    font-family: 'Noto Sans TC', sans-serif;
+  }
+
+  /* file chips */
+  .chip-row { max-width: 1040px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    display: flex; align-items: center; gap: 8px;
+    background: #FFFDF7; border: 1.5px solid #1F2A44; border-radius: 8px;
+    padding: 8px 10px; box-shadow: 3px 3px 0 #C9BFA6; font-size: 13px; max-width: 300px;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .chip:hover { transform: translateY(-2px); box-shadow: 0 4px 0 #C9BFA6; }
+  .chip .name {
+    font-family: 'IBM Plex Mono', monospace; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;
+  }
+  .chip select { font-size: 12px; border: 1px solid #C9BFA6; border-radius: 4px; background: #F2ECDF; color: #1F2A44; }
+  .chip .count { color: #8A7F66; font-size: 11.5px; white-space: nowrap; }
+  .chip .x-btn { margin-left: 2px; border: none; background: none; color: #8A7F66; cursor: pointer; display: flex; font-size: 15px; line-height: 1; }
+
+  /* merge action */
+  .merge-row { max-width: 1040px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
+  .stamp-btn {
+    font-family: 'Zilla Slab', serif; font-weight: 700; font-size: 18px; letter-spacing: 2px;
+    color: #FFFDF7; background: #B23A2E; border: 2px solid #1F2A44;
+    border-radius: 50% 8% 50% 8% / 8% 50% 8% 50%;
+    padding: 16px 34px; cursor: pointer; box-shadow: 4px 4px 0 #1F2A44;
+    transition: transform .18s cubic-bezier(.34,1.56,.64,1);
+  }
+  .stamp-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .stamp-btn:hover:not(:disabled) { transform: rotate(-3deg) scale(1.03); }
+  .stamp-btn:active:not(:disabled) { transform: rotate(-1deg) scale(0.97); }
+  .merge-hint { color: #6B6355; font-size: 13.5px; }
+
+  /* table section */
+  .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .search-box {
+    display: flex; align-items: center; gap: 8px; background: #FFFDF7;
+    border: 1.5px solid #C9BFA6; border-radius: 8px; padding: 7px 12px; min-width: 220px;
+  }
+  .search-box input {
+    border: none; outline: none; background: transparent; font-size: 13.5px;
+    font-family: 'IBM Plex Mono', monospace; width: 100%; color: #1F2A44;
+  }
+  .tool-btn, .download-btn {
+    display: flex; align-items: center; gap: 5px; border-radius: 7px;
+    font-size: 13px; cursor: pointer; font-weight: 500; font-family: 'Noto Sans TC', sans-serif;
+  }
+  .tool-btn { border: 1.5px solid #1F2A44; background: #FFFDF7; padding: 7px 12px; color: #1F2A44; transition: background .15s ease; }
+  .tool-btn:hover { background: #1F2A4410; }
+  .tool-btn.danger { color: #8A2E24; }
+  .download-btn {
+    border: 2px solid #1F2A44; background: #1F2A44; color: #FFFDF7; padding: 7px 16px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 3px 3px 0 #B23A2E;
+  }
+
+  .table-wrap { background: #FFFDF7; border: 1.5px solid #1F2A44; border-radius: 10px; overflow: auto; max-height: 62vh; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  thead th {
+    position: sticky; top: 0; background: #1F2A44; color: #F2ECDF;
+    padding: 9px 10px; text-align: left; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace; min-width: 140px;
+    border-right: 1px solid #3A4666; z-index: 2;
+  }
+  thead th.idx { min-width: 34px; padding: 8px 6px; font-size: 11.5px; text-align: center; }
+  .th-content { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .th-icons { display: flex; gap: 6px; opacity: 0.75; }
+  .th-icons span { cursor: pointer; }
+  .th-input {
+    width: 100%; background: #F2ECDF; color: #1F2A44; border: none; border-radius: 4px;
+    padding: 3px 6px; font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  }
+  tbody tr:hover { background: #F7F2E4; }
+  tbody td { padding: 0; border-bottom: 1px solid #E7DFC9; border-right: 1px solid #EFE8D6; }
+  tbody td.idx {
+    padding: 6px 8px; color: #8A7F66; font-size: 11.5px; text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .cell-input {
+    width: 100%; border: none; background: transparent; padding: 8px 10px;
+    font-size: 13.5px; font-family: 'IBM Plex Mono', monospace; color: #1F2A44;
+  }
+  .cell-input:focus { outline: 2px solid #B23A2E; outline-offset: -2px; background: #FFFDF7; }
+  .row-del-btn { border: none; background: none; color: #B23A2E; cursor: pointer; display: flex; margin: 0 auto; opacity: 0.7; font-size: 14px; }
+  .empty-state { text-align: center; padding: 28px 0; color: #8A7F66; font-size: 13.5px; }
+  .foot-note { margin-top: 10px; font-size: 12.5px; color: #8A7F66; font-family: 'IBM Plex Mono', monospace; }
+
+  /* toast */
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    background: #1F2A44; color: #F2ECDF; padding: 10px 20px; border-radius: 8px;
+    font-size: 13.5px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); z-index: 50;
+    animation: toastIn .25s ease;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  ::-webkit-scrollbar { height: 10px; width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #C9BFA6; border-radius: 6px; }
+  ::-webkit-scrollbar-track { background: #F2ECDF; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="stamp-badge" aria-hidden="true"><span>合</span></div>
+    <div>
+      <h1>合併簿</h1>
+      <p class="subtitle">把好幾份 Excel 疊成一本,欄位直接在網頁上點選編輯</p>
+    </div>
+  </header>
+
+  <!-- Upload zone -->
+  <section id="dropZone" class="drop-zone">
+    <div>📎</div>
+    <p>拖曳檔案到這裡,或 <button class="link-btn" id="chooseBtn">點此選擇檔案</button></p>
+    <p class="hint">支援 .xlsx / .xls / .csv,可一次選擇多份</p>
+    <input type="file" id="fileInput" multiple accept=".xlsx,.xls,.csv" style="display:none" />
+  </section>
+
+  <!-- File chips -->
+  <section id="chipRow" class="chip-row"></section>
+
+  <!-- Merge action -->
+  <div id="mergeRow" class="merge-row">
+    <button id="mergeBtn" class="stamp-btn" disabled>蓋章合併</button>
+    <span id="mergeHint" class="merge-hint">先加入檔案才能合併</span>
+  </div>
+
+  <!-- Merged editable table -->
+  <section id="tableSection" class="hidden">
+    <div class="toolbar">
+      <div class="search-box">
+        🔍<input id="searchInput" placeholder="搜尋所有欄位…" />
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap: wrap;">
+        <button id="addRowBtn" class="tool-btn">＋ 新增列</button>
+        <button id="addColBtn" class="tool-btn">＋ 新增欄</button>
+        <button id="restartBtn" class="tool-btn danger">重新開始</button>
+        <button id="downloadBtn" class="download-btn">⬇ 下載 Excel</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <p class="foot-note" id="footNote"></p>
+  </section>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+(function () {
+  // ---------- state ----------
+  let files = []; // {id, name, sheetNames, selectedSheet, sheetsData: {name: rows[]}}
+  let columns = [];
+  let rows = [];
+  let merged = false;
+  let uidCounter = 0;
+  const nextId = () => 'f' + (++uidCounter) + '-' + Date.now();
+
+  // ---------- DOM refs ----------
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const chooseBtn = document.getElementById('chooseBtn');
+  const chipRow = document.getElementById('chipRow');
+  const mergeRow = document.getElementById('mergeRow');
+  const mergeBtn = document.getElementById('mergeBtn');
+  const mergeHint = document.getElementById('mergeHint');
+  const tableSection = document.getElementById('tableSection');
+  const tableHead = document.getElementById('tableHead');
+  const tableBody = document.getElementById('tableBody');
+  const searchInput = document.getElementById('searchInput');
+  const footNote = document.getElementById('footNote');
+  const toast = document.getElementById('toast');
+
+  let toastTimer = null;
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.add('hidden'), 2200);
+  }
+
+  // ---------- file handling ----------
+  function handleFiles(fileList) {
+    const arr = Array.from(fileList).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+    if (arr.length === 0) {
+      showToast('請上傳 .xlsx、.xls 或 .csv 檔案');
+      return;
+    }
+    arr.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          const sheetsData = {};
+          wb.SheetNames.forEach(sn => {
+            const ws = wb.Sheets[sn];
+            sheetsData[sn] = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          });
+          files.push({
+            id: nextId(),
+            name: file.name.replace(/\.(xlsx|xls|csv)$/i, ''),
+            sheetNames: wb.SheetNames,
+            selectedSheet: wb.SheetNames[0],
+            sheetsData,
+          });
+          renderChips();
+          updateMergeState();
+        } catch (err) {
+          showToast('讀取「' + file.name + '」失敗');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function removeFile(id) {
+    files = files.filter(f => f.id !== id);
+    renderChips();
+    updateMergeState();
+  }
+
+  function changeSheet(id, sheetName) {
+    const f = files.find(f => f.id === id);
+    if (f) f.selectedSheet = sheetName;
+  }
+
+  function updateMergeState() {
+    mergeBtn.disabled = files.length === 0;
+    mergeHint.textContent = files.length > 0 ? `準備合併 ${files.length} 份檔案` : '先加入檔案才能合併';
+  }
+
+  function renderChips() {
+    chipRow.innerHTML = '';
+    files.forEach(f => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      const rowCount = (f.sheetsData[f.selectedSheet] || []).length;
+
+      let sheetSelectHTML = '';
+      if (f.sheetNames.length > 1) {
+        sheetSelectHTML = `<select class="sheet-select" data-id="${f.id}">
+          ${f.sheetNames.map(sn => `<option value="${sn}" ${sn === f.selectedSheet ? 'selected' : ''}>${sn}</option>`).join('')}
+        </select>`;
+      }
+
+      chip.innerHTML = `
+        <span>📄</span>
+        <span class="name" title="${f.name}">${f.name}</span>
+        ${sheetSelectHTML}
+        <span class="count">${rowCount} 列</span>
+        <button class="x-btn" data-id="${f.id}" aria-label="移除檔案">✕</button>
+      `;
+      chipRow.appendChild(chip);
+    });
+
+    chipRow.querySelectorAll('.x-btn').forEach(btn => {
+      btn.addEventListener('click', () => removeFile(btn.dataset.id));
+    });
+    chipRow.querySelectorAll('.sheet-select').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        changeSheet(sel.dataset.id, e.target.value);
+        renderChips();
+      });
+    });
+  }
+
+  // ---------- merge ----------
+  function mergeAll() {
+    if (files.length === 0) {
+      showToast('請先加入至少一份 Excel');
+      return;
+    }
+    const colOrder = ['來源檔案'];
+    const seen = new Set(colOrder);
+    const mergedRows = [];
+
+    files.forEach(f => {
+      const data = f.sheetsData[f.selectedSheet] || [];
+      data.forEach(row => {
+        Object.keys(row).forEach(k => {
+          if (!seen.has(k)) {
+            seen.add(k);
+            colOrder.push(k);
+          }
+        });
+        mergedRows.push(Object.assign({ 來源檔案: f.name }, row));
+      });
+    });
+
+    const normalized = mergedRows.map(r => {
+      const o = {};
+      colOrder.forEach(c => { o[c] = r[c] !== undefined ? r[c] : ''; });
+      return o;
+    });
+
+    columns = colOrder;
+    rows = normalized;
+    merged = true;
+
+    dropZone.classList.add('hidden');
+    chipRow.classList.add('hidden');
+    mergeRow.classList.add('hidden');
+    tableSection.classList.remove('hidden');
+
+    renderTable();
+    showToast(`已合併 ${files.length} 份檔案,共 ${normalized.length} 筆資料`);
+  }
+
+  // ---------- editing ----------
+  function updateCell(rowIdx, col, value) {
+    rows[rowIdx][col] = value;
+  }
+
+  function addRow() {
+    const blank = {};
+    columns.forEach(c => blank[c] = '');
+    rows.push(blank);
+    renderTable();
+  }
+
+  function removeRow(idx) {
+    rows.splice(idx, 1);
+    renderTable();
+  }
+
+  function addColumn() {
+    let name = '新欄位';
+    let n = 1;
+    while (columns.includes(name)) name = '新欄位' + (++n);
+    columns.push(name);
+    rows.forEach(r => r[name] = '');
+    renderTable();
+  }
+
+  function removeColumn(col) {
+    columns = columns.filter(c => c !== col);
+    rows.forEach(r => delete r[col]);
+    renderTable();
+  }
+
+  function renameColumn(oldName, newName) {
+    if (!newName || newName === oldName || columns.includes(newName)) {
+      renderTable();
+      return;
+    }
+    columns = columns.map(c => c === oldName ? newName : c);
+    rows.forEach(r => {
+      r[newName] = r[oldName];
+      delete r[oldName];
+    });
+    renderTable();
+  }
+
+  // ---------- export ----------
+  function downloadXlsx() {
+    const ws = XLSX.utils.json_to_sheet(rows, { header: columns });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '合併結果');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '合併結果_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('已下載合併結果');
+  }
+
+  // ---------- rendering ----------
+  let editingHeader = null;
+
+  function getFilteredRows() {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) return rows.map((r, i) => ({ r, i }));
+    return rows
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => columns.some(c => String(r[c]).toLowerCase().includes(q)));
+  }
+
+  function renderTable() {
+    // head
+    let headHTML = '<tr><th class="idx">#</th>';
+    columns.forEach(col => {
+      if (editingHeader === col) {
+        headHTML += `<th><input class="th-input" data-oldname="${col}" value="${col}" /></th>`;
+      } else {
+        const delIcon = col !== '來源檔案' ? `<span class="del-col" data-col="${col}">🗑</span>` : '';
+        headHTML += `
+          <th>
+            <div class="th-content">
+              <span>${col}</span>
+              <span class="th-icons">
+                <span class="edit-col" data-col="${col}">✎</span>
+                ${delIcon}
+              </span>
+            </div>
+          </th>`;
+      }
+    });
+    headHTML += '<th class="idx"></th></tr>';
+    tableHead.innerHTML = headHTML;
+
+    // body
+    const filtered = getFilteredRows();
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="${columns.length + 2}" class="empty-state">找不到符合的資料</td></tr>`;
+    } else {
+      let bodyHTML = '';
+      filtered.forEach(({ r, i }) => {
+        bodyHTML += `<tr><td class="idx">${i + 1}</td>`;
+        columns.forEach(col => {
+          const val = String(r[col] ?? '').replace(/"/g, '&quot;');
+          bodyHTML += `<td><input class="cell-input" data-row="${i}" data-col="${col}" value="${val}" /></td>`;
+        });
+        bodyHTML += `<td class="idx"><button class="row-del-btn" data-row="${i}" aria-label="刪除此列">🗑</button></td></tr>`;
+      });
+      tableBody.innerHTML = bodyHTML;
+    }
+
+    footNote.textContent = `共 ${rows.length} 筆資料・${columns.length} 個欄位` +
+      (searchInput.value.trim() ? ` ・符合搜尋：${filtered.length} 筆` : '');
+
+    attachTableEvents();
+  }
+
+  function attachTableEvents() {
+    tableHead.querySelectorAll('.edit-col').forEach(el => {
+      el.addEventListener('click', () => {
+        editingHeader = el.dataset.col;
+        renderTable();
+        const input = tableHead.querySelector('.th-input');
+        if (input) { input.focus(); input.select(); }
+      });
+    });
+    tableHead.querySelectorAll('.del-col').forEach(el => {
+      el.addEventListener('click', () => removeColumn(el.dataset.col));
+    });
+    const thInput = tableHead.querySelector('.th-input');
+    if (thInput) {
+      thInput.addEventListener('blur', (e) => {
+        editingHeader = null;
+        renameColumn(e.target.dataset.oldname, e.target.value.trim());
+      });
+      thInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') e.target.blur();
+        if (e.key === 'Escape') { editingHeader = null; renderTable(); }
+      });
+    }
+
+    tableBody.querySelectorAll('.cell-input').forEach(el => {
+      el.addEventListener('input', (e) => {
+        updateCell(parseInt(el.dataset.row, 10), el.dataset.col, e.target.value);
+      });
+    });
+    tableBody.querySelectorAll('.row-del-btn').forEach(el => {
+      el.addEventListener('click', () => removeRow(parseInt(el.dataset.row, 10)));
+    });
+  }
+
+  // ---------- events ----------
+  chooseBtn.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('click', (e) => {
+    if (e.target === chooseBtn) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  mergeBtn.addEventListener('click', mergeAll);
+  document.getElementById('addRowBtn').addEventListener('click', addRow);
+  document.getElementById('addColBtn').addEventListener('click', addColumn);
+  document.getElementById('downloadBtn').addEventListener('click', downloadXlsx);
+  document.getElementById('restartBtn').addEventListener('click', () => {
+    merged = false;
+    files = [];
+    columns = [];
+    rows = [];
+    dropZone.classList.remove('hidden');
+    chipRow.classList.remove('hidden');
+    mergeRow.classList.remove('hidden');
+    tableSection.classList.add('hidden');
+    chipRow.innerHTML = '';
+    updateMergeState();
+  });
+  searchInput.addEventListener('input', renderTable);
+
+  updateMergeState();
+})();
+</script>
+</body>
+</html>
