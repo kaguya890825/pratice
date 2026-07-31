@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAPL 會員分群計算器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg: #F4F6F5;
+    --panel: #FFFFFF;
+    --ink: #14181B;
+    --ink-soft: #565F63;
+    --line: #E0E5E3;
+    --teal: #1F6F5C;
+    --teal-deep: #123F35;
+    --amber: #E2A63B;
+    --clay: #D9713C;
+    --periwinkle: #6E7FDB;
+    --slate: #8A8F98;
+    --green: #2F9E6E;
+    --danger-bg: #FBEAE3;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+    line-height:1.55;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 24px 100px;}
+  .mono{font-family:"IBM Plex Mono", ui-monospace, monospace;}
+
+  header.hero{margin-bottom:36px;}
+  .eyebrow{
+    font-family:"IBM Plex Mono", monospace;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal);
+    font-weight:600;
+    margin-bottom:10px;
+  }
+  h1{
+    font-size:32px;
+    font-weight:900;
+    margin:0 0 10px;
+    letter-spacing:-.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:15px;max-width:640px;}
+
+  .steps{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin:28px 0 36px;
+  }
+  .step{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    position:relative;
+  }
+  .step.active{border-color:var(--teal); box-shadow:0 0 0 1px var(--teal);}
+  .step.done{background:#F1F7F4;}
+  .step-num{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:11px;
+    color:var(--teal);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .step-title{font-weight:700;font-size:14.5px;}
+  .step-desc{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:28px;
+    margin-bottom:24px;
+  }
+  .panel h2{font-size:17px;margin:0 0 4px;}
+  .panel .hint{font-size:13px;color:var(--ink-soft);margin-bottom:18px;}
+
+  .dropzone{
+    border:2px dashed #C6CFCB;
+    border-radius:12px;
+    padding:44px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:all .15s ease;
+    background:#FAFBFA;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--teal);
+    background:#F1F7F4;
+  }
+  .dropzone .icon{font-size:30px;margin-bottom:10px;}
+  .dropzone .main-txt{font-weight:700;font-size:15px;}
+  .dropzone .sub-txt{font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+  input[type=file]{display:none;}
+
+  .file-chip{
+    display:inline-flex;align-items:center;gap:8px;
+    background:#F1F7F4;border:1px solid #CFE4DA;color:var(--teal-deep);
+    padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;
+    margin-bottom:16px;
+  }
+  .file-chip button{
+    border:none;background:none;color:var(--teal-deep);cursor:pointer;
+    font-size:14px;font-weight:700;opacity:.6;
+  }
+  .file-chip button:hover{opacity:1;}
+
+  .field-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:8px;}
+  .field label{
+    display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);
+    text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;
+  }
+  .field .req{color:var(--clay);}
+  select, .txtinput{
+    width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);
+    background:#fff;font-size:14px;color:var(--ink);font-family:inherit;
+  }
+  select:focus, .txtinput:focus{outline:2px solid var(--teal);outline-offset:1px;}
+
+  .status-values{
+    margin-top:14px;padding:14px;background:#FAFBFA;border:1px solid var(--line);border-radius:10px;
+  }
+  .status-values .lbl{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip-toggle{
+    padding:6px 12px;border-radius:20px;border:1px solid var(--line);
+    background:#fff;font-size:12.5px;cursor:pointer;user-select:none;
+  }
+  .chip-toggle.on{background:var(--danger-bg);border-color:#E7B79E;color:#9A4A25;font-weight:600;}
+
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--teal);color:#fff;border:none;
+    padding:12px 22px;border-radius:9px;font-size:14.5px;font-weight:700;
+    cursor:pointer;font-family:inherit;
+  }
+  .btn:hover{background:var(--teal-deep);}
+  .btn:disabled{background:#C7CDC9;cursor:not-allowed;}
+  .btn.ghost{background:none;color:var(--teal);border:1px solid var(--teal);}
+  .btn.ghost:hover{background:#F1F7F4;}
+  .btn.sm{padding:8px 14px;font-size:13px;}
+
+  .optional-toggle{
+    font-size:13px;color:var(--teal);font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;margin-top:6px;
+  }
+
+  /* Results */
+  .cycle-ruler{
+    margin:18px 0 6px;
+    background:linear-gradient(180deg,#fff,#FAFBFA);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:26px 28px 20px;
+  }
+  .cycle-headline{display:flex;align-items:baseline;gap:10px;margin-bottom:22px;flex-wrap:wrap;}
+  .cycle-headline .big{font-family:"IBM Plex Mono",monospace;font-size:42px;font-weight:600;color:var(--teal-deep);}
+  .cycle-headline .lbl{font-size:14px;color:var(--ink-soft);}
+  .ruler-track{position:relative;height:6px;background:#E5E9E6;border-radius:4px;margin:0 6px 30px;}
+  .ruler-fill{position:absolute;left:0;top:0;height:100%;background:var(--teal);border-radius:4px;}
+  .ruler-tick{position:absolute;top:-4px;width:2px;height:14px;background:var(--ink-soft);}
+  .ruler-label{position:absolute;top:16px;transform:translateX(-50%);font-size:11px;font-family:"IBM Plex Mono",monospace;color:var(--ink-soft);white-space:nowrap;text-align:center;}
+  .ruler-label .v{display:block;font-weight:700;color:var(--ink);}
+
+  .summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0;}
+  .scard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .scard .num{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:700;}
+  .scard .lbl{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .scard.highlight{background:#F1F7F4;border-color:#BFE0D0;}
+  .scard.highlight .num{color:var(--teal-deep);}
+
+  .seg-panel{display:grid;grid-template-columns:220px 1fr;gap:32px;align-items:center;}
+  .donut{width:200px;height:200px;border-radius:50%;position:relative;flex-shrink:0;}
+  .donut::after{
+    content:"";position:absolute;inset:32px;background:var(--panel);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .donut-center{
+    position:absolute;inset:32px;border-radius:50%;background:var(--panel);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .donut-center .n{font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:20px;}
+  .donut-center .l{font-size:11px;color:var(--ink-soft);}
+
+  .seg-list{display:flex;flex-direction:column;gap:10px;}
+  .seg-row{display:flex;align-items:center;gap:12px;}
+  .seg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .seg-name{font-weight:700;font-size:14px;width:170px;flex-shrink:0;}
+  .seg-desc{font-size:12px;color:var(--ink-soft);flex:1;}
+  .seg-count{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;width:110px;text-align:right;}
+  .seg-pct{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--ink-soft);width:56px;text-align:right;}
+
+  .table-controls{display:flex;gap:12px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+  .table-controls input, .table-controls select{width:auto;min-width:160px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;padding:10px 12px;background:#FAFBFA;border-bottom:2px solid var(--line);
+    font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);
+  }
+  td{padding:9px 12px;border-bottom:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:12.5px;}
+  td.badge-cell{font-family:"Noto Sans TC",sans-serif;}
+  .badge{padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;display:inline-block;}
+  .pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:13px;color:var(--ink-soft);}
+  .pager .btns{display:flex;gap:8px;}
+
+  .note{
+    font-size:12.5px;color:var(--ink-soft);background:#FAFBFA;border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;margin-top:16px;
+  }
+  .warn-note{background:#FBF4E8;border-color:#EAD2A0;color:#7A5A17;}
+
+  .trend-good{color:#1F6F5C;font-weight:700;}
+  .trend-bad{color:#C24A2C;font-weight:700;}
+  .trend-neutral{color:var(--ink-soft);font-weight:600;}
+  .trend-sub{font-size:11.5px;margin-top:4px;}
+
+  .hidden{display:none !important;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  @media (max-width:720px){
+    .field-grid{grid-template-columns:1fr;}
+    .steps{grid-template-columns:1fr;}
+    .seg-panel{grid-template-columns:1fr;}
+    .summary-cards{grid-template-columns:1fr 1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">會員分群 · 自助計算工具</div>
+    <h1>NAPL 分群計算器</h1>
+    <p class="sub">上傳訂單明細，工具會自動算出品牌專屬的購物週期，並依 NAPL 模型即時判斷每位會員屬於 N／A／P／L／Sealed 哪一群。每次有新資料，重新上傳即可重算。</p>
+  </header>
+
+  <div class="steps">
+    <div class="step" id="step1card"><div class="step-num">STEP 1</div><div class="step-title">上傳訂單明細</div><div class="step-desc">會員編號 + 訂單日期為必要欄位</div></div>
+    <div class="step" id="step2card"><div class="step-num">STEP 2</div><div class="step-title">對應欄位</div><div class="step-desc">告訴工具哪一欄是什麼</div></div>
+    <div class="step" id="step3card"><div class="step-num">STEP 3</div><div class="step-title">查看分群結果</div><div class="step-desc">購物週期、六大分群、明細表</div></div>
+  </div>
+
+  <!-- STEP 1: Upload -->
+  <div class="panel" id="uploadPanel">
+    <h2>上傳訂單明細檔案</h2>
+    <div class="hint">支援 .xlsx / .xls / .csv。檔案需為「每筆訂單一列」的明細資料（不是已經彙總好的會員總表）。</div>
+
+    <div id="dropzone" class="dropzone">
+      <div class="icon">📄</div>
+      <div class="main-txt">拖曳檔案到這裡，或點擊選擇檔案</div>
+      <div class="sub-txt">建議欄位：會員編號、訂單日期、訂單狀態（選填）</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    </div>
+    <div id="fileChipArea"></div>
+  </div>
+
+  <!-- STEP 2: Mapping -->
+  <div class="panel hidden" id="mappingPanel">
+    <h2>對應欄位</h2>
+    <div class="hint">工具已嘗試自動猜測，請確認或手動選擇正確的欄位。</div>
+
+    <div class="field-grid">
+      <div class="field">
+        <label>會員編號欄位 <span class="req">*必填</span></label>
+        <select id="colMember"></select>
+      </div>
+      <div class="field">
+        <label>訂單日期欄位 <span class="req">*必填</span></label>
+        <select id="colDate"></select>
+      </div>
+      <div class="field">
+        <label>訂單狀態欄位（選填）</label>
+        <select id="colStatus"><option value="">— 不使用 —</option></select>
+      </div>
+    </div>
+
+    <div class="status-values hidden" id="statusValuesBox">
+      <div class="lbl">請點選哪些狀態值代表「取消／退貨」，計算時會排除這些訂單：</div>
+      <div class="chip-list" id="statusChipList"></div>
+    </div>
+
+    <button class="btn" id="calcBtn" style="margin-top:20px;">
+      <span id="calcBtnLabel">開始計算</span>
+    </button>
+    <div class="note" id="rowCountNote" style="margin-top:16px;"></div>
+  </div>
+
+  <!-- STEP 3: Results -->
+  <div id="resultsArea" class="hidden">
+
+    <div class="panel">
+      <h2>購物週期</h2>
+      <div class="hint">全店購物週期＝所有會員兩次購買間隔天數的中位數。只買過 1 次的會員，以此值作為其個人購物週期。</div>
+      <div class="cycle-ruler">
+        <div class="cycle-headline">
+          <span class="big" id="cycleValue">—</span>
+          <span class="lbl">天（全店購物週期）</span>
+        </div>
+        <div class="ruler-track" id="rulerTrack">
+          <div class="ruler-fill" id="rulerFill"></div>
+        </div>
+      </div>
+      <div class="note">分群判斷依此週期的「3 倍」作為活躍與否的分水嶺；同時，任何超過 1 年未購買者，無論週期為何，一律歸為 Sealed。</div>
+    </div>
+
+    <div class="panel">
+      <h2>會員總覽</h2>
+      <div class="summary-cards" id="summaryCards"></div>
+    </div>
+
+    <div class="panel">
+      <h2>六大分群分布</h2>
+      <div class="hint" id="segHint"></div>
+      <div class="seg-panel">
+        <div class="donut" id="donutChart"></div>
+        <div class="seg-list" id="segList"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>分群趨勢：MoM／YoY</h2>
+      <div class="hint" id="trendHint"></div>
+      <div class="summary-cards" id="trendHeadline" style="grid-template-columns:repeat(3,1fr);"></div>
+      <div style="overflow-x:auto;">
+        <table style="margin-top:18px;">
+          <thead>
+            <tr>
+              <th>分群</th>
+              <th>本期</th>
+              <th>1個月前（MoM）</th>
+              <th>MoM 變化</th>
+              <th>1年前（YoY）</th>
+              <th>YoY 變化</th>
+            </tr>
+          </thead>
+          <tbody id="trendTableBody"></tbody>
+        </table>
+      </div>
+      <div class="note">變化以「佔比（百分點，pp）」比較，而非單純人數，避免會員基數變動造成誤讀。綠色代表朝 N／A 靠攏（健康方向），紅色代表朝 P／L／Sealed 靠攏（需留意）。</div>
+    </div>
+
+    <div class="panel">
+      <h2>會員明細</h2>
+      <div class="table-controls">
+        <input class="txtinput" id="searchBox" placeholder="搜尋會員編號…" style="max-width:200px;">
+        <select id="filterSeg"><option value="">全部分群</option></select>
+        <button class="btn ghost sm" id="exportBtn">匯出 CSV</button>
+        <span id="tableCount" style="font-size:12.5px;color:var(--ink-soft);margin-left:auto;"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>會員編號</th>
+              <th>訂單筆數</th>
+              <th>最近購買日</th>
+              <th>距今天數</th>
+              <th>適用週期</th>
+              <th>3倍週期門檻</th>
+              <th>分群</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="pagerInfo"></span>
+        <div class="btns">
+          <button class="btn ghost sm" id="prevPage">上一頁</button>
+          <button class="btn ghost sm" id="nextPage">下一頁</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const SEG_META = {
+    'N':      {label:'N ｜ 新客',      color:'#2F9E6E', desc:'週期內僅購買 1 次'},
+    'A':      {label:'A ｜ 活躍客',    color:'#1F6F5C', desc:'週期內購買 2 次以上（主力會員）'},
+    'P':      {label:'P ｜ 潛力客',    color:'#E2A63B', desc:'曾買 2 次以上，但已超出週期未回購'},
+    'L':      {label:'L ｜ 流失客',    color:'#D9713C', desc:'僅買過 1 次，且已超出週期未回購'},
+    'Sealed': {label:'Sealed ｜ 封存客', color:'#8A8F98', desc:'近 1 年無任何購買'},
+  };
+  const SEG_ORDER = ['N','A','P','L','Sealed'];
+
+  let rawRows = [];
+  let headers = [];
+  let statusUniqueValues = [];
+  let cancelledSet = new Set();
+  let results = []; // per-member computed rows
+  let filteredResults = [];
+  let page = 0;
+  const PAGE_SIZE = 50;
+
+  // ---------- Step 1: upload ----------
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileChipArea = document.getElementById('fileChipArea');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drag');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rawRows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        if (!rawRows.length){ alert('這個檔案讀不到任何資料列，請確認檔案內容。'); return; }
+        headers = Object.keys(rawRows[0]);
+        fileChipArea.innerHTML = '';
+        const chip = document.createElement('div');
+        chip.className = 'file-chip';
+        chip.innerHTML = `📎 ${file.name}　·　${rawRows.length.toLocaleString()} 列 <button id="clearFile">✕</button>`;
+        fileChipArea.appendChild(chip);
+        document.getElementById('clearFile').onclick = resetAll;
+        document.getElementById('step1card').classList.add('done');
+        document.getElementById('step2card').classList.add('active');
+        showMappingPanel();
+      }catch(err){
+        alert('檔案解析失敗：' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function resetAll(){
+    rawRows = []; headers = []; results = [];
+    document.getElementById('mappingPanel').classList.add('hidden');
+    document.getElementById('resultsArea').classList.add('hidden');
+    fileChipArea.innerHTML = '';
+    document.getElementById('step1card').classList.remove('done');
+    document.getElementById('step2card').classList.remove('active','done');
+    document.getElementById('step3card').classList.remove('active','done');
+  }
+
+  // ---------- Step 2: mapping ----------
+  function guessColumn(keywords){
+    const lower = headers.map(h => h.toLowerCase());
+    for (let i=0;i<headers.length;i++){
+      for (const kw of keywords){
+        if (headers[i].includes(kw) || lower[i].includes(kw.toLowerCase())) return headers[i];
+      }
+    }
+    return '';
+  }
+
+  function showMappingPanel(){
+    const mp = document.getElementById('mappingPanel');
+    mp.classList.remove('hidden');
+
+    const memberSel = document.getElementById('colMember');
+    const dateSel = document.getElementById('colDate');
+    const statusSel = document.getElementById('colStatus');
+    memberSel.innerHTML = ''; dateSel.innerHTML = '';
+    statusSel.innerHTML = '<option value="">— 不使用 —</option>';
+
+    headers.forEach(h => {
+      memberSel.innerHTML += `<option value="${h}">${h}</option>`;
+      dateSel.innerHTML += `<option value="${h}">${h}</option>`;
+      statusSel.innerHTML += `<option value="${h}">${h}</option>`;
+    });
+
+    const guessMember = guessColumn(['會員','member','編號','id']);
+    const guessDate = guessColumn(['日期','date','時間','time']);
+    const guessStatus = guessColumn(['狀態','status','狀況']);
+    if (guessMember) memberSel.value = guessMember;
+    if (guessDate) dateSel.value = guessDate;
+    if (guessStatus) statusSel.value = guessStatus;
+
+    statusSel.onchange = renderStatusValues;
+    if (guessStatus) renderStatusValues();
+
+    document.getElementById('rowCountNote').textContent =
+      `已讀取 ${rawRows.length.toLocaleString()} 列原始資料。`;
+  }
+
+  function renderStatusValues(){
+    const col = document.getElementById('colStatus').value;
+    const box = document.getElementById('statusValuesBox');
+    const list = document.getElementById('statusChipList');
+    cancelledSet = new Set();
+    if (!col){ box.classList.add('hidden'); return; }
+    const uniq = new Set();
+    for (let i=0;i<rawRows.length && uniq.size < 40;i++){
+      const v = String(rawRows[i][col] ?? '').trim();
+      if (v) uniq.add(v);
+    }
+    statusUniqueValues = Array.from(uniq);
+    list.innerHTML = '';
+    statusUniqueValues.forEach(v => {
+      const chip = document.createElement('div');
+      chip.className = 'chip-toggle';
+      chip.textContent = v;
+      const looksCancelled = /取消|退貨|退款|cancel|return|refund/i.test(v);
+      if (looksCancelled){ chip.classList.add('on'); cancelledSet.add(v); }
+      chip.onclick = () => {
+        chip.classList.toggle('on');
+        if (chip.classList.contains('on')) cancelledSet.add(v);
+        else cancelledSet.delete(v);
+      };
+      list.appendChild(chip);
+    });
+    box.classList.remove('hidden');
+  }
+
+  // ---------- Calculation ----------
+  document.getElementById('calcBtn').addEventListener('click', () => {
+    const memberCol = document.getElementById('colMember').value;
+    const dateCol = document.getElementById('colDate').value;
+    const statusCol = document.getElementById('colStatus').value;
+    if (!memberCol || !dateCol){ alert('請至少選擇「會員編號」與「訂單日期」欄位。'); return; }
+
+    const btn = document.getElementById('calcBtn');
+    const lbl = document.getElementById('calcBtnLabel');
+    btn.disabled = true;
+    lbl.innerHTML = '<span class="spinner"></span> 計算中…';
+
+    setTimeout(() => {
+      try{
+        runComputation(memberCol, dateCol, statusCol);
+        document.getElementById('step2card').classList.add('done');
+        document.getElementById('step3card').classList.add('active','done');
+        document.getElementById('resultsArea').classList.remove('hidden');
+        document.getElementById('resultsArea').scrollIntoView({behavior:'smooth'});
+      }catch(err){
+        alert('計算過程發生錯誤：' + err.message);
+      }finally{
+        btn.disabled = false;
+        lbl.textContent = '重新計算';
+      }
+    }, 30);
+  });
+
+  function parseDateValue(v){
+    if (v instanceof Date && !isNaN(v)) return v;
+    if (typeof v === 'number'){
+      // Excel serial date fallback
+      const ms = Math.round((v - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (!isNaN(d)) return d;
+    }
+    const d2 = new Date(v);
+    if (!isNaN(d2)) return d2;
+    return null;
+  }
+
+  function median(arr){
+    if (!arr.length) return null;
+    const s = [...arr].sort((a,b)=>a-b);
+    const mid = Math.floor(s.length/2);
+    return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+  }
+
+  function addMonths(date, n){ const d = new Date(date); d.setMonth(d.getMonth()+n); return d; }
+  function addYears(date, n){ const d = new Date(date); d.setFullYear(d.getFullYear()+n); return d; }
+
+  // Compute a full NAPL snapshot as of an arbitrary cutoff date, using only
+  // orders that occurred on or before that date. This lets us "rewind" the
+  // same dataset to get MoM / YoY comparisons without needing separate uploads.
+  function computeSegmentsAsOf(byMemberAll, cutoffDate){
+    const cutoff = new Date(cutoffDate); cutoff.setHours(0,0,0,0);
+    const byMember = new Map();
+    byMemberAll.forEach((dates, member) => {
+      const filtered = dates.filter(d => d <= cutoff);
+      if (filtered.length) byMember.set(member, filtered);
+    });
+
+    const allIntervals = [];
+    byMember.forEach(dates => {
+      for (let i=1;i<dates.length;i++){
+        const diff = Math.round((dates[i]-dates[i-1])/86400000);
+        if (diff >= 0) allIntervals.push(diff);
+      }
+    });
+    const storeCycle = median(allIntervals) ?? 30;
+
+    const rows = [];
+    byMember.forEach((dates, member) => {
+      const totalOrders = dates.length;
+      const lastDate = dates[dates.length-1];
+      const daysSince = Math.round((cutoff - lastDate)/86400000);
+      let personalCycle;
+      if (totalOrders >= 2){
+        const intervals = [];
+        for (let i=1;i<dates.length;i++) intervals.push(Math.round((dates[i]-dates[i-1])/86400000));
+        personalCycle = median(intervals);
+      } else {
+        personalCycle = storeCycle;
+      }
+      const threshold = personalCycle * 3;
+      let segment;
+      if (daysSince > 365){
+        segment = 'Sealed';
+      } else if (daysSince <= threshold){
+        segment = totalOrders === 1 ? 'N' : 'A';
+      } else {
+        segment = totalOrders === 1 ? 'L' : 'P';
+      }
+      rows.push({
+        member, totalOrders, lastDate, daysSince,
+        personalCycle: Math.round(personalCycle*10)/10,
+        threshold: Math.round(threshold*10)/10,
+        segment
+      });
+    });
+
+    const counts = {}; SEG_ORDER.forEach(s => counts[s]=0);
+    rows.forEach(r => counts[r.segment]++);
+    return {storeCycle, rows, counts, total: rows.length, cutoff};
+  }
+
+  function runComputation(memberCol, dateCol, statusCol){
+    const byMemberAll = new Map();
+    let validCount = 0, skippedCount = 0, badDateCount = 0;
+    let minDate = null, maxDate = null;
+
+    for (const row of rawRows){
+      const member = String(row[memberCol] ?? '').trim();
+      if (!member) continue;
+      if (statusCol && cancelledSet.has(String(row[statusCol] ?? '').trim())){
+        skippedCount++; continue;
+      }
+      const d = parseDateValue(row[dateCol]);
+      if (!d){ badDateCount++; continue; }
+      if (!byMemberAll.has(member)) byMemberAll.set(member, []);
+      byMemberAll.get(member).push(d);
+      validCount++;
+      if (!minDate || d < minDate) minDate = d;
+      if (!maxDate || d > maxDate) maxDate = d;
+    }
+    byMemberAll.forEach(dates => dates.sort((a,b)=>a-b));
+
+    if (!maxDate){ alert('找不到任何可辨識的訂單日期，請確認欄位對應是否正確。'); return; }
+
+    const momCutoff = addMonths(maxDate, -1);
+    const yoyCutoff = addYears(maxDate, -1);
+
+    const current = computeSegmentsAsOf(byMemberAll, maxDate);
+    const mom = computeSegmentsAsOf(byMemberAll, momCutoff);
+    const yoy = computeSegmentsAsOf(byMemberAll, yoyCutoff);
+
+    results = current.rows;
+    filteredResults = current.rows;
+    page = 0;
+
+    renderCycle(current.storeCycle);
+    renderSummary(validCount, skippedCount, badDateCount, current.storeCycle);
+    renderSegments();
+    renderFilterOptions();
+    renderTable();
+    renderTrends(current, mom, yoy, minDate, maxDate, momCutoff, yoyCutoff);
+  }
+
+  function trendCell(deltaPp, segment){
+    if (deltaPp === null || deltaPp === undefined) return '<span class="trend-neutral">—</span>';
+    const goodWhenUp = (segment === 'N' || segment === 'A');
+    const isUp = deltaPp > 0.05, isDown = deltaPp < -0.05;
+    let cls = 'trend-neutral', arrow = '▬';
+    if (isUp){ arrow = '▲'; cls = goodWhenUp ? 'trend-good' : 'trend-bad'; }
+    else if (isDown){ arrow = '▼'; cls = goodWhenUp ? 'trend-bad' : 'trend-good'; }
+    const sign = deltaPp > 0 ? '+' : '';
+    return `<span class="${cls}">${arrow} ${sign}${deltaPp.toFixed(1)}pp</span>`;
+  }
+
+  function naShare(snap){
+    return snap.total ? (snap.counts.N + snap.counts.A) / snap.total * 100 : null;
+  }
+
+  function renderTrends(current, mom, yoy, minDate, maxDate, momCutoff, yoyCutoff){
+    let warnHtml = '';
+    if (!yoy.total || minDate > yoyCutoff){
+      warnHtml += `<div class="note warn-note">資料涵蓋範圍不足 1 年（最早資料為 ${fmtDate(minDate)}），YoY 比較可能不完整或無法計算。</div>`;
+    }
+    if (!mom.total || minDate > momCutoff){
+      warnHtml += `<div class="note warn-note">資料涵蓋範圍不足 1 個月，MoM 比較可能不完整。</div>`;
+    }
+    document.getElementById('trendHint').innerHTML =
+      `以資料中最後一筆訂單日期（${fmtDate(maxDate)}）為基準「本期」，往前推算 1 個月前（${fmtDate(momCutoff)}）與 1 年前（${fmtDate(yoyCutoff)}）的分群狀態進行比較。` + warnHtml;
+
+    const curNA = naShare(current), momNA = naShare(mom), yoyNA = naShare(yoy);
+    const momDeltaNA = (curNA!==null && momNA!==null) ? curNA-momNA : null;
+    const yoyDeltaNA = (curNA!==null && yoyNA!==null) ? curNA-yoyNA : null;
+
+    document.getElementById('trendHeadline').innerHTML = `
+      <div class="scard highlight">
+        <div class="num">${curNA!==null ? curNA.toFixed(1)+'%' : '—'}</div>
+        <div class="lbl">本期 N＋A 佔比</div>
+      </div>
+      <div class="scard">
+        <div class="num">${momNA!==null ? momNA.toFixed(1)+'%' : '—'}</div>
+        <div class="lbl">1個月前 N＋A 佔比</div>
+        <div class="trend-sub">${trendCell(momDeltaNA,'N')}</div>
+      </div>
+      <div class="scard">
+        <div class="num">${yoyNA!==null ? yoyNA.toFixed(1)+'%' : '—'}</div>
+        <div class="lbl">1年前 N＋A 佔比</div>
+        <div class="trend-sub">${trendCell(yoyDeltaNA,'N')}</div>
+      </div>`;
+
+    document.getElementById('trendTableBody').innerHTML = SEG_ORDER.map(s => {
+      const m = SEG_META[s];
+      const curC = current.counts[s], curPct = current.total ? curC/current.total*100 : 0;
+      const momC = mom.counts[s], momPct = mom.total ? momC/mom.total*100 : 0;
+      const yoyC = yoy.counts[s], yoyPct = yoy.total ? yoyC/yoy.total*100 : 0;
+      const momDelta = mom.total ? curPct-momPct : null;
+      const yoyDelta = yoy.total ? curPct-yoyPct : null;
+      return `<tr>
+        <td class="badge-cell"><span class="badge" style="background:${m.color}22;color:${m.color}">${m.label}</span></td>
+        <td>${curC.toLocaleString()}（${curPct.toFixed(1)}%）</td>
+        <td>${mom.total ? momC.toLocaleString()+'（'+momPct.toFixed(1)+'%）' : '—'}</td>
+        <td>${trendCell(momDelta, s)}</td>
+        <td>${yoy.total ? yoyC.toLocaleString()+'（'+yoyPct.toFixed(1)+'%）' : '—'}</td>
+        <td>${trendCell(yoyDelta, s)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ---------- Rendering ----------
+  function renderCycle(storeCycle){
+    document.getElementById('cycleValue').textContent = Math.round(storeCycle*10)/10;
+    const max = Math.max(storeCycle*3, 365) * 1.05;
+    const pct = v => Math.min(100, (v/max)*100);
+    document.getElementById('rulerFill').style.width = pct(storeCycle) + '%';
+
+    const track = document.getElementById('rulerTrack');
+    track.querySelectorAll('.ruler-tick, .ruler-label').forEach(el=>el.remove());
+    const marks = [
+      {v: storeCycle, label:'1× 週期'},
+      {v: storeCycle*2, label:'2× 週期'},
+      {v: storeCycle*3, label:'3× 週期（分水嶺）'},
+      {v: 365, label:'1 年'},
+    ];
+    marks.forEach(m => {
+      const tick = document.createElement('div');
+      tick.className='ruler-tick';
+      tick.style.left = pct(m.v)+'%';
+      track.appendChild(tick);
+      const lab = document.createElement('div');
+      lab.className='ruler-label';
+      lab.style.left = pct(m.v)+'%';
+      lab.innerHTML = `<span class="v">${Math.round(m.v)}天</span>${m.label}`;
+      track.appendChild(lab);
+    });
+  }
+
+  function renderSummary(validCount, skippedCount, badDateCount, storeCycle){
+    const totalMembers = results.length;
+    const naCount = results.filter(r=>r.segment==='N'||r.segment==='A').length;
+    const naPct = totalMembers ? Math.round(naCount/totalMembers*1000)/10 : 0;
+
+    const cards = [
+      {num: totalMembers.toLocaleString(), lbl:'計算涵蓋會員數', hl:false},
+      {num: validCount.toLocaleString(), lbl:'有效訂單筆數', hl:false},
+      {num: naPct+'%', lbl:'N + A 佔比（核心健康指標）', hl:true},
+      {num: skippedCount.toLocaleString(), lbl:'已排除（取消/退貨）筆數', hl:false},
+    ];
+    document.getElementById('summaryCards').innerHTML = cards.map(c => `
+      <div class="scard ${c.hl?'highlight':''}">
+        <div class="num">${c.num}</div>
+        <div class="lbl">${c.lbl}</div>
+      </div>`).join('');
+
+    let note = '';
+    if (badDateCount > 0){
+      note = `<div class="note warn-note">有 ${badDateCount.toLocaleString()} 列的訂單日期無法辨識，已略過不計入計算。若數量偏多，建議確認日期欄位格式。</div>`;
+    }
+    note += `<div class="note">此工具僅依據上傳的訂單資料計算 N／A／P／L／Sealed 五群。「Ready to buy（從未購買過的會員）」需要完整會員名單才能判斷，此版本尚未涵蓋，如需要可再提供會員主檔。</div>`;
+    document.getElementById('segHint').innerHTML = note;
+  }
+
+  function renderSegments(){
+    const total = results.length || 1;
+    const counts = {};
+    SEG_ORDER.forEach(s => counts[s]=0);
+    results.forEach(r => counts[r.segment]++);
+
+    // donut via conic-gradient
+    let acc = 0;
+    const stops = [];
+    SEG_ORDER.forEach(s => {
+      const pct = counts[s]/total*100;
+      stops.push(`${SEG_META[s].color} ${acc}% ${acc+pct}%`);
+      acc += pct;
+    });
+    const donut = document.getElementById('donutChart');
+    donut.style.background = `conic-gradient(${stops.join(',')})`;
+    donut.innerHTML = `<div class="donut-center"><div class="n">${total.toLocaleString()}</div><div class="l">位會員</div></div>`;
+
+    document.getElementById('segList').innerHTML = SEG_ORDER.map(s => {
+      const c = counts[s];
+      const pct = Math.round(c/total*1000)/10;
+      const m = SEG_META[s];
+      return `<div class="seg-row">
+        <div class="seg-dot" style="background:${m.color}"></div>
+        <div class="seg-name">${m.label}</div>
+        <div class="seg-desc">${m.desc}</div>
+        <div class="seg-count">${c.toLocaleString()} 人</div>
+        <div class="seg-pct">${pct}%</div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderFilterOptions(){
+    const sel = document.getElementById('filterSeg');
+    sel.innerHTML = '<option value="">全部分群</option>' +
+      SEG_ORDER.map(s=>`<option value="${s}">${SEG_META[s].label}</option>`).join('');
+  }
+
+  function fmtDate(d){
+    if (!d) return '—';
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function renderTable(){
+    const tbody = document.getElementById('tableBody');
+    const startIdx = page*PAGE_SIZE;
+    const pageRows = filteredResults.slice(startIdx, startIdx+PAGE_SIZE);
+    tbody.innerHTML = pageRows.map(r => {
+      const m = SEG_META[r.segment];
+      return `<tr>
+        <td>${r.member}</td>
+        <td>${r.totalOrders}</td>
+        <td>${fmtDate(r.lastDate)}</td>
+        <td>${r.daysSince}</td>
+        <td>${r.personalCycle}</td>
+        <td>${r.threshold}</td>
+        <td class="badge-cell"><span class="badge" style="background:${m.color}22;color:${m.color}">${m.label}</span></td>
+      </tr>`;
+    }).join('');
+    const totalPages = Math.max(1, Math.ceil(filteredResults.length/PAGE_SIZE));
+    document.getElementById('pagerInfo').textContent = `第 ${page+1} / ${totalPages} 頁`;
+    document.getElementById('tableCount').textContent = `共 ${filteredResults.length.toLocaleString()} 位會員`;
+    document.getElementById('prevPage').disabled = page===0;
+    document.getElementById('nextPage').disabled = page>=totalPages-1;
+  }
+
+  function applyFilters(){
+    const q = document.getElementById('searchBox').value.trim().toLowerCase();
+    const seg = document.getElementById('filterSeg').value;
+    filteredResults = results.filter(r => {
+      if (seg && r.segment !== seg) return false;
+      if (q && !r.member.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    page = 0;
+    renderTable();
+  }
+
+  document.getElementById('searchBox').addEventListener('input', applyFilters);
+  document.getElementById('filterSeg').addEventListener('change', applyFilters);
+  document.getElementById('prevPage').addEventListener('click', () => { if(page>0){page--; renderTable();} });
+  document.getElementById('nextPage').addEventListener('click', () => {
+    const totalPages = Math.ceil(filteredResults.length/PAGE_SIZE);
+    if(page<totalPages-1){page++; renderTable();}
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const header = ['會員編號','訂單筆數','最近購買日','距今天數','適用週期','3倍週期門檻','分群'];
+    const lines = [header.join(',')];
+    filteredResults.forEach(r => {
+      lines.push([r.member, r.totalOrders, fmtDate(r.lastDate), r.daysSince, r.personalCycle, r.threshold, SEG_META[r.segment].label].join(','));
+    });
+    const blob = new Blob(['\uFEFF'+lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'napl_segments.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+})();
+</script>
+</body>
+</html>
