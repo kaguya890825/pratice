@@ -447,7 +447,7 @@
 
       <div class="subsection">
         <div class="subsection-title">儀表板彙總欄位 <span class="tag">選填</span></div>
-        <p class="card-hint" style="margin-top:-4px;">除了不重複受眾總計之外，還想在儀表板上看到哪些欄位的加總／平均／筆數？</p>
+        <p class="card-hint" style="margin-top:-4px;">除了不重複受眾總計之外，還想看哪些欄位的加總／平均／中位數／眾數？可以指定只計算「重疊名單」（有比對到訂單或用券的受眾）。</p>
         <div id="dash-field-rows"></div>
         <button class="add-key" id="add-dash-field-btn" type="button">+ 新增彙總欄位</button>
       </div>
@@ -759,16 +759,27 @@ function doPost(e) {
   function addDashField(){
     const cols = availableDashboardColumns();
     if(!cols.length) return;
-    state.dashboardFields.push({col: cols[0], agg: 'sum'});
+    state.dashboardFields.push({col: cols[0], agg: 'sum', scope: 'order_match'});
     renderDashFieldRows();
+  }
+
+  function scopeOptions(){
+    const opts = [
+      {v:'all', l:'全部受眾'},
+      {v:'order_match', l:'重疊名單・有訂單'},
+    ];
+    if(state.couponEnabled) opts.push({v:'coupon_match', l:'重疊名單・有用券'});
+    return opts;
   }
 
   function renderDashFieldRows(){
     const container = document.getElementById('dash-field-rows');
     const cols = availableDashboardColumns();
+    const scopes = scopeOptions();
     container.innerHTML = '';
     state.dashboardFields.forEach((field, i) => {
       if(!cols.includes(field.col)) field.col = cols[0] || '';
+      if(!scopes.some(s => s.v === field.scope)) field.scope = 'all';
       const row = document.createElement('div');
       row.className = 'key-row';
       row.innerHTML = `
@@ -780,15 +791,22 @@ function doPost(e) {
           <label class="field-label">彙總方式</label>
           <select data-i="${i}" data-role="agg"></select>
         </div>
+        <div class="col">
+          <label class="field-label">計算範圍</label>
+          <select data-i="${i}" data-role="scope"></select>
+        </div>
         <button class="remove" data-remove="${i}" type="button">移除</button>
       `;
       container.appendChild(row);
       const selCol = row.querySelector('select[data-role="col"]');
       const selAgg = row.querySelector('select[data-role="agg"]');
+      const selScope = row.querySelector('select[data-role="scope"]');
       selCol.innerHTML = cols.map(c => `<option value="${escapeHtml(c)}" ${c===field.col?'selected':''}>${escapeHtml(c)}</option>`).join('');
       selAgg.innerHTML = AGG_OPTIONS.map(o => `<option value="${o.v}" ${o.v===field.agg?'selected':''}>${o.l}</option>`).join('');
+      selScope.innerHTML = scopes.map(o => `<option value="${o.v}" ${o.v===field.scope?'selected':''}>${o.l}</option>`).join('');
       selCol.addEventListener('change', () => { field.col = selCol.value; });
       selAgg.addEventListener('change', () => { field.agg = selAgg.value; });
+      selScope.addEventListener('change', () => { field.scope = selScope.value; });
     });
     container.querySelectorAll('[data-remove]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1003,23 +1021,35 @@ function doPost(e) {
       </div>`;
     }
 
+    const scopeLabelMap = {
+      all: '全部受眾',
+      order_match: '重疊名單・有訂單',
+      coupon_match: '重疊名單・有用券',
+    };
+
     const customAggs = state.dashboardFields
       .filter(f => f.col)
-      .map(f => ({...f, value: computeAgg(rows, f.col, f.agg)}));
+      .map(f => {
+        let subset = rows;
+        if(f.scope === 'order_match') subset = rows.filter(r => r['訂單_比對狀態'] === '有');
+        else if(f.scope === 'coupon_match') subset = rows.filter(r => r['用券_比對狀態'] === '有');
+        return {...f, value: computeAgg(subset, f.col, f.agg)};
+      });
 
     customAggs.forEach(f => {
       const aggLabel = AGG_OPTIONS.find(o => o.v === f.agg).l;
+      const scopeLabel = scopeLabelMap[f.scope] || '全部受眾';
       const displayVal = (f.agg === 'mode') ? escapeHtml(f.value) : Number(f.value).toLocaleString();
       statsHtml += `
       <div class="stat">
         <div class="num">${displayVal}</div>
-        <div class="lbl">${escapeHtml(f.col)}・${aggLabel}</div>
+        <div class="lbl">${escapeHtml(f.col)}・${aggLabel}<br>（${scopeLabel}）</div>
       </div>`;
     });
 
     document.getElementById('dash-stats').innerHTML = statsHtml;
 
-    const extraHeaders = customAggs.map(f => `${f.col}（${AGG_OPTIONS.find(o=>o.v===f.agg).l}）`);
+    const extraHeaders = customAggs.map(f => `${f.col}（${AGG_OPTIONS.find(o=>o.v===f.agg).l}・${scopeLabelMap[f.scope] || '全部受眾'}）`);
     const extraCells = customAggs.map(f => {
       const displayVal = (f.agg === 'mode') ? escapeHtml(f.value) : Number(f.value).toLocaleString();
       return `<td>${displayVal}</td>`;
@@ -1038,7 +1068,7 @@ function doPost(e) {
           </tr>
         </tbody>
       </table>
-      <div class="preview-note">同步到 Google Sheet 時，這一列彙總數字（含你自訂的彙總欄位）會一併寫入「比對彙總」分頁，可在 Sheet 中累積每次的趨勢。</div>
+      <div class="preview-note">同步到 Google Sheet 時，這一列彙總數字（含你自訂的彙總欄位與各自的計算範圍）會一併寫入「比對彙總」分頁，可在 Sheet 中累積每次的趨勢。</div>
     `;
 
     state.lastDashboardRow = {
@@ -1052,7 +1082,8 @@ function doPost(e) {
     };
     customAggs.forEach(f => {
       const aggLabel = AGG_OPTIONS.find(o => o.v === f.agg).l;
-      state.lastDashboardRow[`${f.col}_${aggLabel}`] = f.value;
+      const scopeLabel = scopeLabelMap[f.scope] || '全部受眾';
+      state.lastDashboardRow[`${f.col}_${aggLabel}_${scopeLabel}`] = f.value;
     });
   }
 
