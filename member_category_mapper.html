@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>會員 × 類別 對應工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F3F2EC;
+    --panel:#FFFFFF;
+    --ink:#1B1F1D;
+    --ink-soft:#5B615C;
+    --line:#DCD8CB;
+    --teal:#1F6F62;
+    --teal-dark:#164F45;
+    --teal-tint:#E4EFEC;
+    --gold:#B8863A;
+    --gold-tint:#F5ECDC;
+    --red:#B4432F;
+    --red-tint:#F7E9E5;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:40px 20px 90px;}
+  header.top{margin-bottom:36px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--teal-dark);
+    margin-bottom:10px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:30px;
+    font-weight:700;
+    margin:0 0 10px;
+    letter-spacing:-.01em;
+  }
+  .sub{color:var(--ink-soft);font-size:14.5px;line-height:1.6;max-width:660px;}
+  .privacy{
+    display:inline-flex;align-items:center;gap:7px;
+    margin-top:14px;font-size:12.5px;color:var(--teal-dark);
+    background:var(--teal-tint);border:1px solid #CFE3DE;
+    padding:6px 12px;border-radius:20px;
+  }
+  .privacy svg{flex:none;}
+
+  .step{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    margin-bottom:18px;
+    overflow:hidden;
+  }
+  .step-head{
+    display:flex;align-items:center;gap:14px;
+    padding:18px 22px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+  }
+  .step-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;font-size:13px;
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--line);color:var(--ink-soft);
+    flex:none;
+  }
+  .step.done .step-num{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .step.active .step-num{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .step-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;flex:1;}
+  .step-status{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);}
+  .step-body{padding:22px;display:none;}
+  .step.open .step-body{display:block;}
+
+  label.field-label{display:block;font-size:12.5px;color:var(--ink-soft);margin:0 0 6px;font-weight:500;}
+  select, input[type=text]{
+    font-family:'Inter',sans-serif;
+    width:100%;padding:9px 11px;
+    border:1px solid var(--line);border-radius:6px;
+    background:#fff;font-size:13.5px;color:var(--ink);
+  }
+  select:focus, input:focus{outline:2px solid var(--teal);outline-offset:1px;}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+  @media (max-width:640px){.row{grid-template-columns:1fr;}}
+
+  .dropzone{
+    border:1.5px dashed var(--line);border-radius:8px;
+    padding:22px;text-align:center;cursor:pointer;
+    background:#FCFBF8;transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover{border-color:var(--teal);background:var(--teal-tint);}
+  .dropzone.has-file{border-style:solid;border-color:var(--teal);background:var(--teal-tint);}
+  .dropzone input{display:none;}
+  .dz-icon{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-bottom:6px;}
+  .dz-name{font-size:13.5px;font-weight:600;}
+  .dz-hint{font-size:12px;color:var(--ink-soft);margin-top:4px;}
+
+  .chip-group{margin-bottom:14px;}
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+    border:1px solid var(--line);border-radius:20px;
+    padding:6px 12px 6px 10px;display:flex;align-items:center;gap:6px;
+    cursor:pointer;user-select:none;background:#fff;
+  }
+  .chip input{margin:0;}
+  .chip.metric.checked{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .chip.dim.checked{background:var(--gold);border-color:var(--gold);color:#fff;}
+  .chip.locked{opacity:.85;cursor:not-allowed;}
+  .picker-link{font-size:11.5px;color:var(--teal-dark);text-decoration:none;margin-left:4px;cursor:pointer;}
+  .picker-link:hover{text-decoration:underline;}
+  .picker-sep{color:var(--ink-soft);font-size:11.5px;}
+
+  .btn{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;
+    padding:10px 18px;border-radius:7px;border:1px solid var(--ink);
+    background:var(--ink);color:#fff;cursor:pointer;
+  }
+  .btn:hover{background:#000;}
+  .btn.secondary{background:#fff;color:var(--ink);border-color:var(--line);}
+  .btn.secondary:hover{border-color:var(--ink);}
+  .btn.teal{background:var(--teal);border-color:var(--teal);}
+  .btn.teal:hover{background:var(--teal-dark);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+
+  .list-card{
+    border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px;position:relative;background:#FCFBF8;
+  }
+  .list-card .remove{
+    position:absolute;top:12px;right:12px;background:none;border:none;
+    color:var(--ink-soft);cursor:pointer;font-size:12px;font-family:'IBM Plex Mono',monospace;
+  }
+  .list-card .remove:hover{color:var(--red);}
+
+  .match-badge{
+    display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+    padding:4px 9px;border-radius:20px;margin-top:10px;
+  }
+  .match-badge.ok{background:var(--teal-tint);color:var(--teal-dark);border:1px solid #CFE3DE;}
+  .match-badge.warn{background:var(--red-tint);color:var(--red);border:1px solid #EBC9C0;}
+
+  .dim-tab-bar{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0;}
+  .dim-tab{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+    border:1px solid var(--line);border-radius:6px 6px 0 0;
+    padding:7px 12px;cursor:pointer;background:#F6F5F0;color:var(--ink-soft);
+    border-bottom:none;
+  }
+  .dim-tab.active{background:#fff;color:var(--ink);font-weight:600;border-color:var(--line);}
+  .dim-panel{border:1px solid var(--line);border-top:none;padding:14px;background:#fff;display:none;}
+  .dim-panel.active{display:block;}
+
+  table.preview{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  table.preview th, table.preview td{
+    border:1px solid var(--line);padding:7px 9px;text-align:right;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  table.preview th{background:#F6F5F0;text-align:right;font-weight:600;}
+  table.preview td:first-child, table.preview th:first-child{text-align:left;font-family:'Inter',sans-serif;}
+  table.preview tr.total td{font-weight:700;background:#F6F5F0;}
+  .table-scroll{max-height:420px;overflow:auto;}
+  .preview-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;margin:22px 0 4px;}
+  .preview-note{font-size:11.5px;color:var(--ink-soft);margin-top:8px;}
+
+  .msg{font-size:12.5px;padding:10px 13px;border-radius:6px;margin-top:12px;}
+  .msg.error{background:var(--red-tint);color:var(--red);border:1px solid #EBC9C0;}
+  .msg.info{background:var(--teal-tint);color:var(--teal-dark);border:1px solid #CFE3DE;}
+
+  footer.note{margin-top:30px;font-size:11.5px;color:var(--ink-soft);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">MEMBER × CATEGORY MAPPING</div>
+    <h1>會員 × 類別 對應工具</h1>
+    <p class="sub">上傳「會員 × 商品/類別」明細檔，勾選一個以上的分組欄位（例如類別1-2、類別2、類別3、26碼、商品名稱），再加入會員名單，即可依每個分組欄位各自彙總購買人數、銷售金額、訂單筆數，並匯出成 Excel。</p>
+    <div class="privacy">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2 4 5v6c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V5l-8-3z"/></svg>
+      所有運算都在你的瀏覽器裡執行，檔案不會被上傳到任何伺服器
+    </div>
+  </header>
+
+  <!-- STEP 1 -->
+  <section class="step open active" id="step1">
+    <div class="step-head" onclick="toggleStep(1)">
+      <div class="step-num">1</div>
+      <div class="step-title">上傳明細檔並設定欄位</div>
+      <div class="step-status" id="s1-status">尚未上傳</div>
+    </div>
+    <div class="step-body">
+      <label class="field-label">會員 × 商品/類別 明細檔</label>
+      <div class="dropzone" id="dz1" onclick="document.getElementById('file1').click()">
+        <input type="file" id="file1" accept=".xlsx,.xls" onchange="onCategoryFile(event)">
+        <div class="dz-icon">.XLSX / .XLS</div>
+        <div class="dz-name" id="dz1-name">點此選擇檔案，或拖曳到這裡</div>
+        <div class="dz-hint">例如：類別1-2 / 類別2 / 類別3 / 26碼 / 商品名稱 匯出檔</div>
+      </div>
+
+      <div id="cat-config" style="display:none;margin-top:18px;">
+        <div class="row">
+          <div>
+            <label class="field-label">分頁 (Sheet)</label>
+            <select id="cat-sheet" onchange="onCategorySheetChange()"></select>
+          </div>
+          <div>
+            <label class="field-label">會員編號欄位</label>
+            <select id="cat-idcol" onchange="rebuildChipLists()"></select>
+          </div>
+        </div>
+
+        <div class="chip-group">
+          <label class="field-label">分組欄位（可複選 — 每個欄位都會各自產生一張彙總表，例如同時勾選類別1-2、26碼、商品名稱）</label>
+          <div class="chip-list" id="cat-dims"></div>
+        </div>
+
+        <div class="chip-group">
+          <label class="field-label">要加總的數值欄位（可複選）</label>
+          <div class="chip-list" id="cat-metrics"></div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn teal" onclick="confirmCategoryConfig()">確認欄位，進入下一步</button>
+        </div>
+        <div id="cat-msg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="step" id="step2">
+    <div class="step-head" onclick="toggleStep(2)">
+      <div class="step-num">2</div>
+      <div class="step-title">加入會員名單</div>
+      <div class="step-status" id="s2-status">等待步驟一完成</div>
+    </div>
+    <div class="step-body">
+      <div id="lists-container"></div>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="addMemberList()">+ 新增一份會員名單</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn teal" id="run-btn" onclick="runMapping()" disabled>執行 Mapping</button>
+      </div>
+      <div id="lists-msg"></div>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="step" id="step3">
+    <div class="step-head" onclick="toggleStep(3)">
+      <div class="step-num">3</div>
+      <div class="step-title">預覽結果並下載</div>
+      <div class="step-status" id="s3-status">等待執行 Mapping</div>
+    </div>
+    <div class="step-body">
+      <div id="results"></div>
+      <div class="chip-group" id="col-picker-wrap" style="display:none;">
+        <label class="field-label">
+          下載的明細欄位（可自行勾選；灰色鎖定的欄位是分組/彙總公式需要用到的，無法取消勾選）
+          <a href="#" class="picker-link" onclick="selectAllCols(event)">全選</a>
+          <span class="picker-sep">・</span>
+          <a href="#" class="picker-link" onclick="selectMinimalCols(event)">只留必要欄位</a>
+        </label>
+        <div class="chip-list" id="col-picker"></div>
+      </div>
+      <div class="btn-row" id="download-row" style="display:none;">
+        <button class="btn teal" onclick="downloadWorkbook()">下載 Excel 檔案</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="note">
+    註：瀏覽器版 Excel 匯出使用 SheetJS 社群版，彙總分頁會寫入 SUMIFS 公式（開啟檔案時 Excel 會自動重新計算），但不含儲存格底色／粗體等樣式；若需要跟公司標準報表視覺上完全一致，可把結果丟回來給 Claude 用檔案功能微調樣式。「購買人數」等數量欄位是每位會員在各分組值下的統計，同一會員若橫跨多個分組值（例如買了多個類別、多個商品），各分組值加總會大於名單去重後的實際會員數。分組欄位如果是「商品名稱」「26碼」這種高基數欄位，分組值可能有數百到數千種，彙總表列數會相應變多，屬正常現象。
+  </footer>
+</div>
+
+<script>
+let CAT = { wb:null, sheetName:null, headers:[], idCol:'', dimCols:[], metricCols:[], rows:[] };
+let LISTS = []; // {uid, name, wb, sheetName, sheetNames, headers, idCol}
+let RESULTS = null;
+let listSeq = 0;
+
+function toggleStep(n){
+  const el = document.getElementById('step'+n);
+  el.classList.toggle('open');
+}
+function setStepState(n, state, statusText){
+  const el = document.getElementById('step'+n);
+  el.classList.remove('active','done');
+  if(state) el.classList.add(state);
+  document.getElementById('s'+n+'-status').textContent = statusText;
+}
+
+function readWorkbook(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        resolve(wb);
+      }catch(err){ reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function sheetHeaders(wb, sheetName){
+  const ws = wb.Sheets[sheetName];
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, blankrows:false, defval:null});
+  return aoa.length ? aoa[0].map(h => (h===null||h===undefined) ? '' : String(h).trim()) : [];
+}
+
+function guessCol(headers, keywords){
+  for(const k of keywords){
+    const hit = headers.find(h => h.includes(k));
+    if(hit) return hit;
+  }
+  return headers[0] || '';
+}
+
+// ---------- STEP 1: category / product detail file ----------
+async function onCategoryFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('dz1-name').textContent = file.name;
+  document.getElementById('dz1').classList.add('has-file');
+  try{
+    const wb = await readWorkbook(file);
+    CAT.wb = wb;
+    const sel = document.getElementById('cat-sheet');
+    sel.innerHTML = wb.SheetNames.map(s=>`<option value="${s}">${s}</option>`).join('');
+    document.getElementById('cat-config').style.display = 'block';
+    onCategorySheetChange();
+  }catch(err){
+    showMsg('cat-msg', '讀取檔案失敗：'+err.message, 'error');
+  }
+}
+
+function onCategorySheetChange(){
+  const sheetName = document.getElementById('cat-sheet').value;
+  CAT.sheetName = sheetName;
+  const headers = sheetHeaders(CAT.wb, sheetName);
+  CAT.headers = headers;
+
+  const idSel = document.getElementById('cat-idcol');
+  idSel.innerHTML = headers.map(h=>`<option value="${h}">${h}</option>`).join('');
+  idSel.value = guessCol(headers, ['會員編號','會員','ID','id']);
+
+  rebuildChipLists();
+}
+
+const DIM_KEYWORDS = ['類別','分類','26碼','商品名稱','品項','品類','代碼'];
+const METRIC_KEYWORDS = ['購買人數','銷售金額(點加金)','訂單筆數'];
+
+function rebuildChipLists(){
+  const headers = CAT.headers;
+  const idCol = document.getElementById('cat-idcol').value;
+  const others = headers.filter(h => h !== idCol);
+
+  const dimBox = document.getElementById('cat-dims');
+  dimBox.innerHTML = others.map(h => {
+    const checked = DIM_KEYWORDS.some(k => h.includes(k));
+    return `<label class="chip dim ${checked?'checked':''}">
+      <input type="checkbox" value="${h}" ${checked?'checked':''} onchange="toggleChip(this)"> ${h}
+    </label>`;
+  }).join('');
+
+  const metricBox = document.getElementById('cat-metrics');
+  metricBox.innerHTML = others.map(h => {
+    const checked = METRIC_KEYWORDS.includes(h);
+    return `<label class="chip metric ${checked?'checked':''}">
+      <input type="checkbox" value="${h}" ${checked?'checked':''} onchange="toggleChip(this)"> ${h}
+    </label>`;
+  }).join('');
+}
+
+function toggleChip(cb){
+  cb.closest('.chip').classList.toggle('checked', cb.checked);
+}
+
+function confirmCategoryConfig(){
+  CAT.idCol = document.getElementById('cat-idcol').value;
+  CAT.dimCols = Array.from(document.querySelectorAll('#cat-dims input:checked')).map(i=>i.value);
+  CAT.metricCols = Array.from(document.querySelectorAll('#cat-metrics input:checked')).map(i=>i.value);
+
+  if(!CAT.idCol){ showMsg('cat-msg','請選擇會員編號欄位','error'); return; }
+  if(CAT.dimCols.length === 0){ showMsg('cat-msg','請至少勾選一個分組欄位（例如類別1-2、26碼、商品名稱…）','error'); return; }
+  if(CAT.metricCols.length === 0){ showMsg('cat-msg','請至少勾選一個要加總的數值欄位','error'); return; }
+
+  const ws = CAT.wb.Sheets[CAT.sheetName];
+  const json = XLSX.utils.sheet_to_json(ws, {defval:null});
+  CAT.rows = json
+    .filter(r => r[CAT.idCol] !== null && r[CAT.idCol] !== undefined && String(r[CAT.idCol]).trim() !== '')
+    .map(r => {
+      const out = { id: String(r[CAT.idCol]).trim(), _raw: r }; // _raw keeps every original column for full export
+      CAT.dimCols.forEach(d => out[d] = (r[d]===null||r[d]===undefined) ? '' : String(r[d]).trim());
+      CAT.metricCols.forEach(m => out[m] = Number(r[m]) || 0);
+      return out;
+    });
+
+  showMsg('cat-msg', `已載入 ${CAT.rows.length.toLocaleString()} 筆有效明細列，分組欄位：${CAT.dimCols.join('、')}`, 'info');
+  setStepState(1,'done', `${CAT.dimCols.length} 個分組欄位 / ${CAT.metricCols.length} 個數值欄位`);
+  document.getElementById('step1').classList.remove('open');
+  document.getElementById('step2').classList.add('open','active');
+  setStepState(2, 'active', '請新增會員名單');
+  if(LISTS.length === 0) addMemberList();
+  refreshRunButton();
+}
+
+// ---------- STEP 2: member lists ----------
+function addMemberList(){
+  listSeq += 1;
+  const uid = 'list'+listSeq;
+  LISTS.push({uid, name:'名單 '+listSeq, wb:null, sheetName:null, sheetNames:[], headers:[], idCol:''});
+  renderLists();
+}
+function removeMemberList(uid){
+  LISTS = LISTS.filter(l => l.uid !== uid);
+  renderLists();
+}
+function renderLists(){
+  const box = document.getElementById('lists-container');
+  box.innerHTML = LISTS.map(l => `
+    <div class="list-card" id="card-${l.uid}">
+      <button class="remove" onclick="removeMemberList('${l.uid}')">移除 ✕</button>
+      <div class="row">
+        <div>
+          <label class="field-label">名單名稱（會作為輸出分頁名稱）</label>
+          <input type="text" value="${l.name}" oninput="updateListName('${l.uid}', this.value)">
+        </div>
+        <div>
+          <label class="field-label">上傳檔案</label>
+          <div class="dropzone ${l.wb?'has-file':''}" onclick="document.getElementById('file-${l.uid}').click()">
+            <input type="file" id="file-${l.uid}" accept=".xlsx,.xls" onchange="onListFile('${l.uid}', event)">
+            <div class="dz-name">${l.wb ? l.fileName : '點此選擇檔案'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="row" id="config-${l.uid}" style="${l.wb ? '' : 'display:none;'}">
+        <div>
+          <label class="field-label">分頁 (Sheet)</label>
+          <select id="sheet-${l.uid}" onchange="onListSheetChange('${l.uid}')">
+            ${l.sheetNames.map(s=>`<option value="${s}" ${s===l.sheetName?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="field-label">會員編號欄位</label>
+          <select id="idcol-${l.uid}" onchange="updateListIdCol('${l.uid}', this.value)">
+            ${l.headers.map(h=>`<option value="${h}" ${h===l.idCol?'selected':''}>${h}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  refreshRunButton();
+}
+function updateListName(uid, val){
+  const l = LISTS.find(x=>x.uid===uid); if(l) l.name = val;
+}
+function updateListIdCol(uid, val){
+  const l = LISTS.find(x=>x.uid===uid); if(l) l.idCol = val;
+  refreshRunButton();
+}
+async function onListFile(uid, e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const l = LISTS.find(x=>x.uid===uid);
+  try{
+    const wb = await readWorkbook(file);
+    l.wb = wb; l.fileName = file.name; l.sheetNames = wb.SheetNames;
+    l.sheetName = wb.SheetNames[0];
+    l.headers = sheetHeaders(wb, l.sheetName);
+    l.idCol = guessCol(l.headers, ['會員編號','會員','ID','id']);
+    renderLists();
+  }catch(err){
+    showMsg('lists-msg', '讀取檔案失敗：'+err.message, 'error');
+  }
+}
+function onListSheetChange(uid){
+  const l = LISTS.find(x=>x.uid===uid);
+  l.sheetName = document.getElementById('sheet-'+uid).value;
+  l.headers = sheetHeaders(l.wb, l.sheetName);
+  l.idCol = guessCol(l.headers, ['會員編號','會員','ID','id']);
+  renderLists();
+}
+function refreshRunButton(){
+  const ready = LISTS.length > 0 && LISTS.every(l => l.wb && l.sheetName && l.idCol) && CAT.rows.length > 0;
+  document.getElementById('run-btn').disabled = !ready;
+}
+
+// ---------- STEP 3: run mapping ----------
+function naturalOrder(values){
+  // defensive coercion: values should already be strings by the time they get here,
+  // but coerce again so a stray Number/Boolean/Date cell never crashes the sort.
+  const uniq = Array.from(new Set(values.map(v => String(v))));
+  const allNumbered = uniq.length > 0 && uniq.every(c => /^\d+/.test(c));
+  if(allNumbered){
+    return uniq.sort((a,b)=>{
+      const na = parseInt(a.match(/^\d+/)[0],10);
+      const nb = parseInt(b.match(/^\d+/)[0],10);
+      return na - nb || a.localeCompare(b);
+    });
+  }
+  return uniq.sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+}
+
+function runMapping(){
+  document.getElementById('lists-msg').innerHTML = '';
+  const btn = document.getElementById('run-btn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '計算中…';
+  // defer to next tick so the button label repaints before the (possibly heavy) computation runs
+  setTimeout(() => {
+    try{
+      doRunMapping();
+    }catch(err){
+      console.error(err);
+      showMsg('lists-msg', '執行 Mapping 時發生錯誤：' + err.message + '（可打開瀏覽器主控台看詳細訊息）', 'error');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }, 20);
+}
+
+function doRunMapping(){
+  RESULTS = LISTS.map(l => {
+    const ws = l.wb.Sheets[l.sheetName];
+    const json = XLSX.utils.sheet_to_json(ws, {defval:null});
+    const idSet = new Set(
+      json.map(r => r[l.idCol]).filter(v => v!==null && v!==undefined && String(v).trim()!=='')
+          .map(v => String(v).trim())
+    );
+    const detail = CAT.rows.filter(r => idSet.has(r.id));
+    const matchedIds = new Set(detail.map(r=>r.id));
+
+    // single-pass grouping (Map-based) instead of order.map(val => detail.filter(...)),
+    // which is O(distinct values x rows) and can freeze the tab on high-cardinality
+    // dimensions like 26碼 / 商品名稱.
+    const dims = CAT.dimCols.map(dim => {
+      const groups = new Map();
+      for(const r of detail){
+        const val = (r[dim] === undefined || r[dim] === null) ? '' : String(r[dim]);
+        if(val === '') continue;
+        let g = groups.get(val);
+        if(!g){
+          g = { val };
+          CAT.metricCols.forEach(m => g[m] = 0);
+          groups.set(val, g);
+        }
+        CAT.metricCols.forEach(m => g[m] += (r[m] || 0));
+      }
+      const order = naturalOrder(Array.from(groups.keys()));
+      const summary = order.map(val => groups.get(val));
+      const totals = { val:'總計' };
+      CAT.metricCols.forEach(m => totals[m] = summary.reduce((s,row)=>s+(row[m]||0),0));
+      return { dim, order, summary, totals };
+    });
+
+    return {
+      name: l.name, listTotal: idSet.size, matched: matchedIds.size,
+      detail, dims
+    };
+  });
+
+  renderResults();
+  initColumnPicker();
+  setStepState(2,'done', `已設定 ${LISTS.length} 份名單`);
+  document.getElementById('step2').classList.remove('open');
+  document.getElementById('step3').classList.add('open','active');
+  setStepState(3,'done','已完成，可下載');
+  document.getElementById('download-row').style.display = 'flex';
+}
+
+function fmt(n){ return Number(n||0).toLocaleString('en-US'); }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderResults(){
+  const box = document.getElementById('results');
+  box.innerHTML = RESULTS.map((r, ri) => `
+    <div>
+      <div class="preview-title">${escapeHtml(r.name)}</div>
+      <span class="match-badge ${r.matched===r.listTotal?'ok':'warn'}">
+        名單 ${fmt(r.listTotal)} 人，其中 ${fmt(r.matched)} 人於明細檔中有比對到資料
+      </span>
+      <div class="dim-tab-bar">
+        ${r.dims.map((d,di)=>`<div class="dim-tab ${di===0?'active':''}" onclick="switchDimTab(${ri},${di})" id="tab-${ri}-${di}">${escapeHtml(d.dim)}</div>`).join('')}
+      </div>
+      ${r.dims.map((d,di)=>`
+        <div class="dim-panel ${di===0?'active':''}" id="panel-${ri}-${di}">
+          <div class="table-scroll">
+          <table class="preview">
+            <thead><tr><th>${escapeHtml(d.dim)}</th>${CAT.metricCols.map(m=>`<th>${escapeHtml(m)}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${d.summary.map(row => `<tr><td>${escapeHtml(row.val)}</td>${CAT.metricCols.map(m=>`<td>${fmt(row[m])}</td>`).join('')}</tr>`).join('')}
+              <tr class="total"><td>總計</td>${CAT.metricCols.map(m=>`<td>${fmt(d.totals[m])}</td>`).join('')}</tr>
+            </tbody>
+          </table>
+          </div>
+          <div class="preview-note">${d.order.length} 個「${escapeHtml(d.dim)}」分組值。總計為跨分組值加總，同一會員若橫跨多個分組值會被重複計數。</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+function switchDimTab(ri, di){
+  RESULTS[ri].dims.forEach((d, i)=>{
+    document.getElementById(`tab-${ri}-${i}`).classList.toggle('active', i===di);
+    document.getElementById(`panel-${ri}-${i}`).classList.toggle('active', i===di);
+  });
+}
+
+// ---------- download column picker ----------
+function initColumnPicker(){
+  const required = new Set([...CAT.dimCols, ...CAT.metricCols]);
+  const box = document.getElementById('col-picker');
+  box.innerHTML = CAT.headers.map(h => {
+    const locked = required.has(h);
+    const kind = locked ? 'metric' : 'dim';
+    return `<label class="chip ${kind} checked ${locked?'locked':''}">
+      <input type="checkbox" value="${escapeHtml(h)}" checked ${locked?'disabled':''} onchange="toggleDownloadCol(this)">
+      ${escapeHtml(h)}${locked?' 🔒':''}
+    </label>`;
+  }).join('');
+  document.getElementById('col-picker-wrap').style.display = 'block';
+}
+function toggleDownloadCol(cb){
+  cb.closest('.chip').classList.toggle('checked', cb.checked);
+}
+function selectAllCols(e){
+  e.preventDefault();
+  document.querySelectorAll('#col-picker input[type=checkbox]:not(:disabled)').forEach(cb => {
+    cb.checked = true;
+    cb.closest('.chip').classList.add('checked');
+  });
+}
+function selectMinimalCols(e){
+  e.preventDefault();
+  document.querySelectorAll('#col-picker input[type=checkbox]:not(:disabled)').forEach(cb => {
+    cb.checked = false;
+    cb.closest('.chip').classList.remove('checked');
+  });
+}
+function getSelectedDownloadCols(){
+  const checked = new Set(
+    Array.from(document.querySelectorAll('#col-picker input[type=checkbox]:checked')).map(cb => cb.value)
+  );
+  // preserve the original column order from the source file
+  return CAT.headers.filter(h => checked.has(h));
+}
+
+// ---------- download workbook with formulas ----------
+function colLetter(n){ // 1-indexed
+  let s = '';
+  while(n > 0){
+    const m = (n-1) % 26;
+    s = String.fromCharCode(65+m) + s;
+    n = Math.floor((n-1)/26);
+  }
+  return s;
+}
+function baseSafeName(name){
+  return String(name).replace(/[:\\\/\?\*\[\]]/g,'_');
+}
+function uniqueSheetName(used, name){
+  let base = baseSafeName(name).slice(0,31);
+  let candidate = base;
+  let n = 2;
+  while(used.has(candidate)){
+    const suffix = '_' + n;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    n += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+function downloadWorkbook(){
+  try{
+    doDownloadWorkbook();
+  }catch(err){
+    console.error(err);
+    alert('下載時發生錯誤：' + err.message + '（可打開瀏覽器主控台看詳細訊息）');
+  }
+}
+
+function doDownloadWorkbook(){
+  const downloadCols = getSelectedDownloadCols();
+  const required = new Set([...CAT.dimCols, ...CAT.metricCols]);
+  const missingRequired = Array.from(required).filter(h => !downloadCols.includes(h));
+  if(downloadCols.length === 0){
+    throw new Error('請至少勾選一個要下載的欄位');
+  }
+  if(missingRequired.length > 0){
+    // safety net — shouldn't happen since required columns are locked in the UI
+    throw new Error('分組/彙總公式需要的欄位被移除了：' + missingRequired.join('、'));
+  }
+
+  const wb = XLSX.utils.book_new();
+  const usedNames = new Set();
+  const summaryOrder = [];
+  const detailOrder = [];
+
+  RESULTS.forEach(r => {
+    const detailName = uniqueSheetName(usedNames, r.name + '明細');
+
+    // detail sheet: only the columns the user selected in the download picker
+    // (required dim/metric columns are always included so the summary formulas resolve)
+    const detailHeader = downloadCols;
+    const detailAOA = [detailHeader];
+    r.detail.forEach(row => detailAOA.push(
+      detailHeader.map(h => {
+        const v = row._raw ? row._raw[h] : undefined;
+        return (v === undefined) ? null : v;
+      })
+    ));
+    const wsDetail = XLSX.utils.aoa_to_sheet(detailAOA);
+    wsDetail['!cols'] = detailHeader.map(()=>({wch:16}));
+    XLSX.utils.book_append_sheet(wb, wsDetail, detailName);
+    detailOrder.push(detailName);
+    const lastRow = r.detail.length + 1;
+
+    r.dims.forEach((d, di) => {
+      const dimColIndex = downloadCols.indexOf(d.dim) + 1; // 1-indexed column position in the detail sheet
+      const dimColLetter = colLetter(dimColIndex);
+      const summaryName = uniqueSheetName(usedNames, r.name + '_' + d.dim + '彙總');
+
+      const headerRow = [d.dim, ...CAT.metricCols];
+      const wsData = [headerRow];
+      d.order.forEach(() => wsData.push([]));
+      wsData.push([]); wsData.push([]); wsData.push([]);
+      const wsSummary = XLSX.utils.aoa_to_sheet(wsData);
+
+      d.order.forEach((val, idx) => {
+        const rowNum = idx + 2;
+        const labelCell = XLSX.utils.encode_cell({r: rowNum-1, c:0});
+        wsSummary[labelCell] = {t:'s', v: val};
+        CAT.metricCols.forEach((m, mi) => {
+          const metricColIndex = downloadCols.indexOf(m) + 1; // position in the detail sheet
+          const metricColLetter = colLetter(metricColIndex);
+          const cellRef = XLSX.utils.encode_cell({r: rowNum-1, c: mi+1});
+          const formula = `SUMIFS('${detailName}'!$${metricColLetter}$2:$${metricColLetter}$${lastRow},'${detailName}'!$${dimColLetter}$2:$${dimColLetter}$${lastRow},$A${rowNum})`;
+          wsSummary[cellRef] = {t:'n', f: formula, z:'#,##0'};
+        });
+      });
+
+      const totalRowNum = d.order.length + 2;
+      const totalLabelCell = XLSX.utils.encode_cell({r: totalRowNum-1, c:0});
+      wsSummary[totalLabelCell] = {t:'s', v:'總計'};
+      CAT.metricCols.forEach((m, mi) => {
+        const colL = colLetter(mi+2);
+        const cellRef = XLSX.utils.encode_cell({r: totalRowNum-1, c: mi+1});
+        const formula = `SUM(${colL}2:${colL}${totalRowNum-1})`;
+        wsSummary[cellRef] = {t:'n', f: formula, z:'#,##0'};
+      });
+
+      const noteRowNum = totalRowNum + 2;
+      const noteCell = XLSX.utils.encode_cell({r: noteRowNum-1, c:0});
+      wsSummary[noteCell] = {t:'s', v:`註：名單去重會員總數 = ${r.listTotal} 人（其中 ${r.matched} 人於本資料中有比對到消費紀錄）。上表『總計』為跨「${d.dim}」分組值加總，同一會員若橫跨多個分組值會被重複計數。`};
+
+      wsSummary['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:noteRowNum-1, c: CAT.metricCols.length}});
+      wsSummary['!cols'] = [{wch:18}, ...CAT.metricCols.map(()=>({wch:16}))];
+      XLSX.utils.book_append_sheet(wb, wsSummary, summaryName);
+      summaryOrder.push(summaryName);
+    });
+  });
+
+  wb.SheetNames = [...summaryOrder, ...detailOrder];
+
+  XLSX.writeFile(wb, '會員分組對應分析.xlsx');
+}
+
+function showMsg(elId, text, kind){
+  document.getElementById(elId).innerHTML = `<div class="msg ${kind}">${escapeHtml(text)}</div>`;
+}
+</script>
+</body>
+</html>
