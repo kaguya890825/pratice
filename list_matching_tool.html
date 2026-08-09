@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名單邏輯比對工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#12151a;
+    --panel:#1a1f27;
+    --panel-2:#20262f;
+    --panel-3:#252b35;
+    --border:#2b313c;
+    --border-soft:#232833;
+    --text:#e9ebee;
+    --muted:#8b93a3;
+    --muted-2:#5f6774;
+    --accent:#e0a458;
+    --accent-dim:#3a3226;
+    --teal:#5ec8c2;
+    --teal-dim:#1c3532;
+    --danger:#e2735a;
+    --danger-dim:#3a231f;
+    --radius:10px;
+    --radius-lg:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 500px at 10% -10%, #1d2530 0%, transparent 60%),
+      radial-gradient(1000px 600px at 100% 0%, #1a2126 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    line-height:1.5;
+    padding:40px 24px 80px;
+  }
+  .wrap{max-width:1220px;margin:0 auto;}
+  header.hero{margin-bottom:40px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow::before{content:'';width:20px;height:1px;background:var(--accent);display:inline-block;}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(28px,4vw,40px);
+    font-weight:700;
+    margin:0 0 14px;
+    letter-spacing:-0.01em;
+  }
+  header.hero p{color:var(--muted);max-width:700px;font-size:15px;margin:0 0 4px;}
+  .privacy-note{
+    display:inline-flex;align-items:center;gap:8px;margin-top:16px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);
+    background:var(--teal-dim);border:1px solid #2a4644;padding:7px 12px;border-radius:999px;
+  }
+  .privacy-note::before{content:'●';font-size:8px;}
+
+  section{margin-bottom:36px;}
+  .section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;}
+  .section-head .num{font-family:'IBM Plex Mono',monospace;color:var(--muted-2);font-size:13px;}
+  .section-head h2{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600;margin:0;}
+  .section-sub{color:var(--muted);font-size:13.5px;margin:6px 0 0;}
+
+  .lists-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;}
+  .list-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:18px;position:relative;transition:border-color .2s;display:flex;flex-direction:column;
+  }
+  .list-card.role-and{border-color:#2c4a48;}
+  .list-card.role-not{border-color:#4a332c;}
+  .list-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:14px;}
+  .list-name-input{
+    background:transparent;border:none;border-bottom:1px solid transparent;
+    font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--text);
+    padding:2px 0;width:100%;
+  }
+  .list-name-input:focus{outline:none;border-bottom-color:var(--accent);}
+  .remove-btn{
+    background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:16px;
+    line-height:1;padding:2px 6px;border-radius:6px;flex-shrink:0;
+  }
+  .remove-btn:hover{color:var(--danger);background:var(--danger-dim);}
+
+  .field-label{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted-2);margin:12px 0 6px;display:flex;justify-content:space-between;align-items:center;
+  }
+  .field-label .hint{text-transform:none;letter-spacing:0;color:var(--muted-2);font-size:10.5px;}
+  .dropzone{
+    border:1.5px dashed var(--border);border-radius:8px;padding:14px 12px;text-align:center;
+    cursor:pointer;transition:.15s;background:var(--panel-2);
+  }
+  .dropzone:hover{border-color:var(--accent);}
+  .dropzone.has-file{border-style:solid;border-color:var(--teal);}
+  .dropzone input{display:none;}
+  .dz-text{font-size:12.5px;color:var(--muted);}
+  .dz-filename{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);word-break:break-all;}
+  .dz-rowcount{font-size:11px;color:var(--muted-2);margin-top:2px;}
+
+  select{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    border-radius:7px;padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;
+    appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b93a3'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center;
+  }
+  select:disabled{opacity:.4;cursor:not-allowed;}
+  select:focus{outline:none;border-color:var(--accent);}
+
+  .role-toggle{display:flex;gap:6px;margin-top:6px;}
+  .role-btn{
+    flex:1;padding:7px 4px;font-size:12px;font-family:'IBM Plex Mono',monospace;
+    border-radius:7px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);
+    cursor:pointer;text-align:center;transition:.15s;
+  }
+  .role-btn.active[data-role="AND"]{background:var(--teal-dim);border-color:var(--teal);color:var(--teal);}
+  .role-btn.active[data-role="NOT"]{background:var(--danger-dim);border-color:var(--danger);color:var(--danger);}
+
+  .col-config-wrap{
+    border:1px solid var(--border-soft);border-radius:8px;background:var(--panel-2);
+    max-height:220px;overflow-y:auto;
+  }
+  .col-config-wrap.empty{display:flex;align-items:center;justify-content:center;min-height:60px;}
+  .col-config-empty-text{color:var(--muted-2);font-size:12px;padding:16px;text-align:center;}
+  .col-row{
+    display:grid;grid-template-columns:1fr 88px;gap:8px;align-items:center;
+    padding:7px 10px;border-bottom:1px solid var(--border-soft);
+  }
+  .col-row:last-child{border-bottom:none;}
+  .col-checkbox{display:flex;align-items:center;gap:7px;min-width:0;cursor:pointer;}
+  .col-checkbox input{accent-color:var(--accent);flex-shrink:0;width:14px;height:14px;}
+  .col-name{
+    font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);
+  }
+  .col-type-badge{
+    font-family:'IBM Plex Mono',monospace;font-size:9px;padding:1px 5px;border-radius:4px;flex-shrink:0;
+  }
+  .col-type-badge.numeric{background:var(--teal-dim);color:var(--teal);}
+  .col-type-badge.text{background:var(--panel-3);color:var(--muted-2);}
+  .col-agg{padding:5px 6px;font-size:11.5px;background-position:right 6px center;}
+
+  .add-list-btn{
+    margin-top:16px;background:none;border:1px dashed var(--border);color:var(--muted);
+    padding:12px;width:100%;border-radius:var(--radius);cursor:pointer;font-size:13px;
+    font-family:'IBM Plex Mono',monospace;transition:.15s;
+  }
+  .add-list-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .add-list-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  .logic-bar{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);
+    padding:20px 24px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;
+    font-family:'IBM Plex Mono',monospace;font-size:13px;
+  }
+  .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--border);white-space:nowrap;}
+  .chip.and{border-color:var(--teal);color:var(--teal);background:var(--teal-dim);}
+  .chip.not{border-color:var(--danger);color:var(--danger);background:var(--danger-dim);}
+  .op{color:var(--muted-2);}
+  .arrow{color:var(--accent);}
+  .chip.result{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);font-weight:600;}
+
+  .run-row{display:flex;justify-content:flex-end;margin-top:18px;}
+  .run-btn{
+    background:var(--accent);color:#1a140a;border:none;padding:13px 28px;border-radius:9px;
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;cursor:pointer;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .run-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px -6px rgba(224,164,88,.5);}
+  .run-btn:active{transform:translateY(0);}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;align-items:start;}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+  .stat-card.highlight{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-dim),var(--panel) 70%);}
+  .stat-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+  .stat-value{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;margin-top:6px;}
+  .stat-card.highlight .stat-value{color:var(--accent);}
+  .stat-sub{font-size:11.5px;color:var(--muted-2);margin-top:4px;font-family:'IBM Plex Mono',monospace;}
+  .stat-metrics{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:6px;}
+  .stat-metric-row{display:flex;justify-content:space-between;font-size:12px;font-family:'IBM Plex Mono',monospace;gap:8px;}
+  .stat-metric-row span:first-child{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .stat-metric-row span:last-child{color:var(--text);font-weight:500;flex-shrink:0;}
+
+  .result-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;}
+  .result-head{
+    display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);
+    flex-wrap:wrap;gap:10px;
+  }
+  .result-head h3{font-family:'Space Grotesk',sans-serif;margin:0;font-size:15px;}
+  .download-btn{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:9px 16px;
+    border-radius:7px;cursor:pointer;font-size:13px;font-family:'IBM Plex Mono',monospace;
+  }
+  .download-btn:hover{border-color:var(--teal);color:var(--teal);}
+  .table-scroll{max-height:520px;overflow:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:'IBM Plex Mono',monospace;}
+  thead th{
+    position:sticky;top:0;background:var(--panel-2);text-align:left;padding:10px 16px;
+    color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  tbody td{padding:9px 16px;border-bottom:1px solid var(--border-soft);white-space:nowrap;}
+  tbody tr:hover{background:var(--panel-2);}
+  .empty-state{padding:50px 20px;text-align:center;color:var(--muted-2);font-size:13px;}
+
+  .howto{margin-top:44px;border-top:1px solid var(--border-soft);padding-top:24px;}
+  .howto summary{cursor:pointer;color:var(--muted);font-size:13px;font-family:'IBM Plex Mono',monospace;}
+  .howto-body{margin-top:14px;color:var(--muted);font-size:13.5px;line-height:1.8;}
+  .howto-body b{color:var(--text);}
+  .howto-body code{background:var(--panel-2);padding:1px 6px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--teal);}
+
+  @media (max-width:640px){
+    body{padding:24px 14px 60px;}
+    .result-head{flex-direction:column;align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">名單比對引擎</div>
+    <h1>名單邏輯比對工具</h1>
+    <p>設定任意數量的名單，指定每份名單是「必須包含」還是「必須排除」，即可算出符合條件的會員清單；每份名單的原始欄位都能整欄帶出，數值欄位可加總／平均／取最大最小值，直接看到符合條件會員的過往與近期消費狀況。</p>
+    <p>本次用途：2024/12/31（含）前有消費 × 2025 無消費 × 2026 再次消費 → 找出回流客名單與其消費狀況。</p>
+    <div class="privacy-note">所有檔案僅在瀏覽器本機解析與運算，不會上傳到任何伺服器</div>
+  </header>
+
+  <section>
+    <div class="section-head"><span class="num">01</span><h2>設定名單</h2></div>
+    <p class="section-sub">上傳 CSV 或 Excel 檔案，替每份名單命名、選擇角色與會員編號欄位；下方勾選要帶出的欄位，並指定聚合方式（同一會員有多筆資料時如何合併）。</p>
+    <div class="lists-grid" id="listsGrid"></div>
+    <button class="add-list-btn" id="addListBtn">＋ 新增名單</button>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="num">02</span><h2>比對邏輯</h2></div>
+    <p class="section-sub">下方會依照你目前的設定即時組成邏輯式；調整完成後按「執行比對」。</p>
+    <div class="logic-bar" id="logicBar"></div>
+    <div class="run-row"><button class="run-btn" id="runBtn">執行比對</button></div>
+  </section>
+
+  <section id="resultSection" style="display:none;">
+    <div class="section-head"><span class="num">03</span><h2>結果</h2></div>
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="result-panel">
+      <div class="result-head">
+        <h3>符合條件名單明細（含各名單原始欄位）</h3>
+        <button class="download-btn" id="downloadBtn">下載 CSV</button>
+      </div>
+      <div class="table-scroll"><table id="resultTable"></table></div>
+    </div>
+  </section>
+
+  <details class="howto">
+    <summary>這個工具怎麼重複用在其他專案？</summary>
+    <div class="howto-body">
+      核心邏輯很單純：每份名單都是一個「會員編號集合」，替每份名單指定角色——
+      <b>必須包含（AND）</b>或<b>必須排除（NOT）</b>——工具會計算「所有 AND 名單的交集，再扣掉所有 NOT 名單的聯集」。<br><br>
+      每份 AND 名單可以勾選任意欄位帶入結果表格，並選擇該欄位同一會員有多筆資料時怎麼合併：
+      <br>• <code>取第一筆</code>：適合本身就是會員層級（一人一列）的欄位，例如已經算好的「最後一次購買日」
+      <br>• <code>加總</code>：適合訂單筆數、銷售金額、銷售數量等指標，同一會員多筆訂單會自動加總
+      <br>• <code>平均 / 最大值 / 最小值</code>：適合想看客單價、最近一次日期等情境
+      <br><br>
+      換到別的專案時，只要換掉上傳的檔案、調整角色與欄位設定即可重複使用，例如：
+      <br>• 新客回購分析：<code>Q1新客（AND）</code> × <code>Q2有消費（AND）</code>，並把 Q2 的銷售金額設為加總
+      <br>• 沉睡客盤點：<code>過去有消費（AND）</code> － <code>近12個月有消費（NOT）</code>
+    </div>
+  </details>
+
+</div>
+
+<script>
+(function(){
+  let listIdCounter = 0;
+  const lists = []; // {id,name,role,fileName,headers[],rows[],idCol,colConfig:{col:{checked,agg,type}}}
+
+  const listsGrid = document.getElementById('listsGrid');
+  const addListBtn = document.getElementById('addListBtn');
+  const logicBar = document.getElementById('logicBar');
+  const runBtn = document.getElementById('runBtn');
+  const resultSection = document.getElementById('resultSection');
+  const statGrid = document.getElementById('statGrid');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let lastResult = null; // {headers, rows}
+
+  function cleanId(v){
+    if(v===null||v===undefined) return '';
+    let s = String(v).trim();
+    if(/^\d+\.0$/.test(s)) s = s.slice(0,-2);
+    return s;
+  }
+
+  function toNumberStrict(v){
+    if(v===null||v===undefined) return NaN;
+    let s = String(v).trim();
+    if(s==='') return NaN;
+    s = s.replace(/,/g,'');
+    if(!/^-?\d+(\.\d+)?$/.test(s)) return NaN;
+    return parseFloat(s);
+  }
+
+  function detectColumnType(rows, col){
+    let sampled = 0, numeric = 0;
+    for(let i=0;i<rows.length && sampled<60;i++){
+      const v = rows[i][col];
+      if(v===undefined||v===null||String(v).trim()==='') continue;
+      sampled++;
+      if(!isNaN(toNumberStrict(v))) numeric++;
+    }
+    if(sampled===0) return 'text';
+    return (numeric/sampled) >= 0.7 ? 'numeric' : 'text';
+  }
+
+  function aggregate(values, method, colType){
+    const nonEmpty = values.filter(v=>v!==undefined && v!==null && String(v).trim()!=='');
+    if(nonEmpty.length===0) return '';
+    switch(method){
+      case 'SUM': {
+        const nums = nonEmpty.map(toNumberStrict).filter(n=>!isNaN(n));
+        return nums.length ? nums.reduce((a,b)=>a+b,0) : '';
+      }
+      case 'AVG': {
+        const nums = nonEmpty.map(toNumberStrict).filter(n=>!isNaN(n));
+        return nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length) : '';
+      }
+      case 'MAX': {
+        if(colType==='numeric'){
+          const nums = nonEmpty.map(toNumberStrict).filter(n=>!isNaN(n));
+          return nums.length ? Math.max(...nums) : '';
+        }
+        const dated = nonEmpty.map(v=>({raw:v,d:new Date(v)})).filter(o=>!isNaN(o.d.getTime()));
+        if(dated.length===nonEmpty.length && dated.length>0) return dated.reduce((a,b)=> b.d>a.d?b:a).raw;
+        return nonEmpty.slice().sort().pop();
+      }
+      case 'MIN': {
+        if(colType==='numeric'){
+          const nums = nonEmpty.map(toNumberStrict).filter(n=>!isNaN(n));
+          return nums.length ? Math.min(...nums) : '';
+        }
+        const dated = nonEmpty.map(v=>({raw:v,d:new Date(v)})).filter(o=>!isNaN(o.d.getTime()));
+        if(dated.length===nonEmpty.length && dated.length>0) return dated.reduce((a,b)=> b.d<a.d?b:a).raw;
+        return nonEmpty.slice().sort()[0];
+      }
+      case 'FIRST':
+      default:
+        return nonEmpty[0];
+    }
+  }
+
+  function fmtValue(v){
+    if(typeof v === 'number'){
+      if(Number.isInteger(v)) return v.toLocaleString();
+      return v.toLocaleString(undefined,{maximumFractionDigits:2});
+    }
+    return v===undefined||v===null ? '' : String(v);
+  }
+
+  function makeList(defaultName, defaultRole){
+    listIdCounter++;
+    const list = {
+      id:'l'+listIdCounter, name:defaultName, role:defaultRole,
+      fileName:null, headers:[], rows:[], idCol:'', colConfig:{}
+    };
+    lists.push(list);
+    renderListCard(list);
+    renderLogicBar();
+  }
+
+  function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderListCard(list){
+    const card = document.createElement('div');
+    card.className = 'list-card role-'+list.role.toLowerCase();
+    card.id = 'card-'+list.id;
+    card.innerHTML = `
+      <div class="list-card-top">
+        <input class="list-name-input" value="${escapeAttr(list.name)}" data-field="name">
+        <button class="remove-btn" title="移除名單">✕</button>
+      </div>
+
+      <label class="field-label">條件角色</label>
+      <div class="role-toggle">
+        <button type="button" class="role-btn ${list.role==='AND'?'active':''}" data-role="AND">必須包含 AND</button>
+        <button type="button" class="role-btn ${list.role==='NOT'?'active':''}" data-role="NOT">必須排除 NOT</button>
+      </div>
+
+      <label class="field-label">上傳檔案（CSV / Excel）</label>
+      <label class="dropzone" data-dz>
+        <input type="file" accept=".csv,.xlsx,.xls" data-file>
+        <div class="dz-text" data-dz-text>點擊或拖曳檔案到這裡</div>
+      </label>
+
+      <label class="field-label">會員編號欄位</label>
+      <select data-field="idCol" disabled><option value="">－ 尚未上傳檔案 －</option></select>
+
+      <label class="field-label" data-col-config-label style="display:none;">
+        帶出欄位與合併方式
+        <span class="hint">同一會員多筆時如何合併</span>
+      </label>
+      <div class="col-config-wrap empty" data-col-config>
+        <div class="col-config-empty-text">上傳檔案並選好會員編號欄位後，這裡會列出可帶出的欄位</div>
+      </div>
+    `;
+    listsGrid.appendChild(card);
+
+    card.querySelector('[data-field="name"]').addEventListener('input', (e)=>{
+      list.name = e.target.value;
+      renderLogicBar();
+    });
+
+    card.querySelector('.remove-btn').addEventListener('click', ()=>{
+      const idx = lists.findIndex(l=>l.id===list.id);
+      if(idx>-1) lists.splice(idx,1);
+      card.remove();
+      renderLogicBar();
+      updateAddBtnState();
+    });
+
+    card.querySelectorAll('.role-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        list.role = btn.dataset.role;
+        card.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        card.className = 'list-card role-'+list.role.toLowerCase();
+        renderLogicBar();
+      });
+    });
+
+    const fileInput = card.querySelector('[data-file]');
+    const dz = card.querySelector('[data-dz]');
+    fileInput.addEventListener('change', (e)=>{
+      const file = e.target.files[0];
+      if(file) handleFile(list, file, card);
+    });
+    dz.addEventListener('dragover', e=>{e.preventDefault(); dz.style.borderColor='var(--accent)';});
+    dz.addEventListener('dragleave', ()=>{dz.style.borderColor='';});
+    dz.addEventListener('drop', e=>{
+      e.preventDefault();
+      dz.style.borderColor='';
+      const file = e.dataTransfer.files[0];
+      if(file){ fileInput.files = e.dataTransfer.files; handleFile(list, file, card); }
+    });
+
+    card.querySelector('[data-field="idCol"]').addEventListener('change', (e)=>{
+      list.idCol = e.target.value;
+      renderColumnConfig(list, card);
+    });
+  }
+
+  function handleFile(list, file, card){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, {type:'array', cellDates:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:false, dateNF:'yyyy/mm/dd'});
+        if(rows.length === 0){
+          alert('這個檔案看起來沒有資料列：' + file.name);
+          return;
+        }
+        list.headers = Object.keys(rows[0]);
+        list.rows = rows;
+        list.fileName = file.name;
+        list.colConfig = {};
+
+        card.querySelector('[data-dz]').classList.add('has-file');
+        card.querySelector('[data-dz-text]').innerHTML =
+          `<div class="dz-filename">${escapeHtml(file.name)}</div><div class="dz-rowcount">${rows.length.toLocaleString()} 筆資料，${list.headers.length} 個欄位</div>`;
+
+        const idSel = card.querySelector('[data-field="idCol"]');
+        idSel.disabled = false;
+        idSel.innerHTML = '<option value="">－ 請選擇欄位 －</option>' +
+          list.headers.map(h=>`<option value="${escapeAttr(h)}">${escapeHtml(h)}</option>`).join('');
+
+        const idGuess = list.headers.find(h => ['會員編號','會員','編號','ID','id'].some(k=>h.includes(k)));
+        if(idGuess){ list.idCol = idGuess; idSel.value = idGuess; }
+
+        renderColumnConfig(list, card);
+        renderLogicBar();
+      }catch(err){
+        console.error(err);
+        alert('讀取檔案時發生錯誤，請確認檔案格式為 CSV 或 Excel：' + file.name);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function renderColumnConfig(list, card){
+    const wrap = card.querySelector('[data-col-config]');
+    const label = card.querySelector('[data-col-config-label]');
+    if(!list.headers.length || !list.idCol){
+      wrap.className = 'col-config-wrap empty';
+      wrap.innerHTML = '<div class="col-config-empty-text">上傳檔案並選好會員編號欄位後，這裡會列出可帶出的欄位</div>';
+      label.style.display = 'none';
+      return;
+    }
+    label.style.display = 'flex';
+    wrap.className = 'col-config-wrap';
+    const cols = list.headers.filter(h => h !== list.idCol);
+
+    // build / preserve colConfig
+    cols.forEach(col=>{
+      if(!list.colConfig[col]){
+        const type = detectColumnType(list.rows, col);
+        list.colConfig[col] = {
+          checked: true,
+          type: type,
+          agg: type==='numeric' ? 'SUM' : 'FIRST'
+        };
+      }
+    });
+
+    wrap.innerHTML = cols.map(col=>{
+      const cfg = list.colConfig[col];
+      const aggOptions = ['FIRST','SUM','AVG','MAX','MIN'].map(m=>{
+        const labelMap = {FIRST:'取第一筆',SUM:'加總',AVG:'平均',MAX:'最大值',MIN:'最小值'};
+        return `<option value="${m}" ${cfg.agg===m?'selected':''}>${labelMap[m]}</option>`;
+      }).join('');
+      return `
+        <div class="col-row" data-col="${escapeAttr(col)}">
+          <label class="col-checkbox">
+            <input type="checkbox" data-role="chk" ${cfg.checked?'checked':''}>
+            <span class="col-name" title="${escapeAttr(col)}">${escapeHtml(col)}</span>
+            <span class="col-type-badge ${cfg.type}">${cfg.type==='numeric'?'數值':'文字'}</span>
+          </label>
+          <select class="col-agg" data-role="agg">${aggOptions}</select>
+        </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('.col-row').forEach(row=>{
+      const col = row.dataset.col;
+      row.querySelector('[data-role="chk"]').addEventListener('change', e=>{
+        list.colConfig[col].checked = e.target.checked;
+      });
+      row.querySelector('[data-role="agg"]').addEventListener('change', e=>{
+        list.colConfig[col].agg = e.target.value;
+      });
+    });
+  }
+
+  function renderLogicBar(){
+    logicBar.innerHTML = '';
+    const andLists = lists.filter(l=>l.role==='AND');
+    const notLists = lists.filter(l=>l.role==='NOT');
+
+    if(lists.length===0){
+      logicBar.innerHTML = '<span style="color:var(--muted-2)">尚未設定任何名單</span>';
+      return;
+    }
+
+    andLists.forEach((l,i)=>{
+      if(i>0){ const op = document.createElement('span'); op.className='op'; op.textContent='∩'; logicBar.appendChild(op); }
+      const chip = document.createElement('span'); chip.className='chip and';
+      chip.textContent = l.name || '(未命名名單)';
+      logicBar.appendChild(chip);
+    });
+
+    if(andLists.length===0){
+      const chip = document.createElement('span'); chip.className='chip';
+      chip.style.color='var(--muted-2)';
+      chip.textContent = '（尚無「必須包含」名單）';
+      logicBar.appendChild(chip);
+    }
+
+    notLists.forEach(l=>{
+      const op = document.createElement('span'); op.className='op'; op.textContent='－';
+      logicBar.appendChild(op);
+      const chip = document.createElement('span'); chip.className='chip not';
+      chip.textContent = l.name || '(未命名名單)';
+      logicBar.appendChild(chip);
+    });
+
+    const arrow = document.createElement('span'); arrow.className='arrow'; arrow.textContent='→';
+    logicBar.appendChild(arrow);
+    const result = document.createElement('span'); result.className='chip result';
+    result.textContent = '結果名單';
+    logicBar.appendChild(result);
+  }
+
+  function updateAddBtnState(){ addListBtn.disabled = lists.length >= 8; }
+
+  addListBtn.addEventListener('click', ()=>{
+    if(lists.length >= 8) return;
+    makeList('名單'+(lists.length+1), 'AND');
+    updateAddBtnState();
+  });
+
+  runBtn.addEventListener('click', ()=>{
+    _matchedIdSet = null;
+    runMatch();
+  });
+
+  function groupRowsById(list){
+    const map = new Map(); // id -> array of rows
+    list.rows.forEach(row=>{
+      const id = cleanId(row[list.idCol]);
+      if(!id) return;
+      if(!map.has(id)) map.set(id, []);
+      map.get(id).push(row);
+    });
+    return map;
+  }
+
+  function runMatch(){
+    const andLists = lists.filter(l=>l.role==='AND');
+    const notLists = lists.filter(l=>l.role==='NOT');
+
+    if(andLists.length===0){ alert('請至少設定一份「必須包含」的名單。'); return; }
+    for(const l of andLists.concat(notLists)){
+      if(!l.rows.length){ alert(`名單「${l.name}」尚未上傳檔案。`); return; }
+      if(!l.idCol){ alert(`請為名單「${l.name}」選擇會員編號欄位。`); return; }
+    }
+
+    const andGroups = andLists.map(l=>({list:l, groups:groupRowsById(l)}));
+    const notGroups = notLists.map(l=>({list:l, groups:groupRowsById(l)}));
+
+    let resultIds = new Set(andGroups[0].groups.keys());
+    for(let i=1;i<andGroups.length;i++){
+      const keys = andGroups[i].groups;
+      resultIds = new Set([...resultIds].filter(id=>keys.has(id)));
+    }
+    notGroups.forEach(({groups})=>{
+      resultIds = new Set([...resultIds].filter(id=>!groups.has(id)));
+    });
+
+    // build output headers based on checked columns per AND list
+    const headers = ['會員編號'];
+    const colPlan = []; // {list, col, agg, type}
+    andGroups.forEach(({list})=>{
+      Object.keys(list.colConfig).forEach(col=>{
+        const cfg = list.colConfig[col];
+        if(cfg.checked){
+          headers.push(`${list.name}｜${col}`);
+          colPlan.push({list, col, agg:cfg.agg, type:cfg.type});
+        }
+      });
+    });
+
+    const outRows = [...resultIds].sort().map(id=>{
+      const row = [id];
+      colPlan.forEach(({list, col, agg, type})=>{
+        const memberRows = andGroups.find(g=>g.list===list).groups.get(id) || [];
+        const values = memberRows.map(r=>r[col]);
+        row.push(aggregate(values, agg, type));
+      });
+      return row;
+    });
+
+    lastResult = {headers, rows: outRows};
+    renderResult(andGroups, notGroups, resultIds.size);
+  }
+
+  function renderResult(andGroups, notGroups, matchedCount){
+    resultSection.style.display = '';
+    statGrid.innerHTML = '';
+
+    andGroups.forEach(({list, groups})=>{
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+
+      // sum-type metrics among matched members, computed over ALL their rows in this list
+      const sumCols = Object.keys(list.colConfig).filter(c => list.colConfig[c].checked && list.colConfig[c].agg==='SUM');
+      let metricsHtml = '';
+      if(sumCols.length){
+        metricsHtml = '<div class="stat-metrics">' + sumCols.map(col=>{
+          let total = 0;
+          groups.forEach((rows, id)=>{
+            if(!lastResultHasId(id)) return;
+            rows.forEach(r=>{
+              const n = toNumberStrict(r[col]);
+              if(!isNaN(n)) total += n;
+            });
+          });
+          return `<div class="stat-metric-row"><span title="${escapeAttr(col)}">${escapeHtml(col)} 合計</span><span>${fmtValue(total)}</span></div>`;
+        }).join('') + '</div>';
+      }
+
+      card.innerHTML = `
+        <div class="stat-label">${escapeHtml(list.name)}（必須包含）</div>
+        <div class="stat-value">${groups.size.toLocaleString()}</div>
+        <div class="stat-sub">名單原始不重複會員數</div>
+        ${metricsHtml}
+      `;
+      statGrid.appendChild(card);
+    });
+
+    notGroups.forEach(({list, groups})=>{
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.innerHTML = `
+        <div class="stat-label">${escapeHtml(list.name)}（必須排除）</div>
+        <div class="stat-value">${groups.size.toLocaleString()}</div>
+        <div class="stat-sub">名單原始不重複會員數</div>
+      `;
+      statGrid.appendChild(card);
+    });
+
+    const baseCount = andGroups[0].groups.size;
+    const rate = baseCount ? ((matchedCount/baseCount)*100).toFixed(1) : '0.0';
+    const highlightCard = document.createElement('div');
+    highlightCard.className = 'stat-card highlight';
+    highlightCard.innerHTML = `
+      <div class="stat-label">符合條件（結果名單）</div>
+      <div class="stat-value">${matchedCount.toLocaleString()}</div>
+      <div class="stat-sub">佔「${escapeHtml(andGroups[0].list.name)}」${rate}%</div>
+    `;
+    statGrid.appendChild(highlightCard);
+
+    const scrollWrap = document.querySelector('.table-scroll');
+    if(!lastResult.rows.length){
+      scrollWrap.innerHTML = '<div class="empty-state">目前的條件組合下沒有符合的會員。</div>';
+    } else {
+      const theadHtml = '<thead><tr>' + lastResult.headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead>';
+      const rowsToShow = lastResult.rows.slice(0, 2000);
+      const tbodyHtml = '<tbody>' + rowsToShow.map(r=>'<tr>'+r.map(c=>`<td>${escapeHtml(fmtValue(c))}</td>`).join('')+'</tr>').join('') + '</tbody>';
+      scrollWrap.innerHTML = `<table id="resultTable">${theadHtml}${tbodyHtml}</table>`;
+      if(lastResult.rows.length > 2000){
+        const note = document.createElement('div');
+        note.className = 'dz-rowcount';
+        note.style.padding = '10px 16px';
+        note.textContent = `表格僅預覽前 2,000 筆，完整 ${lastResult.rows.length.toLocaleString()} 筆請下載 CSV。`;
+        scrollWrap.appendChild(note);
+      }
+    }
+
+    resultSection.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  // helper closures referencing lastResult built member id set for quick lookup
+  let _matchedIdSet = null;
+  function lastResultHasId(id){
+    if(!_matchedIdSet && lastResult){ _matchedIdSet = new Set(lastResult.rows.map(r=>r[0])); }
+    return _matchedIdSet ? _matchedIdSet.has(id) : false;
+  }
+  function rowExistsInResult(id){ return lastResultHasId(id); }
+
+  downloadBtn.addEventListener('click', ()=>{
+    if(!lastResult || !lastResult.rows.length){
+      alert('請先執行比對並確認有結果資料。');
+      return;
+    }
+    const csvLines = [lastResult.headers.join(',')];
+    lastResult.rows.forEach(r=>{
+      csvLines.push(r.map(v=>{
+        const s = String(fmtValue(v)).replace(/"/g,'""');
+        return /[",\n]/.test(s) ? `"${s}"` : s;
+      }).join(','));
+    });
+    const csvContent = '\uFEFF' + csvLines.join('\n');
+    const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '名單比對結果_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // initial three lists for the stated use case
+  makeList('2024/12/31前有消費', 'AND');
+  makeList('2025年有消費', 'NOT');
+  makeList('2026年有消費', 'AND');
+  updateAddBtnState();
+})();
+</script>
+</body>
+</html>
