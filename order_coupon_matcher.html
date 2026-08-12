@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>訂單 × 用券明細 比對工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2024;
+    --paper:#fbfaf8;
+    --line:#dcd7cc;
+    --line-soft:#eae6dc;
+    --accent:#2f5d50;
+    --accent-soft:#e4ece8;
+    --warn:#9a4a3a;
+    --warn-soft:#f3e6e2;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.55;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+  header{margin-bottom:28px;border-bottom:2px solid var(--ink);padding-bottom:16px;}
+  header .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.01em;}
+  header p{margin:0;color:#5b5750;font-size:14px;}
+
+  .step{
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:10px;
+    padding:20px 22px;
+    margin-bottom:18px;
+  }
+  .step-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
+  .step-num{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--accent);
+    border:1px solid var(--accent);
+    border-radius:999px;
+    width:22px;height:22px;
+    display:flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .step-head h2{font-size:16px;margin:0;}
+  .step-head .sub{font-size:12.5px;color:#84806f;margin-left:auto;font-family:var(--mono);}
+
+  .drop{
+    border:1.5px dashed var(--line);
+    border-radius:8px;
+    padding:22px;
+    text-align:center;
+    cursor:pointer;
+    transition:.15s border-color, .15s background;
+    background:#fdfcfa;
+  }
+  .drop:hover, .drop.drag{border-color:var(--accent);background:var(--accent-soft);}
+  .drop input{display:none;}
+  .drop .hint{font-size:13px;color:#8a8577;}
+  .drop .fname{font-family:var(--mono);font-size:13.5px;color:var(--ink);margin-top:4px;word-break:break-all;}
+
+  .filegrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:640px){.filegrid{grid-template-columns:1fr;}}
+
+  .meta{
+    margin-top:12px;
+    font-size:12.5px;
+    color:#5b5750;
+    display:none;
+  }
+  .meta.show{display:block;}
+  .meta table{width:100%;border-collapse:collapse;margin-top:6px;}
+  .meta td{padding:3px 0;vertical-align:top;}
+  .meta td:first-child{color:#8a8577;width:78px;flex:none;}
+  select{
+    font-family:var(--mono);
+    font-size:12.5px;
+    padding:5px 8px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    background:#fff;
+    color:var(--ink);
+    max-width:100%;
+  }
+
+  button.primary{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14.5px;
+    color:#fff;
+    background:var(--ink);
+    border:none;
+    border-radius:7px;
+    padding:12px 22px;
+    cursor:pointer;
+    transition:.15s opacity, .15s transform;
+  }
+  button.primary:hover{opacity:.88;}
+  button.primary:active{transform:translateY(1px);}
+  button.primary:disabled{background:#c9c5ba;cursor:not-allowed;}
+
+  button.ghost{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--accent);
+    background:none;
+    border:1px solid var(--accent);
+    border-radius:6px;
+    padding:8px 14px;
+    cursor:pointer;
+  }
+  button.ghost:hover{background:var(--accent-soft);}
+
+  .status{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#8a8577;
+    margin-top:12px;
+    min-height:16px;
+  }
+  .status.err{color:var(--warn);}
+
+  .progress{
+    height:4px;background:var(--line-soft);border-radius:2px;overflow:hidden;margin-top:12px;display:none;
+  }
+  .progress.show{display:block;}
+  .progress > div{height:100%;width:0%;background:var(--accent);transition:.15s width;}
+
+  .results{display:none;}
+  .results.show{display:block;}
+  .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+  .stat{
+    border:1px solid var(--line-soft);
+    border-radius:8px;
+    padding:14px 16px;
+    background:#fdfcfa;
+  }
+  .stat .num{font-family:var(--mono);font-size:22px;font-weight:600;}
+  .stat .lbl{font-size:12px;color:#8a8577;margin-top:2px;}
+  .stat.hit .num{color:var(--accent);}
+  .stat.miss .num{color:var(--warn);}
+
+  table.preview{
+    width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);
+    display:block;overflow-x:auto;white-space:nowrap;
+    border:1px solid var(--line-soft);border-radius:6px;
+  }
+  table.preview th, table.preview td{
+    padding:7px 10px;border-bottom:1px solid var(--line-soft);text-align:left;
+  }
+  table.preview th{background:#f5f2ea;position:sticky;top:0;}
+  table.preview tr:last-child td{border-bottom:none;}
+  .tag{
+    display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;
+  }
+  .tag.y{background:var(--accent-soft);color:var(--accent);}
+  .tag.n{background:var(--warn-soft);color:var(--warn);}
+
+  .preview-wrap{margin-top:18px;}
+  .preview-wrap .cap{font-size:12px;color:#8a8577;margin-bottom:6px;}
+
+  footer{margin-top:36px;font-size:12px;color:#a19c8d;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">本機比對工具 · 資料不會上傳到任何伺服器</div>
+    <h1>訂單 × 用券明細比對</h1>
+    <p>上傳訂單明細與用券明細，依訂單號碼自動比對，輸出標記成功/失敗的 Excel。全程在瀏覽器本機執行。</p>
+  </header>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <h2>上傳兩份 Excel</h2>
+    </div>
+    <div class="filegrid">
+      <div>
+        <div class="drop" id="drop-orders">
+          <input type="file" id="file-orders" accept=".xlsx,.xls">
+          <div class="hint">訂單明細（點擊或拖曳上傳 .xlsx）</div>
+          <div class="fname" id="fname-orders"></div>
+        </div>
+        <div class="meta" id="meta-orders">
+          <table>
+            <tr><td>筆數</td><td id="meta-orders-rows">—</td></tr>
+            <tr><td>訂單號碼欄</td><td><select id="col-orders"></select></td></tr>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="drop" id="drop-coupons">
+          <input type="file" id="file-coupons" accept=".xlsx,.xls">
+          <div class="hint">用券明細（點擊或拖曳上傳 .xlsx）</div>
+          <div class="fname" id="fname-coupons"></div>
+        </div>
+        <div class="meta" id="meta-coupons">
+          <table>
+            <tr><td>筆數</td><td id="meta-coupons-rows">—</td></tr>
+            <tr><td>訂單號碼欄</td><td><select id="col-coupons"></select></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <h2>執行比對</h2>
+      <div class="sub" id="ready-hint">請先完成上傳</div>
+    </div>
+    <button class="primary" id="run-btn" disabled>開始比對</button>
+    <div class="progress" id="progress"><div id="progress-bar"></div></div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step results" id="results-step">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <h2>比對結果</h2>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="stat-total">—</div><div class="lbl">訂單總數</div></div>
+      <div class="stat hit"><div class="num" id="stat-hit">—</div><div class="lbl">有用券（比對成功）</div></div>
+      <div class="stat miss"><div class="num" id="stat-miss">—</div><div class="lbl">無用券（比對失敗）</div></div>
+    </div>
+
+    <button class="ghost" id="download-btn">下載比對結果 Excel</button>
+
+    <div class="preview-wrap">
+      <div class="cap">預覽前 15 筆結果：</div>
+      <table class="preview" id="preview-table"></table>
+    </div>
+  </div>
+
+  <footer>訂單明細以「訂單號碼」為主鍵，串接用券明細中所有相符紀錄後彙總輸出。</footer>
+</div>
+
+<script>
+(function(){
+  const state = {
+    orders: null,      // {headers, rows}
+    coupons: null,
+    orderKeyCol: null,
+    couponKeyCol: null,
+    result: null        // {headers, rows} for download
+  };
+
+  // ---------- helpers ----------
+  function normKey(v){
+    if(v === null || v === undefined) return '';
+    if(typeof v === 'number'){
+      if(Number.isFinite(v)) return String(Math.round(v));
+      return '';
+    }
+    let s = String(v).trim();
+    if(s === '') return '';
+    // strip trailing .0 style decimals coming through as text, and stray non-digit chars
+    s = s.replace(/\.0+$/,'');
+    return s;
+  }
+
+  function guessKeyColumn(headers){
+    // priority: exact "訂單號碼" > contains 訂單 and 號碼 > contains 訂單編號 > contains 訂單 > contains 號碼
+    const exact = headers.find(h => h === '訂單號碼' || h === '母訂單號碼');
+    if(exact) return exact;
+    const both = headers.find(h => h.includes('訂單') && h.includes('號碼'));
+    if(both) return both;
+    const orderNo = headers.find(h => h.includes('訂單編號'));
+    if(orderNo) return orderNo;
+    const anyOrder = headers.find(h => h.includes('訂單'));
+    if(anyOrder) return anyOrder;
+    return headers[0];
+  }
+
+  function readWorkbook(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try{
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, {type:'array', cellDates:true});
+          const sheetName = wb.SheetNames[0];
+          const ws = wb.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});
+          const headers = json.length ? Object.keys(json[0]) : (XLSX.utils.sheet_to_json(ws,{header:1})[0]||[]);
+          resolve({headers, rows: json, sheetName});
+        }catch(err){ reject(err); }
+      };
+      reader.onerror = () => reject(new Error('讀取檔案失敗'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function fmtCell(v){
+    if(v instanceof Date){
+      const pad = n => String(n).padStart(2,'0');
+      return `${v.getFullYear()}-${pad(v.getMonth()+1)}-${pad(v.getDate())}`;
+    }
+    return v;
+  }
+
+  function populateSelect(sel, headers, guessed){
+    sel.innerHTML = '';
+    headers.forEach(h => {
+      const opt = document.createElement('option');
+      opt.value = h; opt.textContent = h;
+      if(h === guessed) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function setStatus(msg, isErr){
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+  }
+
+  function checkReady(){
+    const ready = state.orders && state.coupons;
+    document.getElementById('run-btn').disabled = !ready;
+    document.getElementById('ready-hint').textContent = ready ? '已就緒，可以開始比對' : '請先完成上傳';
+  }
+
+  // ---------- file wiring ----------
+  function wireDrop(dropId, inputId, onFile){
+    const drop = document.getElementById(dropId);
+    const input = document.getElementById(inputId);
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => { if(input.files[0]) onFile(input.files[0]); });
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.add('drag');
+    }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.remove('drag');
+    }));
+    drop.addEventListener('drop', e => {
+      const f = e.dataTransfer.files[0];
+      if(f) onFile(f);
+    });
+  }
+
+  wireDrop('drop-orders','file-orders', async (file) => {
+    document.getElementById('fname-orders').textContent = file.name;
+    setStatus('讀取訂單明細中…');
+    try{
+      const parsed = await readWorkbook(file);
+      state.orders = parsed;
+      document.getElementById('meta-orders-rows').textContent = parsed.rows.length.toLocaleString();
+      const sel = document.getElementById('col-orders');
+      const guess = guessKeyColumn(parsed.headers);
+      populateSelect(sel, parsed.headers, guess);
+      sel.onchange = () => { state.orderKeyCol = sel.value; };
+      state.orderKeyCol = sel.value;
+      document.getElementById('meta-orders').classList.add('show');
+      setStatus('');
+    }catch(err){
+      setStatus('讀取訂單明細失敗：'+err.message, true);
+    }
+    checkReady();
+  });
+
+  wireDrop('drop-coupons','file-coupons', async (file) => {
+    document.getElementById('fname-coupons').textContent = file.name;
+    setStatus('讀取用券明細中…');
+    try{
+      const parsed = await readWorkbook(file);
+      state.coupons = parsed;
+      document.getElementById('meta-coupons-rows').textContent = parsed.rows.length.toLocaleString();
+      const sel = document.getElementById('col-coupons');
+      const guess = guessKeyColumn(parsed.headers);
+      populateSelect(sel, parsed.headers, guess);
+      sel.onchange = () => { state.couponKeyCol = sel.value; };
+      state.couponKeyCol = sel.value;
+      document.getElementById('meta-coupons').classList.add('show');
+      setStatus('');
+    }catch(err){
+      setStatus('讀取用券明細失敗：'+err.message, true);
+    }
+    checkReady();
+  });
+
+  // ---------- matching ----------
+  function runMatch(){
+    const progress = document.getElementById('progress');
+    const bar = document.getElementById('progress-bar');
+    progress.classList.add('show');
+    bar.style.width = '10%';
+    setStatus('建立索引中…');
+
+    setTimeout(() => {
+      try{
+        const orderKey = state.orderKeyCol;
+        const couponKey = state.couponKeyCol;
+
+        // build map: normalized key -> array of coupon rows
+        const couponMap = new Map();
+        for(const row of state.coupons.rows){
+          const k = normKey(row[couponKey]);
+          if(k === '') continue;
+          if(!couponMap.has(k)) couponMap.set(k, []);
+          couponMap.get(k).push(row);
+        }
+        bar.style.width = '45%';
+
+        const couponOtherCols = state.coupons.headers.filter(h => h !== couponKey);
+        // pick a reasonable "amount" and "name" column heuristically for summary
+        const amountCol = couponOtherCols.find(h => h.includes('金額')) || null;
+        const nameCol = couponOtherCols.find(h => h.includes('名稱')) || couponOtherCols.find(h => h.includes('編號')) || null;
+
+        const resultRows = [];
+        const detailRows = [];
+        let hit = 0, miss = 0;
+
+        for(const orow of state.orders.rows){
+          const k = normKey(orow[orderKey]);
+          const matches = k !== '' ? (couponMap.get(k) || []) : [];
+          const matched = matches.length > 0;
+          if(matched) hit++; else miss++;
+
+          const out = {};
+          for(const h of state.orders.headers){ out[h] = fmtCell(orow[h]); }
+          out['是否有用券'] = matched ? '是' : '否';
+          out['用券筆數'] = matches.length;
+          if(amountCol){
+            out['用券金額合計'] = matches.reduce((s,r)=> s + (Number(r[amountCol])||0), 0);
+          }
+          if(nameCol){
+            out['用券項目'] = matches.map(r => r[nameCol]).filter(Boolean).join('、');
+          }
+          resultRows.push(out);
+
+          for(const m of matches){
+            const drow = {};
+            drow[orderKey] = fmtCell(orow[orderKey]);
+            for(const h of couponOtherCols){ drow[h] = fmtCell(m[h]); }
+            detailRows.push(drow);
+          }
+        }
+
+        bar.style.width = '85%';
+
+        const resultHeaders = Object.keys(resultRows[0] || {});
+        state.result = { headers: resultHeaders, rows: resultRows, detailRows, detailHeaders: Object.keys(detailRows[0]||{orderKey:''}) };
+
+        // stats
+        document.getElementById('stat-total').textContent = state.orders.rows.length.toLocaleString();
+        document.getElementById('stat-hit').textContent = hit.toLocaleString();
+        document.getElementById('stat-miss').textContent = miss.toLocaleString();
+
+        // preview table
+        renderPreview(resultHeaders, resultRows.slice(0,15));
+
+        document.getElementById('results-step').classList.add('show');
+        bar.style.width = '100%';
+        setStatus(`比對完成：共 ${state.orders.rows.length.toLocaleString()} 筆訂單，${hit.toLocaleString()} 筆有用券。`);
+        setTimeout(()=> progress.classList.remove('show'), 600);
+      }catch(err){
+        setStatus('比對失敗：'+err.message, true);
+        progress.classList.remove('show');
+      }
+    }, 30);
+  }
+
+  function renderPreview(headers, rows){
+    const table = document.getElementById('preview-table');
+    let html = '<thead><tr>' + headers.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+    for(const row of rows){
+      html += '<tr>' + headers.map(h => {
+        if(h === '是否有用券'){
+          const y = row[h] === '是';
+          return `<td><span class="tag ${y?'y':'n'}">${row[h]}</span></td>`;
+        }
+        return `<td>${row[h] ?? ''}</td>`;
+      }).join('') + '</tr>';
+    }
+    html += '</tbody>';
+    table.innerHTML = html;
+  }
+
+  document.getElementById('run-btn').addEventListener('click', runMatch);
+
+  document.getElementById('download-btn').addEventListener('click', () => {
+    if(!state.result) return;
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(state.result.rows, {header: state.result.headers});
+    XLSX.utils.book_append_sheet(wb, ws1, '比對結果');
+    if(state.result.detailRows.length){
+      const ws2 = XLSX.utils.json_to_sheet(state.result.detailRows, {header: state.result.detailHeaders});
+      XLSX.utils.book_append_sheet(wb, ws2, '用券明細比對');
+    }
+    const ts = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const fname = `比對結果_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}.xlsx`;
+    XLSX.writeFile(wb, fname);
+  });
+
+})();
+</script>
+</body>
+</html>
