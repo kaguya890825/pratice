@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>電子報排程自動產生工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Microsoft JhengHei", "PingFang TC", "Helvetica Neue", Arial, sans-serif;
+    background: #f4f5f7;
+    margin: 0;
+    padding: 28px 16px 60px;
+    color: #222;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { text-align:center; font-size:20px; color:#2F5496; margin-bottom: 6px; }
+  .subtitle { text-align:center; color:#666; font-size:13px; margin-bottom:24px; }
+
+  .panel {
+    background:#fff; border-radius:8px; padding:20px 24px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.08); margin-bottom:24px;
+  }
+  .panel h2 { font-size:15px; color:#2F5496; margin:0 0 14px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
+  label { font-size:13px; font-weight:bold; color:#444; margin-right:6px; }
+  input[type=file], input[type=month] {
+    padding:7px 10px; border:1px solid #ccc; border-radius:5px; font-size:13px;
+  }
+  button {
+    background:#2F5496; color:#fff; border:none; padding:9px 18px;
+    border-radius:5px; font-size:13px; font-weight:bold; cursor:pointer;
+  }
+  button:disabled { background:#aab4c8; cursor:not-allowed; }
+  button.secondary { background:#666; }
+  button:hover:not(:disabled) { background:#1f3a6e; }
+  .status { font-size:12px; color:#c0392b; margin-top:8px; min-height:16px; }
+  .status.ok { color:#1a7a3c; }
+
+  .section { margin-bottom: 28px; border-radius:6px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+  .section-banner { background:#2F5496; color:#fff; font-weight:bold; font-size:15px; text-align:center; padding:9px 0; }
+  .sub-banner { background:#FFFF00; color:#333; font-weight:bold; font-size:12px; text-align:center; padding:5px 0; }
+  table { width:100%; border-collapse:collapse; background:#fff; }
+  th, td { border:1px solid #d9d9d9; padding:6px 8px; text-align:center; font-size:12.5px; }
+  th { background:#FFF2CC; font-weight:bold; }
+  td input { width:100%; border:1px solid #ddd; border-radius:3px; padding:4px 6px; font-size:12.5px; text-align:left; }
+  tr.group-boundary td { border-top:2px solid #2F5496; }
+  tr.group-alt td { background:#FAFBFF; }
+  td.line-cell { font-weight:bold; color:#2F5496; white-space:nowrap; }
+  .note { font-size:11.5px; color:#888; margin-top:6px; line-height:1.6; }
+  .actions { text-align:center; margin-top:8px; }
+  .actions button { margin: 0 6px; }
+  #previewArea { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>電子報排程自動產生工具</h1>
+  <div class="subtitle">上傳每月「重點活動排程表」(.xlsx) → 選擇排程月份 → 自動依規則產生定刊 / 特刊排程 → 匯出 Excel</div>
+
+  <div class="panel">
+    <h2>Step 1．上傳資料 &amp; 選擇月份</h2>
+    <div class="row">
+      <div><label>重點活動排程表</label><input type="file" id="fileInput" accept=".xlsx,.xls"></div>
+      <div><label>排程月份</label><input type="month" id="monthInput"></div>
+      <button id="generateBtn" disabled>產生排程</button>
+    </div>
+    <div class="status" id="statusMsg"></div>
+    <div class="note">
+      系統會自動偵測欄位（品類 / 起日 / 迄日 / 重要性 / 活動主題 / 業績），不需固定欄位順序，但欄位標題文字需與範本一致。
+    </div>
+  </div>
+
+  <div id="previewArea">
+    <div class="panel">
+      <h2>Step 2．預覽 &amp; 調整（可直接修改「活動名稱」欄位後再匯出）</h2>
+
+      <div class="section">
+        <div class="section-banner">定刊</div>
+        <table id="regularTable">
+          <thead><tr><th style="width:6%">序號</th><th style="width:10%">線別</th><th style="width:26%">活動名稱</th><th style="width:8%">時間</th><th style="width:12%">日期</th><th style="width:38%">備註</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <div class="section-banner">特刊</div>
+        <div class="sub-banner">系統自動篩選（依業績 &gt; 節慶 &gt; 熱門議題 排序，可手動調整活動名稱）</div>
+        <table id="specialTable">
+          <thead><tr><th style="width:6%">序號</th><th style="width:16%">線別</th><th style="width:38%">活動名稱</th><th style="width:8%">時間</th><th style="width:14%">日期</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="actions">
+        <button id="exportBtn">匯出 Excel</button>
+        <button id="regenBtn" class="secondary">重新產生（重置編輯）</button>
+      </div>
+      <div class="note" id="ruleNote"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   排程規則設定
+--------------------------------------------------------------- */
+const FESTIVAL_KEYWORDS = ['中秋','萬聖','聖誕','跨年','新年','情人節','母親節','父親節','兒童節',
+  '清明','端午','元宵','黑五','雙11','雙十一','雙12','雙十二','週年慶','館慶','開學','畢業','過年','春節'];
+const HOT_KEYWORDS = ['話題','議題','時事','選','熱銷','趨勢','熱搜'];
+
+const SPECIAL_QUOTA = [
+  {key:'中文', quota:4},
+  {key:'文具潮藝', quota:2, splitHalf:true},
+  {key:'親子', quota:1},
+  {key:'樂活家居(生活)', quota:1},
+  {key:'樂活家居(休閒)', quota:1, afterStart:true},
+  {key:'美妝保養', quota:1},
+  {key:'3C家電', quota:1},
+  {key:'服飾鞋包', quota:1},
+  {key:'食品保健', quota:1},
+  {key:'影音', quota:1},
+  {key:'童書', quota:1},
+];
+
+/* ---------------------------------------------------------------
+   日期工具
+--------------------------------------------------------------- */
+function nthWeekday(year, monthIndex0, isoWeekday, n){
+  // isoWeekday: 1=Mon ... 7=Sun
+  let found = [];
+  let d = new Date(year, monthIndex0, 1);
+  while(d.getMonth() === monthIndex0){
+    const wd = d.getDay();
+    const iso = wd === 0 ? 7 : wd;
+    if(iso === isoWeekday) found.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return found[n-1] || null;
+}
+function isWeekend(d){ const wd = d.getDay(); return wd===0 || wd===6; }
+function nextWeekday(d){ let x = new Date(d); while(isWeekend(x)) x.setDate(x.getDate()+1); return x; }
+function addWeekdays(d, n){
+  let x = new Date(d); let count = 0;
+  while(count < n){ x.setDate(x.getDate()+1); if(!isWeekend(x)) count++; }
+  return x;
+}
+function mondayOfWeek(d){
+  const x = new Date(d); const day = (x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x;
+}
+function weekKey(d){ return mondayOfWeek(d).toISOString().slice(0,10); }
+function fmtDate(d){
+  const w = ['日','一','二','三','四','五','六'][d.getDay()];
+  return (d.getMonth()+1)+'/'+d.getDate()+'('+w+')';
+}
+function toDate(v){
+  if(v instanceof Date) return v;
+  if(typeof v === 'number'){
+    // excel serial fallback
+    return new Date(Date.UTC(1899,11,30) + v*86400000);
+  }
+  if(typeof v === 'string'){
+    const d = new Date(v);
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------
+   定刊（固定公式）
+--------------------------------------------------------------- */
+function generateRegular(year, monthIndex0){
+  const rows = [];
+  const add = (line,name,time,date,note) => { if(date) rows.push({line,name,time,date,note}); };
+  add('全站','新品報','14:00', nthWeekday(year,monthIndex0,2,2), '每月第二個週二');
+  add('全站','新品報','14:00', nthWeekday(year,monthIndex0,2,4), '每月第四個週二');
+  add('中文','誠品選書報','10:00', nthWeekday(year,monthIndex0,4,2), '每月第二個週四');
+  add('中文','愛讀報','10:00', nthWeekday(year,monthIndex0,4,1), '每月第一個週四');
+  add('中文','愛讀報','10:00', nthWeekday(year,monthIndex0,4,3), '每月第三個週四');
+  add('外文','外文報','14:00', nthWeekday(year,monthIndex0,3,4), '每月第四個週三');
+  add('兒童','童心抱報','14:00', nthWeekday(year,monthIndex0,1,1), '每月第一個週一');
+  add('文具','風格文具報','14:00', nthWeekday(year,monthIndex0,3,3), '每月第三個週三');
+  add('生活','生活品味報','14:00', nthWeekday(year,monthIndex0,5,2), '每月第二個週五(輪值:生活)');
+  add('休閒','生活品味報','14:00', nthWeekday(year,monthIndex0,5,3), '每月第三個週五(輪值:休閒)');
+  add('3C','生活品味報','14:00', nthWeekday(year,monthIndex0,5,4), '每月第四個週五(輪值:3C)');
+  add('服飾','流行風尚報','14:00', nthWeekday(year,monthIndex0,1,2), '每月第二個週一(輪值:服飾)');
+  add('美妝','流行風尚報','14:00', nthWeekday(year,monthIndex0,1,4), '每月第四個週一(輪值:美妝)');
+  add('影音','影音報','14:00', nthWeekday(year,monthIndex0,5,1), '每月第一個週五');
+  add('食品','饗食報','14:00', nthWeekday(year,monthIndex0,3,2), '每月第二個週三');
+
+  const groupOrder = ['全站','中文','外文','兒童','文具','生活','休閒','3C','服飾','美妝','影音','食品'];
+  rows.sort((a,b)=>{
+    const gi = groupOrder.indexOf(a.line) - groupOrder.indexOf(b.line);
+    if(gi !== 0) return gi;
+    if(a.name !== b.name) return a.name.localeCompare(b.name, 'zh-Hant');
+    return a.date - b.date;
+  });
+  return rows;
+}
+
+/* ---------------------------------------------------------------
+   讀取上傳的重點活動排程表
+--------------------------------------------------------------- */
+function detectColumns(aoa){
+  for(let r=0; r<Math.min(8, aoa.length); r++){
+    const row = aoa[r] || [];
+    const texts = row.map(c => String(c==null ? '' : c));
+    if(texts.some(t=>t.includes('起日')) && texts.some(t=>t.includes('迄日'))){
+      const map = {};
+      row.forEach((cell, idx) => {
+        const t = String(cell==null ? '' : cell);
+        if(t.includes('品類') && map.category===undefined) map.category = idx;
+        if(t.includes('起日')) map.startDate = idx;
+        if(t.includes('迄日')) map.endDate = idx;
+        if(t.includes('重要性')) map.importance = idx;
+        if(t.includes('活動主題')) map.name = idx;
+        if(t.includes('企劃概念')) map.concept = idx;
+        if(t.includes('業績')) map.revenue = idx;
+      });
+      if(map.startDate!==undefined && map.endDate!==undefined && map.name!==undefined && map.category!==undefined){
+        return {headerRow: r, map};
+      }
+    }
+  }
+  return null;
+}
+
+function parseRevenue(v){
+  if(v==null) return 0;
+  if(typeof v === 'number') return v;
+  const s = String(v).replace(/[^0-9.\-]/g,'');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function mapLine(catRaw, nameRaw){
+  const cat = String(catRaw||'').trim();
+  const name = String(nameRaw||'');
+  if(cat==='中文') return '中文';
+  if(cat==='文具潮藝') return '文具潮藝';
+  if(cat==='親子') return '親子';
+  if(cat==='樂活家居') return (name.includes('休閒')) ? '樂活家居(休閒)' : '樂活家居(生活)';
+  if(cat==='美妝保養') return '美妝保養';
+  if(cat==='3C家電') return '3C家電';
+  if(cat==='服飾鞋包') return '服飾鞋包';
+  if(cat==='食品保健') return '食品保健';
+  if(cat==='影音') return '影音';
+  if(cat==='兒童') return '童書';
+  return null;
+}
+
+function parseEvents(workbook, monthStart, monthEnd){
+  const sheetName = workbook.SheetNames[0];
+  const ws = workbook.Sheets[sheetName];
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:null});
+  const detected = detectColumns(aoa);
+  if(!detected) throw new Error('找不到「起日」「迄日」等欄位，請確認檔案格式與範本一致');
+  const { headerRow, map } = detected;
+
+  // re-read with cellDates for accurate date objects
+  const wsRaw = workbook.Sheets[sheetName];
+  const aoaRaw = XLSX.utils.sheet_to_json(wsRaw, {header:1, raw:true, defval:null});
+
+  const events = [];
+  for(let r=headerRow+1; r<aoaRaw.length; r++){
+    const row = aoaRaw[r] || [];
+    const catRaw = row[map.category];
+    const nameRaw = row[map.name];
+    const startRaw = row[map.startDate];
+    const endRaw = row[map.endDate];
+    if(!nameRaw || !startRaw) continue;
+    const line = mapLine(catRaw, nameRaw);
+    if(!line) continue;
+    const startDate = toDate(startRaw);
+    const endDate = toDate(endRaw) || startDate;
+    if(!startDate) continue;
+    // must overlap the target month
+    if(endDate < monthStart || startDate > monthEnd) continue;
+    const revenue = map.revenue!==undefined ? parseRevenue(row[map.revenue]) : 0;
+    const concept = map.concept!==undefined ? String(row[map.concept]||'') : '';
+    const importance = map.importance!==undefined ? row[map.importance] : null;
+    events.push({ line, name: String(nameRaw).trim(), startDate, endDate, revenue, concept, importance });
+  }
+  return events;
+}
+
+/* ---------------------------------------------------------------
+   特刊挑選邏輯
+--------------------------------------------------------------- */
+function scoreEvents(events){
+  return events.map(e => ({
+    ...e,
+    festival: FESTIVAL_KEYWORDS.some(k => (e.name+e.concept).includes(k)),
+    hot: HOT_KEYWORDS.some(k => (e.name+e.concept).includes(k)),
+  }));
+}
+function sortByPriority(list){
+  return list.slice().sort((a,b)=>{
+    if(b.revenue !== a.revenue) return b.revenue - a.revenue;
+    if(b.festival !== a.festival) return (b.festival?1:0)-(a.festival?1:0);
+    if(b.hot !== a.hot) return (b.hot?1:0)-(a.hot?1:0);
+    return a.startDate - b.startDate;
+  });
+}
+
+function selectSpecials(events, monthStart, monthEnd){
+  const selected = [];
+  SPECIAL_QUOTA.forEach(cfg => {
+    const lineEvents = events.filter(e => e.line === cfg.key);
+    const startedInMonth = lineEvents.filter(e => e.startDate >= monthStart && e.startDate <= monthEnd);
+    const pool = startedInMonth.length >= cfg.quota ? startedInMonth : lineEvents;
+    const scored = sortByPriority(scoreEvents(pool));
+
+    let picks = [];
+    if(cfg.splitHalf){
+      const firstHalf = scored.filter(e => e.startDate.getDate() <= 15);
+      const secondHalf = scored.filter(e => e.startDate.getDate() > 15);
+      if(firstHalf[0]) picks.push(firstHalf[0]);
+      if(secondHalf[0]) picks.push(secondHalf[0]);
+      // fill remaining quota from whatever's left, avoiding duplicates
+      const chosenNames = new Set(picks.map(p=>p.name));
+      for(const e of scored){
+        if(picks.length >= cfg.quota) break;
+        if(!chosenNames.has(e.name)){ picks.push(e); chosenNames.add(e.name); }
+      }
+    } else {
+      picks = scored.slice(0, cfg.quota);
+    }
+    picks.forEach(e => selected.push({ ...e, afterStart: !!cfg.afterStart, lineKey: cfg.key }));
+  });
+  return selected;
+}
+
+function assignDates(selected, monthStart, monthEnd){
+  const byLine = {};
+  selected.forEach(e => { (byLine[e.lineKey] = byLine[e.lineKey] || []).push(e); });
+
+  Object.keys(byLine).forEach(lineKey => {
+    const list = byLine[lineKey].sort((a,b)=>a.startDate-b.startDate);
+    const usedWeeks = new Set();
+    list.forEach(e => {
+      let base = e.startDate < monthStart ? monthStart : e.startDate;
+      if(e.afterStart) base = addWeekdays(base, 4);
+      base = nextWeekday(base);
+      if(base > monthEnd) base = nextWeekday(monthEnd);
+      let guard = 0;
+      while(usedWeeks.has(weekKey(base)) && guard < 12){
+        const mon = mondayOfWeek(base);
+        mon.setDate(mon.getDate()+7);
+        base = nextWeekday(mon);
+        guard++;
+      }
+      usedWeeks.add(weekKey(base));
+      e.assignedDate = base;
+      e.time = (lineKey === '中文') ? '10:00' : '14:00';
+    });
+  });
+
+  const groupOrder = SPECIAL_QUOTA.map(c=>c.key);
+  const out = [];
+  groupOrder.forEach(k => {
+    (byLine[k]||[]).sort((a,b)=>a.assignedDate-b.assignedDate).forEach(e => out.push(e));
+  });
+  return out;
+}
+
+/* ---------------------------------------------------------------
+   UI 邏輯
+--------------------------------------------------------------- */
+let workbookCache = null;
+let lastRegular = [];
+let lastSpecial = [];
+let currentMonthStart = null;
+let currentMonthEnd = null;
+
+const fileInput = document.getElementById('fileInput');
+const monthInput = document.getElementById('monthInput');
+const generateBtn = document.getElementById('generateBtn');
+const statusMsg = document.getElementById('statusMsg');
+const previewArea = document.getElementById('previewArea');
+
+function setStatus(msg, ok){
+  statusMsg.textContent = msg;
+  statusMsg.className = 'status' + (ok ? ' ok' : '');
+}
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if(!file) return;
+  setStatus('讀取檔案中...');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      workbookCache = XLSX.read(data, {type:'array', cellDates:true});
+      setStatus('檔案讀取完成，請選擇排程月份後按「產生排程」', true);
+      checkReady();
+    } catch(err){
+      setStatus('讀取失敗：' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+monthInput.addEventListener('change', checkReady);
+function checkReady(){
+  generateBtn.disabled = !(workbookCache && monthInput.value);
+}
+
+generateBtn.addEventListener('click', () => {
+  try {
+    const [yearStr, monthStr] = monthInput.value.split('-');
+    const year = parseInt(yearStr,10);
+    const monthIndex0 = parseInt(monthStr,10) - 1;
+    const monthStart = new Date(year, monthIndex0, 1);
+    const monthEnd = new Date(year, monthIndex0+1, 0);
+    currentMonthStart = monthStart;
+    currentMonthEnd = monthEnd;
+
+    lastRegular = generateRegular(year, monthIndex0);
+    const events = parseEvents(workbookCache, monthStart, monthEnd);
+    const selected = selectSpecials(events, monthStart, monthEnd);
+    lastSpecial = assignDates(selected, monthStart, monthEnd);
+
+    renderRegular(lastRegular);
+    renderSpecial(lastSpecial);
+    previewArea.style.display = 'block';
+    document.getElementById('ruleNote').textContent =
+      '特刊挑選依「業績高 > 節慶 > 熱門議題」排序，並以活動起日排在當月為優先；同線別特刊每週至多1檔、休閒線安排於活動開跑後幾天發送、六日不排程。活動名稱可於上表手動修改後再匯出。';
+    setStatus('排程已產生，可於下方預覽並調整', true);
+  } catch(err){
+    setStatus('產生排程失敗：' + err.message);
+    console.error(err);
+  }
+});
+
+function renderRegular(rows){
+  const tbody = document.querySelector('#regularTable tbody');
+  tbody.innerHTML = '';
+  let prevKey = null, altToggle = false;
+  rows.forEach((r, i) => {
+    const key = r.line + '|' + r.name;
+    const boundary = key !== prevKey;
+    if(boundary) altToggle = !altToggle;
+    const tr = document.createElement('tr');
+    const classes = [boundary ? 'group-boundary' : '', altToggle ? 'group-alt' : ''].filter(Boolean).join(' ');
+    if(classes) tr.className = classes;
+    tr.innerHTML = `<td>${i+1}</td><td class="line-cell">${r.line}</td><td>${r.name}</td><td>${r.time}</td><td>${fmtDate(r.date)}</td><td>${r.note}</td>`;
+    tbody.appendChild(tr);
+    prevKey = key;
+  });
+}
+
+function renderSpecial(rows){
+  const tbody = document.querySelector('#specialTable tbody');
+  tbody.innerHTML = '';
+  let prevLine = null, altToggle = false;
+  rows.forEach((r, i) => {
+    const boundary = r.lineKey !== prevLine;
+    if(boundary) altToggle = !altToggle;
+    const tr = document.createElement('tr');
+    const classes = [boundary ? 'group-boundary' : '', altToggle ? 'group-alt' : ''].filter(Boolean).join(' ');
+    if(classes) tr.className = classes;
+    tr.innerHTML = `<td>${i+1}</td><td class="line-cell">${r.lineKey}</td>` +
+      `<td><input type="text" value="${(r.name||'').replace(/"/g,'&quot;')}"></td>` +
+      `<td>${r.time}</td><td>${fmtDate(r.assignedDate)}</td>`;
+    tbody.appendChild(tr);
+    prevLine = r.lineKey;
+  });
+}
+
+document.getElementById('regenBtn').addEventListener('click', () => {
+  renderRegular(lastRegular);
+  renderSpecial(lastSpecial);
+});
+
+/* ---------------------------------------------------------------
+   甘特圖行事曆 上色設定
+--------------------------------------------------------------- */
+const PALETTE = ['FFBDD7EE','FFE2EFDA','FFFCE4D6','FFFFF2CC','FFD9D2E9','FFC6E0B4',
+  'FFFFCCFF','FFADD8E6','FFFFE699','FFF4B183','FFB4C7E7','FFF8CBAD','FFA9D18E','FFD6DCE5'];
+const lineColorMap = {};
+function normalizeBase(line){
+  if(line.includes('樂活家居')) return line.includes('休閒') ? '休閒' : '生活';
+  if(line === '文具潮藝') return '文具';
+  if(line === '美妝保養') return '美妝';
+  if(line === '3C家電') return '3C';
+  if(line === '服飾鞋包') return '服飾';
+  if(line === '食品保健') return '食品';
+  if(line === '童書') return '兒童';
+  return line;
+}
+function colorForLine(line){
+  const base = normalizeBase(line);
+  if(!lineColorMap[base]){
+    const idx = Object.keys(lineColorMap).length % PALETTE.length;
+    lineColorMap[base] = PALETTE[idx];
+  }
+  return lineColorMap[base];
+}
+function dateKey(d){ return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+
+function buildGanttSheet(workbook, regularItems, specialItems, monthStart, monthEnd){
+  const ws = workbook.addWorksheet('甘特圖行事曆');
+  const timeSlots = ['8:00','10:00','14:00','17:00','20:00'];
+  const days = [];
+  let d = new Date(monthStart);
+  while(d <= monthEnd){ days.push(new Date(d)); d.setDate(d.getDate()+1); }
+  const leftCols = 2;
+
+  const row1 = ws.getRow(1);
+  row1.getCell(1).value = '線別';
+  row1.getCell(2).value = '時段';
+  days.forEach((day,i)=>{
+    const cell = row1.getCell(leftCols+1+i);
+    cell.value = (day.getMonth()+1)+'/'+day.getDate();
+    cell.alignment = {horizontal:'center'};
+    const weekend = isWeekend(day);
+    cell.font = {bold:true, color:{argb: weekend ? 'FFFFFFFF' : 'FF000000'}};
+    if(weekend) cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF808080'}};
+  });
+
+  const row2 = ws.getRow(2);
+  row2.getCell(1).value = '';
+  row2.getCell(2).value = '';
+  days.forEach((day,i)=>{
+    const wd = ['日','一','二','三','四','五','六'][day.getDay()];
+    const cell = row2.getCell(leftCols+1+i);
+    cell.value = wd;
+    cell.alignment = {horizontal:'center'};
+    const weekend = isWeekend(day);
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: weekend ? 'FFBFBFBF' : 'FFF2F2F2'}};
+    cell.font = {bold:true, color:{argb: weekend ? 'FFFF0000' : 'FF000000'}};
+  });
+
+  const lookup = {};
+  function addItem(date, time, line, name, isRegular){
+    if(!date) return;
+    const key = dateKey(date) + '|' + time;
+    (lookup[key] = lookup[key] || []).push({line, name, isRegular});
+  }
+  regularItems.forEach(r => addItem(r.date, r.time, r.line, r.name, true));
+  specialItems.forEach(r => addItem(r.date, r.time, r.line, r.name, false));
+
+  timeSlots.forEach((slot, rIdx) => {
+    const row = ws.getRow(3+rIdx);
+    row.getCell(1).value = rIdx === 0 ? 'OMIeDM' : '';
+    row.getCell(1).font = {bold:true};
+    row.getCell(2).value = slot;
+    row.getCell(2).alignment = {horizontal:'center'};
+    days.forEach((day,i)=>{
+      const cell = row.getCell(leftCols+1+i);
+      const weekend = isWeekend(day);
+      if(weekend) cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF595959'}};
+      const items = lookup[dateKey(day)+'|'+slot];
+      if(items && items.length){
+        cell.value = items.map(it => it.line + (it.name ? ('_'+it.name) : '')).join(' / ');
+        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb: colorForLine(items[0].line)}};
+        cell.font = {bold:true, color:{argb: items[0].isRegular ? 'FFFF0000' : 'FF000000'}};
+        cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+      }
+    });
+    row.height = 26;
+  });
+
+  ws.getColumn(1).width = 10;
+  ws.getColumn(2).width = 8;
+  for(let i=0;i<days.length;i++) ws.getColumn(leftCols+1+i).width = 10;
+  ws.views = [{state:'frozen', xSplit:2, ySplit:2}];
+
+  // 圖例
+  const legendStartRow = 3 + timeSlots.length + 2;
+  ws.getCell(legendStartRow, 1).value = '圖例（紅字＝定刊，黑字＝特刊）';
+  ws.getCell(legendStartRow, 1).font = {bold:true};
+  let lr = legendStartRow + 1;
+  Object.keys(lineColorMap).forEach(base => {
+    const c = ws.getCell(lr, 1);
+    c.value = base;
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb: lineColorMap[base]}};
+    c.alignment = {horizontal:'center'};
+    lr++;
+  });
+}
+
+function buildDataSheet(workbook, regularRows, specialRows){
+  const ws = workbook.addWorksheet('排程表');
+  const headerFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF2CC'}};
+  const bannerFill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF2F5496'}};
+  const bannerFont = {bold:true, color:{argb:'FFFFFFFF'}, size:13};
+  const thin = {style:'thin', color:{argb:'FF999999'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+
+  let r = 1;
+  ws.mergeCells(r,1,r,6);
+  ws.getCell(r,1).value = '定刊';
+  ws.getCell(r,1).fill = bannerFill;
+  ws.getCell(r,1).font = bannerFont;
+  ws.getCell(r,1).alignment = {horizontal:'center'};
+  r++;
+  ['序號','線別','活動名稱','時間','日期','備註'].forEach((h,i)=>{
+    const c = ws.getCell(r,i+1); c.value = h; c.fill = headerFill; c.font = {bold:true}; c.alignment={horizontal:'center'}; c.border=border;
+  });
+  r++;
+  regularRows.forEach(row => {
+    row.forEach((v,i)=>{ const c = ws.getCell(r,i+1); c.value = v; c.border = border; c.alignment = {horizontal: i===2||i===5 ? 'left':'center'}; });
+    r++;
+  });
+  r++;
+
+  ws.mergeCells(r,1,r,5);
+  ws.getCell(r,1).value = '特刊';
+  ws.getCell(r,1).fill = bannerFill;
+  ws.getCell(r,1).font = bannerFont;
+  ws.getCell(r,1).alignment = {horizontal:'center'};
+  r++;
+  ['序號','線別','活動名稱','時間','日期'].forEach((h,i)=>{
+    const c = ws.getCell(r,i+1); c.value = h; c.fill = headerFill; c.font = {bold:true}; c.alignment={horizontal:'center'}; c.border=border;
+  });
+  r++;
+  specialRows.forEach(row => {
+    row.forEach((v,i)=>{ const c = ws.getCell(r,i+1); c.value = v; c.border = border; c.alignment = {horizontal: i===2 ? 'left':'center'}; });
+    r++;
+  });
+
+  ws.columns = [{width:6},{width:18},{width:32},{width:8},{width:12},{width:34}];
+}
+
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  const exportBtn = document.getElementById('exportBtn');
+  exportBtn.disabled = true;
+  exportBtn.textContent = '匯出中...';
+  try {
+    const regularRows = [...document.querySelectorAll('#regularTable tbody tr')].map((tr,idx) => {
+      const tds = tr.querySelectorAll('td');
+      return { data:[tds[0].textContent, tds[1].textContent, tds[2].textContent, tds[3].textContent, tds[4].textContent, tds[5].textContent],
+               date: lastRegular[idx].date, time: lastRegular[idx].time, line: lastRegular[idx].line, name: tds[2].textContent };
+    });
+    const specialRows = [...document.querySelectorAll('#specialTable tbody tr')].map((tr,idx) => {
+      const tds = tr.querySelectorAll('td');
+      const nameVal = tds[2].querySelector('input').value;
+      return { data:[tds[0].textContent, tds[1].textContent, nameVal, tds[3].textContent, tds[4].textContent],
+               date: lastSpecial[idx].assignedDate, time: lastSpecial[idx].time, line: lastSpecial[idx].lineKey, name: nameVal };
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    buildDataSheet(workbook, regularRows.map(r=>r.data), specialRows.map(r=>r.data));
+    buildGanttSheet(workbook, regularRows, specialRows, currentMonthStart, currentMonthEnd);
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const monthLabel = monthInput.value || 'schedule';
+    a.href = url;
+    a.download = `${monthLabel}_電子報排程表.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(err){
+    alert('匯出失敗：' + err.message);
+    console.error(err);
+  } finally {
+    exportBtn.disabled = false;
+    exportBtn.textContent = '匯出 Excel';
+  }
+});
+</script>
+</body>
+</html>
