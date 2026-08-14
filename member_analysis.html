@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>購買週期試算台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#EFEDE6;
+    --paper-raised:#F7F5F0;
+    --ink:#20242B;
+    --ink-soft:#5B6169;
+    --rule:#D8D4C8;
+    --brass:#8A6A3C;
+    --brass-deep:#6B5029;
+    --signal:#2F6E5C;
+    --signal-soft:#DCEAE4;
+    --warn:#9C4A32;
+    --warn-soft:#F3E1D8;
+    --mono: 'Courier New', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --serif: Georgia, 'Noto Serif TC', 'PMingLiU', serif;
+    --sans: -apple-system, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.6;
+    min-height:100vh;
+  }
+  .wrap{
+    max-width:920px;
+    margin:0 auto;
+    padding:56px 28px 96px;
+  }
+
+  /* ---- header / ledger title block ---- */
+  header{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:22px;
+    margin-bottom:36px;
+    position:relative;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--brass-deep);
+    display:flex;
+    justify-content:space-between;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:400;
+    font-size:40px;
+    margin:10px 0 6px;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    color:var(--ink-soft);
+    font-size:15px;
+    max-width:56ch;
+    margin:0;
+  }
+
+  section{margin-bottom:40px;}
+  .step-label{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.1em;
+    color:var(--brass-deep);
+    text-transform:uppercase;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .step-label .num{
+    width:22px;height:22px;
+    border:1px solid var(--brass-deep);
+    border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:11px;
+    color:var(--brass-deep);
+    flex-shrink:0;
+  }
+  .card{
+    background:var(--paper-raised);
+    border:1px solid var(--rule);
+    border-radius:2px;
+    padding:26px;
+  }
+
+  /* ---- dropzone ---- */
+  .dropzone{
+    border:1.5px dashed var(--rule);
+    border-radius:2px;
+    padding:40px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    background:var(--paper-raised);
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--brass);
+    background:#FBF8F1;
+  }
+  .dropzone .icon{
+    font-family:var(--serif);
+    font-size:30px;
+    color:var(--brass);
+    margin-bottom:8px;
+  }
+  .dropzone strong{font-weight:600;}
+  .dropzone .hint{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+  input[type=file]{display:none;}
+
+  .file-chip{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 18px;
+    border:1px solid var(--rule);
+    background:var(--paper-raised);
+    font-family:var(--mono);
+    font-size:13px;
+  }
+  .file-chip button{
+    font-family:var(--sans);
+    background:none;border:1px solid var(--rule);
+    padding:4px 10px;border-radius:2px;cursor:pointer;
+    color:var(--ink-soft);
+    font-size:12px;
+  }
+  .file-chip button:hover{border-color:var(--warn);color:var(--warn);}
+
+  /* ---- select rows ---- */
+  .field-row{
+    display:grid;
+    grid-template-columns:180px 1fr;
+    gap:16px;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid var(--rule);
+  }
+  .field-row:last-child{border-bottom:none;}
+  .field-row label{
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  select{
+    font-family:var(--mono);
+    font-size:13px;
+    padding:9px 10px;
+    background:#fff;
+    border:1px solid var(--rule);
+    border-radius:2px;
+    color:var(--ink);
+    width:100%;
+  }
+  .sheet-picker{margin-bottom:18px;}
+
+  button.primary{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14px;
+    background:var(--ink);
+    color:var(--paper);
+    border:none;
+    padding:13px 26px;
+    border-radius:2px;
+    cursor:pointer;
+    letter-spacing:.01em;
+    transition:background .15s ease;
+  }
+  button.primary:hover{background:var(--brass-deep);}
+  button.primary:disabled{background:#B7B2A4;cursor:not-allowed;}
+
+  button.ghost{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:13px;
+    background:none;
+    color:var(--ink);
+    border:1px solid var(--ink);
+    padding:11px 20px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  button.ghost:hover{background:var(--ink);color:var(--paper);}
+
+  .actions{display:flex;gap:12px;align-items:center;margin-top:20px;}
+
+  /* progress */
+  .progress-wrap{display:none;margin-top:18px;}
+  .progress-wrap.show{display:block;}
+  .progress-track{
+    height:6px;background:var(--rule);border-radius:3px;overflow:hidden;
+  }
+  .progress-bar{
+    height:100%;width:0%;background:var(--signal);transition:width .2s ease;
+  }
+  .progress-text{
+    font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:8px;
+  }
+
+  /* ---- results ---- */
+  #results{display:none;}
+  #results.show{display:block;}
+
+  .stat-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+    margin-bottom:28px;
+  }
+  .stat{
+    background:var(--paper-raised);
+    padding:20px 18px;
+  }
+  .stat .label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    margin-bottom:8px;
+  }
+  .stat .value{
+    font-family:var(--serif);
+    font-size:28px;
+  }
+  .stat .sub{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:4px;
+  }
+
+  table.method{
+    width:100%;
+    border-collapse:collapse;
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  table.method th, table.method td{
+    text-align:left;
+    padding:12px 10px;
+    border-bottom:1px solid var(--rule);
+  }
+  table.method th{
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    color:var(--ink-soft);
+    font-weight:400;
+  }
+  table.method td.num{
+    font-family:var(--mono);
+    text-align:right;
+    font-size:16px;
+  }
+  table.method tr.recommend td{background:var(--signal-soft);}
+  table.method tr.recommend td:first-child{
+    border-left:3px solid var(--signal);
+    padding-left:8px;
+  }
+  .recommend-tag{
+    font-family:var(--mono);
+    font-size:10px;
+    background:var(--signal);
+    color:#fff;
+    padding:2px 6px;
+    border-radius:2px;
+    margin-left:8px;
+    letter-spacing:.04em;
+  }
+  .note{
+    font-size:13px;
+    color:var(--ink-soft);
+    background:var(--warn-soft);
+    border-left:3px solid var(--warn);
+    padding:12px 16px;
+    margin-top:18px;
+  }
+  .note strong{color:var(--warn);}
+
+  footer.result-actions{
+    display:flex;
+    gap:12px;
+    margin-top:28px;
+    padding-top:22px;
+    border-top:1px solid var(--rule);
+  }
+
+  .error-box{
+    display:none;
+    background:var(--warn-soft);
+    border-left:3px solid var(--warn);
+    padding:14px 18px;
+    font-size:13px;
+    color:var(--warn);
+    margin-top:16px;
+  }
+  .error-box.show{display:block;}
+
+  @media (max-width:640px){
+    .wrap{padding:36px 18px 70px;}
+    h1{font-size:30px;}
+    .stat-grid{grid-template-columns:1fr;}
+    .field-row{grid-template-columns:1fr;gap:6px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow"><span>NAPL 分析工具</span><span id="clock-tag">購物週期試算</span></div>
+    <h1>購買週期試算台</h1>
+    <p>上傳含「會員編號」與「訂單日期」的訂單明細表，在瀏覽器裡直接算出全體會員的購買間隔，資料不會上傳到任何伺服器。</p>
+  </header>
+
+  <!-- Step 1: upload -->
+  <section id="step-upload">
+    <div class="step-label"><span class="num">1</span>上傳訂單明細（.xlsx / .csv）</div>
+    <div class="card">
+      <div class="dropzone" id="dropzone">
+        <div class="icon">⌘</div>
+        <div><strong>點此選擇檔案</strong>，或將檔案拖曳到這裡</div>
+        <div class="hint">建議欄位：會員編號、訂單日期（其餘欄位會忽略）</div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      </div>
+      <div id="fileChipWrap" style="display:none;margin-top:14px;">
+        <div class="file-chip">
+          <span id="fileName">—</span>
+          <button id="clearFile">移除</button>
+        </div>
+      </div>
+      <div class="error-box" id="uploadError"></div>
+    </div>
+  </section>
+
+  <!-- Step 2: map columns -->
+  <section id="step-map" style="display:none;">
+    <div class="step-label"><span class="num">2</span>對應欄位</div>
+    <div class="card">
+      <div class="sheet-picker">
+        <div class="field-row">
+          <label for="sheetSelect">工作表</label>
+          <select id="sheetSelect"></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <label for="memberCol">會員編號欄位</label>
+        <select id="memberCol"></select>
+      </div>
+      <div class="field-row">
+        <label for="dateCol">訂單日期欄位</label>
+        <select id="dateCol"></select>
+      </div>
+      <div class="actions">
+        <button class="primary" id="runBtn">開始試算</button>
+      </div>
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-text" id="progressText">讀取中…</div>
+      </div>
+      <div class="error-box" id="runError"></div>
+    </div>
+  </section>
+
+  <!-- Step 3: results -->
+  <section id="results">
+    <div class="step-label"><span class="num">3</span>試算結果</div>
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="label">全體會員數</div>
+          <div class="value" id="stat-total">—</div>
+        </div>
+        <div class="stat">
+          <div class="label">僅購買 1 次</div>
+          <div class="value" id="stat-onetime">—</div>
+          <div class="sub" id="stat-onetime-pct"></div>
+        </div>
+        <div class="stat">
+          <div class="label">購買 2 次以上</div>
+          <div class="value" id="stat-repeat">—</div>
+          <div class="sub" id="stat-repeat-pct"></div>
+        </div>
+      </div>
+
+      <table class="method">
+        <thead>
+          <tr><th>算法</th><th>天數</th></tr>
+        </thead>
+        <tbody id="method-body"></tbody>
+      </table>
+
+      <div class="note">
+        <strong>只買過 1 次的會員</strong>沒有「間隔」可算，不包含在上面任何一個天數裡。依 NAPL 模型定義，這群人應改套用「全店購物週期」（即標示為建議值的那一列）計算 3 倍週期門檻。本試算未偵測退貨/取消欄位，若你的資料中含退貨訂單，數字可能需要另外排除後再算一次。
+      </div>
+
+      <footer class="result-actions">
+        <button class="primary" id="downloadBtn">下載完整報表（.xlsx）</button>
+        <button class="ghost" id="resetBtn">重新上傳另一份檔案</button>
+      </footer>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileChipWrap = document.getElementById('fileChipWrap');
+  const fileName = document.getElementById('fileName');
+  const clearFile = document.getElementById('clearFile');
+  const uploadError = document.getElementById('uploadError');
+  const stepMap = document.getElementById('step-map');
+  const sheetSelect = document.getElementById('sheetSelect');
+  const memberCol = document.getElementById('memberCol');
+  const dateCol = document.getElementById('dateCol');
+  const runBtn = document.getElementById('runBtn');
+  const runError = document.getElementById('runError');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+  const results = document.getElementById('results');
+  const resetBtn = document.getElementById('resetBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let workbook = null;
+  let currentSheetData = null; // array of arrays
+  let headerRow = [];
+  let lastComputation = null;
+
+  function showError(el, msg){
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+  function clearError(el){
+    el.textContent='';
+    el.classList.remove('show');
+  }
+
+  function resetAll(){
+    workbook = null; currentSheetData = null; headerRow = [];
+    fileInput.value = '';
+    fileChipWrap.style.display = 'none';
+    stepMap.style.display = 'none';
+    results.classList.remove('show');
+    clearError(uploadError); clearError(runError);
+    progressWrap.classList.remove('show');
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', e => {
+    if(e.target.files.length) handleFile(e.target.files[0]);
+  });
+  clearFile.addEventListener('click', resetAll);
+  resetBtn.addEventListener('click', resetAll);
+
+  function handleFile(file){
+    clearError(uploadError);
+    const okExt = /\.(xlsx|xls|csv)$/i.test(file.name);
+    if(!okExt){
+      showError(uploadError, '請上傳 .xlsx、.xls 或 .csv 檔案。');
+      return;
+    }
+    fileName.textContent = file.name + '  ·  ' + (file.size/1024/1024).toFixed(1) + ' MB';
+    fileChipWrap.style.display = 'block';
+
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        workbook = XLSX.read(data, {type:'array', cellDates:true});
+        populateSheetPicker();
+      }catch(err){
+        showError(uploadError, '無法解析這個檔案：' + err.message);
+      }
+    };
+    reader.onerror = function(){
+      showError(uploadError, '讀取檔案時發生錯誤，請再試一次。');
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function populateSheetPicker(){
+    sheetSelect.innerHTML = '';
+    workbook.SheetNames.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sheetSelect.appendChild(opt);
+    });
+    loadSheet(workbook.SheetNames[0]);
+    stepMap.style.display = 'block';
+    results.classList.remove('show');
+  }
+
+  sheetSelect.addEventListener('change', () => loadSheet(sheetSelect.value));
+
+  function loadSheet(name){
+    clearError(runError);
+    const ws = workbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    if(!rows.length){
+      showError(runError, '這個工作表沒有資料。');
+      return;
+    }
+    headerRow = rows[0].map(h => (h===null||h===undefined) ? '' : String(h));
+    currentSheetData = rows;
+    populateColumnSelects();
+  }
+
+  function populateColumnSelects(){
+    [memberCol, dateCol].forEach(sel => sel.innerHTML='');
+    headerRow.forEach((h, idx) => {
+      [memberCol, dateCol].forEach(sel => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = h || ('欄位 ' + (idx+1));
+        sel.appendChild(opt);
+      });
+    });
+    // best-effort auto-detect
+    const memberGuess = headerRow.findIndex(h => /會員|member|編號|id/i.test(h));
+    const dateGuess = headerRow.findIndex(h => /日期|date|時間/i.test(h));
+    if(memberGuess >= 0) memberCol.value = memberGuess;
+    if(dateGuess >= 0) dateCol.value = dateGuess;
+  }
+
+  function excelSerialToDate(v){
+    // XLSX with cellDates:true should already give JS Date for real date cells.
+    if(v instanceof Date) return v;
+    if(typeof v === 'number'){
+      // fallback: excel serial date
+      const utc_days = Math.floor(v - 25569);
+      const utc_value = utc_days * 86400;
+      return new Date(utc_value * 1000);
+    }
+    if(typeof v === 'string'){
+      const d = new Date(v);
+      if(!isNaN(d.getTime())) return d;
+    }
+    return null;
+  }
+
+  runBtn.addEventListener('click', () => {
+    clearError(runError);
+    if(!currentSheetData){ showError(runError, '請先選擇工作表。'); return; }
+    const mIdx = parseInt(memberCol.value, 10);
+    const dIdx = parseInt(dateCol.value, 10);
+    if(mIdx === dIdx){
+      showError(runError, '會員編號欄位跟訂單日期欄位不能選同一欄。');
+      return;
+    }
+    runBtn.disabled = true;
+    progressWrap.classList.add('show');
+    progressBar.style.width = '5%';
+    progressText.textContent = '解析欄位中…';
+
+    // defer to allow UI paint
+    setTimeout(() => {
+      try{
+        compute(mIdx, dIdx);
+      }catch(err){
+        showError(runError, '試算時發生錯誤：' + err.message);
+      }finally{
+        runBtn.disabled = false;
+        progressWrap.classList.remove('show');
+      }
+    }, 30);
+  });
+
+  function median(arr){
+    if(!arr.length) return null;
+    const s = arr.slice().sort((a,b)=>a-b);
+    const mid = Math.floor(s.length/2);
+    return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+  }
+  function mean(arr){
+    if(!arr.length) return null;
+    return arr.reduce((a,b)=>a+b,0) / arr.length;
+  }
+  const DAY_MS = 86400000;
+
+  function compute(mIdx, dIdx){
+    const rows = currentSheetData;
+    const n = rows.length;
+    progressText.textContent = '整理訂單資料（' + (n-1).toLocaleString() + ' 筆）…';
+    progressBar.style.width = '15%';
+
+    // group by member -> array of timestamps (ms), dedup exact same-day duplicates per member
+    const groups = new Map();
+    let skipped = 0;
+    for(let i=1;i<n;i++){
+      const row = rows[i];
+      if(!row) { continue; }
+      const memberRaw = row[mIdx];
+      const dateRaw = row[dIdx];
+      if(memberRaw === null || memberRaw === undefined || memberRaw === '') { skipped++; continue; }
+      const d = excelSerialToDate(dateRaw);
+      if(!d || isNaN(d.getTime())) { skipped++; continue; }
+      const key = String(memberRaw).trim();
+      const dayStamp = Math.floor(d.getTime() / DAY_MS); // day-level dedup
+      let arr = groups.get(key);
+      if(!arr){ arr = new Set(); groups.set(key, arr); }
+      arr.add(dayStamp);
+    }
+
+    progressText.textContent = '計算每位會員的購買間隔…';
+    progressBar.style.width = '55%';
+
+    const totalMembers = groups.size;
+    let oneTime = 0, repeat = 0;
+    const pooledIntervals = [];
+    const perMemberMeans = [];
+    const perMemberMedians = [];
+    const perMemberRows = []; // for export
+
+    for(const [key, daySet] of groups.entries()){
+      const days = Array.from(daySet).sort((a,b)=>a-b);
+      const count = days.length;
+      if(count === 1){
+        oneTime++;
+        perMemberRows.push([key, count, '', '']);
+        continue;
+      }
+      repeat++;
+      const intervals = [];
+      for(let i=1;i<days.length;i++){
+        intervals.push(days[i]-days[i-1]); // already in day units
+      }
+      pooledIntervals.push(...intervals);
+      const mn = mean(intervals);
+      const md = median(intervals);
+      perMemberMeans.push(mn);
+      perMemberMedians.push(md);
+      perMemberRows.push([key, count, Math.round(mn*10)/10, md]);
+    }
+
+    progressText.textContent = '彙整統計結果…';
+    progressBar.style.width = '85%';
+
+    const results = {
+      totalMembers,
+      oneTime,
+      repeat,
+      skipped,
+      pooledMean: mean(pooledIntervals),
+      pooledMedian: median(pooledIntervals),
+      perMemberMeanThenMean: mean(perMemberMeans),
+      perMemberMeanThenMedian: median(perMemberMeans),
+      perMemberMedianThenMedian: median(perMemberMedians),
+      perMemberMedianThenMean: mean(perMemberMedians),
+      perMemberRows
+    };
+    lastComputation = results;
+
+    progressBar.style.width = '100%';
+    progressText.textContent = '完成';
+    renderResults(results);
+  }
+
+  function fmt(v){
+    if(v === null || v === undefined || isNaN(v)) return '—';
+    return (Math.round(v*10)/10).toLocaleString();
+  }
+
+  function renderResults(r){
+    document.getElementById('stat-total').textContent = r.totalMembers.toLocaleString();
+    document.getElementById('stat-onetime').textContent = r.oneTime.toLocaleString();
+    document.getElementById('stat-onetime-pct').textContent = r.totalMembers ? (r.oneTime/r.totalMembers*100).toFixed(1)+'%' : '';
+    document.getElementById('stat-repeat').textContent = r.repeat.toLocaleString();
+    document.getElementById('stat-repeat-pct').textContent = r.totalMembers ? (r.repeat/r.totalMembers*100).toFixed(1)+'%' : '';
+
+    const rowsDef = [
+      ['全部相鄰間隔混在一起取平均', r.pooledMean, false],
+      ['全部相鄰間隔混在一起取中位數', r.pooledMedian, false],
+      ['先算每位會員的平均間隔，再對全體取平均', r.perMemberMeanThenMean, false],
+      ['先算每位會員的平均間隔，再對全體取中位數', r.perMemberMeanThenMedian, false],
+      ['先算每位會員的間隔中位數，再對全體取中位數（NAPL 購物週期標準算法）', r.perMemberMedianThenMedian, true],
+      ['先算每位會員的間隔中位數，再對全體取平均', r.perMemberMedianThenMean, false],
+    ];
+    const tbody = document.getElementById('method-body');
+    tbody.innerHTML = '';
+    rowsDef.forEach(([label, val, isRec]) => {
+      const tr = document.createElement('tr');
+      if(isRec) tr.className = 'recommend';
+      tr.innerHTML = `<td>${label}${isRec ? '<span class="recommend-tag">建議</span>' : ''}</td><td class="num">${fmt(val)} 天</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('results').classList.add('show');
+    document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  downloadBtn.addEventListener('click', () => {
+    if(!lastComputation) return;
+    const r = lastComputation;
+    const summarySheet = XLSX.utils.aoa_to_sheet([
+      ['購買週期試算報表'],
+      [],
+      ['全體會員數', r.totalMembers],
+      ['僅購買 1 次', r.oneTime],
+      ['購買 2 次以上', r.repeat],
+      ['略過（缺會員編號或日期無法解析）', r.skipped],
+      [],
+      ['算法', '天數'],
+      ['全部相鄰間隔混在一起取平均', round1(r.pooledMean)],
+      ['全部相鄰間隔混在一起取中位數', round1(r.pooledMedian)],
+      ['先算每位會員的平均間隔，再對全體取平均', round1(r.perMemberMeanThenMean)],
+      ['先算每位會員的平均間隔，再對全體取中位數', round1(r.perMemberMeanThenMedian)],
+      ['先算每位會員的間隔中位數，再對全體取中位數（NAPL 購物週期標準算法）', round1(r.perMemberMedianThenMedian)],
+      ['先算每位會員的間隔中位數，再對全體取平均', round1(r.perMemberMedianThenMean)],
+      [],
+      ['備註：僅購買 1 次的會員無法算出間隔，不計入上述天數。NAPL 模型建議這群人改套用「NAPL 購物週期標準算法」列的天數作為全店購物週期。本工具未偵測退貨/取消欄位，如資料中含退貨訂單，數字可能需另外排除後重算。']
+    ]);
+    summarySheet['!cols'] = [{wch:56},{wch:14}];
+
+    const detailAoa = [['會員編號','購買次數','平均間隔(天)','間隔中位數(天)']].concat(r.perMemberRows);
+    const detailSheet = XLSX.utils.aoa_to_sheet(detailAoa);
+    detailSheet['!cols'] = [{wch:18},{wch:12},{wch:14},{wch:14}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, summarySheet, '總覽');
+    XLSX.utils.book_append_sheet(wb, detailSheet, '會員明細');
+    XLSX.writeFile(wb, '購買週期試算報表.xlsx');
+  });
+
+  function round1(v){
+    if(v===null||v===undefined||isNaN(v)) return '';
+    return Math.round(v*10)/10;
+  }
+
+})();
+</script>
+</body>
+</html>
