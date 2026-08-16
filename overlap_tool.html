@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名單重疊比對工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2b24;
+    --paper:#f6f5ef;
+    --line:#d8d3c4;
+    --grid:#c9c2ab;
+    --accent:#2f6f4f;
+    --accent-dim:#e7efe8;
+    --accent2:#a6491f;
+    --accent2-dim:#f6e9e1;
+    --mono: "SFMono-Regular", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: "IBM Plex Sans", "Noto Sans TC", -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      var(--paper);
+    background-size: 28px 28px, 28px 28px;
+    background-position: -1px -1px;
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.55;
+    padding:40px 20px 80px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+  header{margin-bottom:34px;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    background:var(--accent-dim);
+    display:inline-block;
+    padding:4px 10px;
+    border:1px solid var(--accent);
+    border-radius:3px;
+    margin-bottom:16px;
+  }
+  h1{
+    font-size:clamp(28px,4vw,38px);
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+    font-weight:700;
+  }
+  .sub{color:#565048;max-width:64ch;font-size:15.5px;}
+  .card{
+    background:#fffdf8;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:26px 28px;
+    margin-bottom:22px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.02);
+  }
+  .card h2{
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .card h2 .num{
+    font-family:var(--mono);
+    color:#fff;
+    background:var(--ink);
+    width:22px;height:22px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    flex:none;
+  }
+  .card p.hint{margin:6px 0 16px;color:#726b5f;font-size:13.5px;}
+  .dropzone{
+    border:1.5px dashed var(--grid);
+    border-radius:6px;
+    padding:18px 16px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:#fbfaf5;
+    transition:border-color .15s, background .15s;
+    cursor:pointer;
+  }
+  .dropzone:hover{border-color:var(--accent);background:var(--accent-dim);}
+  .dropzone.filled{border-style:solid;border-color:var(--accent);background:var(--accent-dim);}
+  .dropzone input{display:none;}
+  .dz-icon{
+    font-family:var(--mono);
+    font-size:11px;
+    color:#fff;
+    background:var(--ink);
+    padding:6px 8px;
+    border-radius:4px;
+    flex:none;
+  }
+  .dz-text{font-size:14px;flex:1;min-width:0;}
+  .dz-text .fname{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--accent);
+    word-break:break-all;
+    margin-top:2px;
+  }
+  .dz-text .placeholder{color:#928a7c;}
+  .col-picker{
+    margin-top:14px;
+    display:none;
+    align-items:center;
+    gap:10px;
+    font-size:13.5px;
+  }
+  .col-picker.show{display:flex;}
+  .col-picker select{
+    font-family:var(--mono);
+    font-size:13px;
+    padding:7px 10px;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:#fff;
+    color:var(--ink);
+    flex:1;
+  }
+  .btn{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14.5px;
+    background:var(--ink);
+    color:#fdfcf8;
+    border:none;
+    border-radius:6px;
+    padding:13px 22px;
+    cursor:pointer;
+    transition:transform .08s ease, background .15s;
+  }
+  .btn:hover{background:var(--accent);}
+  .btn:active{transform:scale(.98);}
+  .btn:disabled{background:#c7c1b3;cursor:not-allowed;}
+  .btn.full{width:100%;}
+  .btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);}
+  .btn.secondary:hover{background:var(--accent-dim);border-color:var(--accent);}
+  #runBtn{margin-top:6px;}
+  .log{
+    font-family:var(--mono);
+    font-size:12.5px;
+    background:#151d18;
+    color:#c9e6d3;
+    border-radius:6px;
+    padding:16px 18px;
+    max-height:220px;
+    overflow-y:auto;
+    white-space:pre-wrap;
+    display:none;
+  }
+  .log.show{display:block;margin-top:18px;}
+  .log .err{color:#f0a58a;}
+  .log .ok{color:#8fd4a8;}
+
+  /* dashboard */
+  .dashboard{display:none;}
+  .dashboard.show{display:block;}
+  .dash-grid{
+    display:grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap:24px;
+    align-items:center;
+  }
+  @media (max-width: 640px){ .dash-grid{grid-template-columns:1fr;} }
+  .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .donut{
+    width:180px;height:180px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+  .donut::after{
+    content:'';
+    position:absolute;
+    width:112px;height:112px;
+    border-radius:50%;
+    background:#fffdf8;
+  }
+  .donut .center{
+    position:relative;
+    z-index:1;
+    text-align:center;
+  }
+  .donut .center .pct{font-family:var(--mono);font-size:26px;font-weight:700;}
+  .donut .center .lbl{font-size:11px;color:#726b5f;margin-top:2px;}
+  .legend{display:flex;gap:18px;font-size:13px;}
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+  .stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  @media (max-width: 640px){ .stat-cards{grid-template-columns:1fr;} }
+  .stat{
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:16px 16px;
+    background:#fbfaf5;
+  }
+  .stat .n{font-family:var(--mono);font-size:26px;font-weight:700;}
+  .stat .l{font-size:12.5px;color:#726b5f;margin-top:4px;}
+  .stat.overlap{border-color:var(--accent);background:var(--accent-dim);}
+  .stat.overlap .n{color:var(--accent);}
+  .stat.nonoverlap{border-color:var(--accent2);background:var(--accent2-dim);}
+  .stat.nonoverlap .n{color:var(--accent2);}
+
+  .downloads{
+    display:flex;
+    gap:12px;
+    margin-top:22px;
+    flex-wrap:wrap;
+  }
+  footer{
+    margin-top:30px;
+    font-size:12.5px;
+    color:#928a7c;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">List Overlap / 名單重疊比對</span>
+    <h1>名單重疊比對工具</h1>
+    <p class="sub">上傳「來源名單」與「對照名單」兩份 EXCEL，工具會在瀏覽器內比對兩者的會員編號（或任何你指定的欄位），拆分出重疊與不重疊名單，並用儀表板顯示總體人數——檔案不會上傳到任何伺服器。</p>
+  </header>
+
+  <div class="card">
+    <h2><span class="num">1</span>來源名單</h2>
+    <p class="hint">要被拆分的名單，例如「1元電子書」名單</p>
+    <label class="dropzone" id="dzA">
+      <span class="dz-icon">XLSX</span>
+      <span class="dz-text"><span class="placeholder" id="dzA-text">點擊選擇檔案，或拖曳到這裡</span></span>
+      <input type="file" id="fileA" accept=".xlsx,.xls">
+    </label>
+    <div class="col-picker" id="pickerA">
+      <span>比對欄位：</span>
+      <select id="colA"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>對照名單</h2>
+    <p class="hint">用來判斷來源名單是否重疊的參照名單，例如「20260101前有購電子書」名單</p>
+    <label class="dropzone" id="dzB">
+      <span class="dz-icon">XLSX</span>
+      <span class="dz-text"><span class="placeholder" id="dzB-text">點擊選擇檔案，或拖曳到這裡</span></span>
+      <input type="file" id="fileB" accept=".xlsx,.xls">
+    </label>
+    <div class="col-picker" id="pickerB">
+      <span>比對欄位：</span>
+      <select id="colB"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">3</span>去重設定</h2>
+    <p class="hint">名單中常見同一會員編號出現多次的情況，預設會先去重再比對，避免人數被重複計算</p>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;">
+      <input type="checkbox" id="dedupeToggle" checked style="width:16px;height:16px;">
+      比對前先去除重複會員編號（同一編號僅保留第一筆）
+    </label>
+  </div>
+
+  <button class="btn full" id="runBtn" disabled>請先上傳兩個檔案</button>
+  <div class="log" id="log"></div>
+
+  <div class="card dashboard" id="dashboard">
+    <h2><span class="num">✓</span>比對結果</h2>
+    <div class="dash-grid">
+      <div class="donut-wrap">
+        <div class="donut" id="donut">
+          <div class="center">
+            <div class="pct" id="donutPct">0%</div>
+            <div class="lbl">重疊率</div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--accent)"></i>重疊</span>
+          <span><i style="background:var(--accent2)"></i>不重疊</span>
+        </div>
+      </div>
+      <div class="stat-cards">
+        <div class="stat"><div class="n" id="statTotal">0</div><div class="l">來源名單總人數（去重後）</div></div>
+        <div class="stat overlap"><div class="n" id="statOverlap">0</div><div class="l">重疊人數</div></div>
+        <div class="stat nonoverlap"><div class="n" id="statNonoverlap">0</div><div class="l">不重疊人數</div></div>
+      </div>
+    </div>
+    <div class="downloads">
+      <button class="btn" id="downloadAllBtn">下載完整結果（總覽＋重疊＋不重疊）</button>
+      <button class="btn secondary" id="downloadOverlapBtn">只下載重疊名單</button>
+      <button class="btn secondary" id="downloadNonoverlapBtn">只下載不重疊名單</button>
+    </div>
+  </div>
+
+  <footer>所有解析、比對與匯出都在你的瀏覽器裡完成，檔案內容不會離開這台裝置。</footer>
+</div>
+
+<script>
+const state = { fA:null, fB:null, dataA:null, dataB:null, headersA:[], headersB:[] };
+let result = null; // { total, overlapRows, nonoverlapRows, overlapCount, nonoverlapCount, colA, colB }
+
+function bindDrop(dzId, inputId, key, pickerId, colSelId, dataKey, headersKey){
+  const dz = document.getElementById(dzId);
+  const input = document.getElementById(inputId);
+  const textEl = document.getElementById(dzId + "-text");
+  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('filled');});
+  dz.addEventListener('dragleave', e=>{ if(!state[key]) dz.classList.remove('filled'); });
+  dz.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files.length){ input.files = e.dataTransfer.files; loadFile(key, input.files[0], dz, textEl, pickerId, colSelId, dataKey, headersKey); }
+  });
+  input.addEventListener('change', ()=>{
+    if(input.files.length) loadFile(key, input.files[0], dz, textEl, pickerId, colSelId, dataKey, headersKey);
+  });
+}
+
+function guessIdColumn(headers){
+  const preferred = headers.find(h => /編號|會員|id|email|信箱|手機|電話/i.test(h));
+  return preferred || headers[0];
+}
+
+async function loadFile(key, file, dz, textEl, pickerId, colSelId, dataKey, headersKey){
+  state[key] = file;
+  dz.classList.add('filled');
+  textEl.className = 'fname';
+  textEl.textContent = '讀取中...';
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const headerRow = XLSX.utils.sheet_to_json(sheet, {header:1})[0] || [];
+  const rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+  state[dataKey] = rows;
+  state[headersKey] = headerRow;
+
+  textEl.textContent = `${file.name}（頁籤：${sheetName}，共 ${rows.length} 列）`;
+
+  const picker = document.getElementById(pickerId);
+  const sel = document.getElementById(colSelId);
+  sel.innerHTML = '';
+  headerRow.forEach(h=>{
+    const opt = document.createElement('option');
+    opt.value = h; opt.textContent = h;
+    sel.appendChild(opt);
+  });
+  sel.value = guessIdColumn(headerRow);
+  picker.classList.add('show');
+
+  checkReady();
+}
+
+function checkReady(){
+  const btn = document.getElementById('runBtn');
+  if(state.fA && state.fB){
+    btn.disabled = false;
+    btn.textContent = '開始比對';
+  } else {
+    btn.disabled = true;
+    btn.textContent = '請先上傳兩個檔案';
+  }
+}
+bindDrop('dzA','fileA','fA','pickerA','colA','dataA','headersA');
+bindDrop('dzB','fileB','fB','pickerB','colB','dataB','headersB');
+
+const logEl = document.getElementById('log');
+function log(msg, cls){
+  logEl.classList.add('show');
+  const line = document.createElement('div');
+  if(cls) line.className = cls;
+  line.textContent = msg;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// normalize an id value for robust comparison (handles "123.0" float-ified ids, whitespace, case)
+function normId(v){
+  if(v === null || v === undefined) return null;
+  if(typeof v === 'number'){
+    if(Number.isInteger(v)) return String(v);
+    // integer-valued float (e.g. 8885399065.0 read as float)
+    if(Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+    return String(v);
+  }
+  let s = String(v).trim();
+  if(s === '') return null;
+  // strip trailing ".0" style artifacts
+  if(/^-?\d+\.0+$/.test(s)) s = s.split('.')[0];
+  return s.toLowerCase();
+}
+
+document.getElementById('runBtn').addEventListener('click', ()=>{
+  logEl.innerHTML = '';
+  document.getElementById('dashboard').classList.remove('show');
+  try{
+    run();
+  }catch(err){
+    log('發生錯誤：' + err.message, 'err');
+    console.error(err);
+  }
+});
+
+function dedupeRows(rows, col){
+  const seen = new Set();
+  const kept = [];
+  let dupCount = 0;
+  for(const row of rows){
+    const id = normId(row[col]);
+    if(id === null){ kept.push(row); continue; } // keep blank-id rows as-is, handled later
+    if(seen.has(id)){ dupCount++; continue; }
+    seen.add(id);
+    kept.push(row);
+  }
+  return { kept, dupCount };
+}
+
+function run(){
+  const colA = document.getElementById('colA').value;
+  const colB = document.getElementById('colB').value;
+  const dedupe = document.getElementById('dedupeToggle').checked;
+  log(`來源名單比對欄位：${colA}／對照名單比對欄位：${colB}`);
+
+  let rowsA = state.dataA;
+  let rowsB = state.dataB;
+  let dupA = 0, dupB = 0;
+
+  if(dedupe){
+    const resA = dedupeRows(rowsA, colA);
+    const resB = dedupeRows(rowsB, colB);
+    rowsA = resA.kept; dupA = resA.dupCount;
+    rowsB = resB.kept; dupB = resB.dupCount;
+    log(`來源名單去除重複會員編號 ${dupA} 筆（僅保留第一筆）`, dupA ? 'ok' : undefined);
+    log(`對照名單去除重複會員編號 ${dupB} 筆（僅保留第一筆）`, dupB ? 'ok' : undefined);
+  }
+
+  const setB = new Set();
+  let skippedB = 0;
+  for(const row of rowsB){
+    const id = normId(row[colB]);
+    if(id === null){ skippedB++; continue; }
+    setB.add(id);
+  }
+  log(`對照名單有效比對值：${setB.size} 筆（略過空值 ${skippedB} 筆）`);
+
+  const overlapRows = [];
+  const nonoverlapRows = [];
+  let skippedA = 0;
+  for(const row of rowsA){
+    const id = normId(row[colA]);
+    if(id === null){ skippedA++; continue; }
+    if(setB.has(id)) overlapRows.push(row);
+    else nonoverlapRows.push(row);
+  }
+  const total = overlapRows.length + nonoverlapRows.length;
+  const overlapPct = total ? (overlapRows.length / total * 100) : 0;
+  const nonoverlapPct = 100 - overlapPct;
+
+  log(`來源名單總人數（去重後、扣除空值）：${total}｜重疊 ${overlapRows.length}（${overlapPct.toFixed(1)}%）｜不重疊 ${nonoverlapRows.length}（${nonoverlapPct.toFixed(1)}%）`, 'ok');
+  if(skippedA) log(`來源名單中有 ${skippedA} 列比對欄位為空值，已排除計算`, 'err');
+
+  result = { total, overlapRows, nonoverlapRows, colA, colB, overlapPct, nonoverlapPct, dupA, dupB, dedupe };
+  renderDashboard(result);
+}
+
+function renderDashboard(r){
+  document.getElementById('statTotal').textContent = r.total.toLocaleString();
+  document.getElementById('statOverlap').textContent = r.overlapRows.length.toLocaleString();
+  document.getElementById('statNonoverlap').textContent = r.nonoverlapRows.length.toLocaleString();
+  document.getElementById('donutPct').textContent = r.overlapPct.toFixed(1) + '%';
+
+  const donut = document.getElementById('donut');
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const accent2 = getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim();
+  donut.style.background = `conic-gradient(${accent} 0% ${r.overlapPct}%, ${accent2} ${r.overlapPct}% 100%)`;
+
+  document.getElementById('dashboard').classList.add('show');
+}
+
+function buildSummarySheet(r){
+  const rows = [
+    { 指標: '比對日期', 數值: new Date().toLocaleString('zh-TW') },
+    { 指標: '來源名單比對欄位', 數值: r.colA },
+    { 指標: '對照名單比對欄位', 數值: r.colB },
+    { 指標: '是否先去重', 數值: r.dedupe ? '是（同編號僅保留第一筆）' : '否' },
+    { 指標: '來源名單去除重複筆數', 數值: r.dupA },
+    { 指標: '對照名單去除重複筆數', 數值: r.dupB },
+    { 指標: '來源名單總人數（去重後）', 數值: r.total },
+    { 指標: '重疊人數', 數值: r.overlapRows.length },
+    { 指標: '重疊率', 數值: r.overlapPct.toFixed(1) + '%' },
+    { 指標: '不重疊人數', 數值: r.nonoverlapRows.length },
+    { 指標: '不重疊率', 數值: r.nonoverlapPct.toFixed(1) + '%' },
+  ];
+  return XLSX.utils.json_to_sheet(rows);
+}
+
+function download(filename, sheets){
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(({name, ws}) => XLSX.utils.book_append_sheet(wb, ws, name));
+  XLSX.writeFile(wb, filename);
+}
+
+document.getElementById('downloadAllBtn').addEventListener('click', ()=>{
+  if(!result) return;
+  const wsSummary = buildSummarySheet(result);
+  const wsOverlap = XLSX.utils.json_to_sheet(result.overlapRows);
+  const wsNonoverlap = XLSX.utils.json_to_sheet(result.nonoverlapRows);
+  download('名單重疊比對結果.xlsx', [
+    {name:'總覽', ws:wsSummary},
+    {name:'重疊名單', ws:wsOverlap},
+    {name:'不重疊名單', ws:wsNonoverlap},
+  ]);
+});
+document.getElementById('downloadOverlapBtn').addEventListener('click', ()=>{
+  if(!result) return;
+  const wsOverlap = XLSX.utils.json_to_sheet(result.overlapRows);
+  download('重疊名單.xlsx', [{name:'重疊名單', ws:wsOverlap}]);
+});
+document.getElementById('downloadNonoverlapBtn').addEventListener('click', ()=>{
+  if(!result) return;
+  const wsNonoverlap = XLSX.utils.json_to_sheet(result.nonoverlapRows);
+  download('不重疊名單.xlsx', [{name:'不重疊名單', ws:wsNonoverlap}]);
+});
+</script>
+</body>
+</html>
