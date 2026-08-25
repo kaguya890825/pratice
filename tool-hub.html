@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工具工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDE7DA;
+    --card:#FBF9F3;
+    --ink:#22303C;
+    --ink-soft:#5B6B74;
+    --line:#C9BFA9;
+    --teal:#2F6E6A;
+    --teal-soft:#DCEAE8;
+    --amber:#C98A2C;
+    --amber-soft:#F3E4C8;
+    --plum:#6B4E71;
+    --plum-soft:#E7DEE8;
+    --shadow: 0 1px 0 rgba(34,48,60,0.06), 0 8px 20px -12px rgba(34,48,60,0.25);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(34,48,60,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+    color:var(--ink);
+    font-family:'IBM Plex Sans', sans-serif;
+    min-height:100vh;
+    padding: 40px 24px 80px;
+  }
+  .wrap{ max-width: 980px; margin: 0 auto; }
+
+  header{ margin-bottom: 28px; }
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 10px;
+  }
+  h1{
+    font-family:'Fraunces', serif;
+    font-weight: 700;
+    font-size: clamp(30px, 4vw, 42px);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  .sub{
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 560px;
+    line-height: 1.6;
+  }
+
+  .search{
+    margin: 26px 0 22px;
+    position: relative;
+  }
+  .search input{
+    width: 100%;
+    padding: 13px 16px 13px 42px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 14.5px;
+    color: var(--ink);
+    outline: none;
+    box-shadow: var(--shadow);
+  }
+  .search input:focus{ border-color: var(--teal); }
+  .search::before{
+    content:"⌕";
+    position:absolute; left:15px; top:50%; transform:translateY(-50%);
+    font-size:18px; color:var(--ink-soft);
+  }
+
+  .tabs{
+    display:flex;
+    gap: 4px;
+    padding: 0 6px;
+    position: relative;
+    z-index: 2;
+  }
+  .tab{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 10px 18px 12px;
+    border-radius: 10px 10px 0 0;
+    background: #E2DBC9;
+    color: var(--ink-soft);
+    cursor: pointer;
+    border: 1px solid var(--line);
+    border-bottom: none;
+    transition: transform .15s ease, background .15s ease, color .15s ease;
+    user-select:none;
+  }
+  .tab:hover{ transform: translateY(-2px); }
+  .tab.active{
+    background: var(--card);
+    color: var(--ink);
+    font-weight: 600;
+    transform: translateY(-1px);
+    box-shadow: 0 -2px 0 0 var(--tab-color, var(--teal)) inset;
+  }
+  .tab[data-cat="all"].active{ --tab-color: var(--ink); }
+  .tab[data-cat="member"].active{ --tab-color: var(--teal); }
+  .tab[data-cat="content"].active{ --tab-color: var(--amber); }
+  .tab[data-cat="ops"].active{ --tab-color: var(--plum); }
+
+  .folder-body{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0 12px 12px 12px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    position: relative;
+    z-index: 1;
+  }
+
+  .grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .card{
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+    transition: box-shadow .15s ease, transform .15s ease;
+    position: relative;
+  }
+  .card:hover{ box-shadow: 0 10px 24px -16px rgba(34,48,60,0.35); transform: translateY(-2px); }
+
+  .tag{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    width: fit-content;
+  }
+  .tag.member{ background: var(--teal-soft); color: var(--teal); }
+  .tag.content{ background: var(--amber-soft); color: var(--amber); }
+  .tag.ops{ background: var(--plum-soft); color: var(--plum); }
+
+  .card h3{
+    font-family:'Fraunces', serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.3;
+    padding-right: 20px;
+  }
+  .card p{
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  .card .when{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    background: var(--paper);
+    border-radius: 6px;
+    padding: 8px 10px;
+    line-height: 1.5;
+  }
+  .card .when b{ color: var(--ink); font-weight: 600; }
+
+  .card-actions{
+    margin-top: auto;
+    display:flex;
+    gap: 8px;
+    padding-top: 4px;
+  }
+  .btn{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    color: var(--ink);
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .btn:hover{ background: #E2DBC9; }
+  .btn.primary{
+    background: var(--ink);
+    color: var(--card);
+    border-color: var(--ink);
+  }
+  .btn.primary:hover{ background: #384A57; }
+  .btn.copied{ background: var(--teal); color:#fff; border-color: var(--teal); }
+
+  .del-x{
+    position:absolute;
+    top:14px; right:12px;
+    width:20px; height:20px;
+    border-radius:50%;
+    border:none;
+    background:transparent;
+    color: var(--ink-soft);
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .del-x:hover{ background: var(--amber-soft); color: var(--amber); }
+
+  .copy-box{
+    display:none;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    background: var(--paper);
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    color: var(--ink);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    user-select: all;
+  }
+  .copy-box.show{ display:block; }
+  .copy-hint{
+    font-size: 11px;
+    color: var(--ink-soft);
+    display:none;
+  }
+  .copy-hint.show{ display:block; }
+
+  .add-card{
+    border: 1.5px dashed var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:flex-start;
+    gap:6px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    min-height: 140px;
+    cursor: pointer;
+    background: transparent;
+    text-align:left;
+    width:100%;
+    font-family:'IBM Plex Sans', sans-serif;
+  }
+  .add-card:hover{ background: rgba(255,255,255,0.5); border-color: var(--teal); color: var(--teal); }
+  .add-card b{ font-family:'Fraunces', serif; font-size:16px; font-weight:600; display:block; margin-bottom:2px; }
+
+  .no-result{
+    text-align:center;
+    color: var(--ink-soft);
+    font-size: 14px;
+    padding: 40px 0;
+    display:none;
+  }
+
+  footer{
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: center;
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  /* modal */
+  .modal-overlay{
+    display:none;
+    position: fixed; inset:0;
+    background: rgba(34,48,60,0.45);
+    align-items:center; justify-content:center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal{
+    background: var(--card);
+    border-radius: 12px;
+    padding: 26px;
+    max-width: 460px;
+    width: 100%;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.4);
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+  .modal h2{
+    font-family:'Fraunces', serif;
+    font-size: 20px;
+    margin: 0 0 16px;
+  }
+  .field{ margin-bottom: 14px; }
+  .field label{
+    display:block;
+    font-size: 12px;
+    font-family:'IBM Plex Mono', monospace;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  .field input, .field select, .field textarea{
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 13.5px;
+    color: var(--ink);
+    outline: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color: var(--teal); }
+  .field textarea{ resize: vertical; min-height: 56px; }
+  .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top: 18px; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">TOOL HUB · 個人工具工作台</div>
+    <h1>需要的時候，來這裡找。</h1>
+    <div class="sub">把訓練過的小工具收在同一個地方。輸入關鍵字，或點選左上分類標籤，找到工具後複製起手指令，貼回對話視窗就能開始。</div>
+  </header>
+
+  <div class="search">
+    <input id="searchInput" type="text" placeholder="搜尋工具，例如「回購」「分群」「報表」…" oninput="applyFilter()">
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-cat="all" onclick="setCat('all')">全部</div>
+    <div class="tab" data-cat="member" onclick="setCat('member')">會員行銷</div>
+    <div class="tab" data-cat="content" onclick="setCat('content')">內容優化</div>
+    <div class="tab" data-cat="ops" onclick="setCat('ops')">工具管理</div>
+  </div>
+
+  <div class="folder-body">
+    <div class="grid" id="grid"></div>
+    <div class="no-result" id="noResult">沒有符合的工具——換個關鍵字試試，或直接告訴我你想做什麼，我可以幫你判斷用哪一個。</div>
+  </div>
+
+  <footer>持續累積中 · 資料存在這個瀏覽器裡（localStorage），換裝置或清除瀏覽器資料會不見</footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>+ 新增工具</h2>
+    <div class="field">
+      <label>標題</label>
+      <input id="fTitle" type="text" placeholder="例如：某某分析工具">
+    </div>
+    <div class="field">
+      <label>分類</label>
+      <select id="fCat">
+        <option value="member">會員行銷</option>
+        <option value="content">內容優化</option>
+        <option value="ops">工具管理</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>說明（一句話）</label>
+      <textarea id="fDesc" placeholder="這個工具在做什麼"></textarea>
+    </div>
+    <div class="field">
+      <label>使用時機</label>
+      <textarea id="fWhen" placeholder="什麼情況下該用這個工具"></textarea>
+    </div>
+    <div class="field">
+      <label>起手指令</label>
+      <textarea id="fPrompt" placeholder="貼到對話裡的開場白"></textarea>
+    </div>
+    <div class="field">
+      <label>連結（選填）</label>
+      <input id="fUrl" type="text" placeholder="https://…　例如工具的表單、文件、Sheet 連結">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" onclick="saveNewTool()">新增</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const builtInTools = [
+  {
+    id: "ec-report",
+    cat: "member",
+    tagLabel: "會員行銷",
+    title: "EC 會員行銷觀測報表",
+    desc: "把每月 7 份來源檔案回填進報表主檔的「附」表，數字自動更新不用手動重新整理。",
+    when: "使用時機：每月要回填/更新 EC 會員行銷觀測報表、或要往前捲動到新的月份時。",
+    prompt: "我要更新這個月的 EC 會員行銷觀測報表，我會上傳這個月的來源檔案和主檔，請照之前的欄位對應方式回填。",
+    url: "",
+    custom: false
+  },
+  {
+    id: "napl",
+    cat: "member",
+    tagLabel: "會員行銷",
+    title: "NAPL 會員分群模型",
+    desc: "依「購物週期」與「消費次數」把會員自動分成 N / A / P / L / Ready to buy / Sealed 六類。",
+    when: "使用時機：要做會員活躍度分析、找流失客或潛力客名單、或設計分群溝通策略時。",
+    prompt: "我想用 NAPL 模型幫這批會員資料做分群，請照六大分類邏輯幫我判斷並整理結果。",
+    url: "",
+    custom: false
+  },
+  {
+    id: "overlap",
+    cat: "member",
+    tagLabel: "會員行銷",
+    title: "名單重疊 / 回購分析",
+    desc: "比對多份會員名單與另一段期間的購買名單，算出重疊率、回購率，產出公式驅動的 Excel 報表。",
+    when: "使用時機：要看某批名單後續有沒有回購、新舊客比較、或多份名單互相比對重疊時。",
+    prompt: "我有幾份會員名單想跟另一段期間的購買名單比對，想看重疊率跟回購率，我把檔案上傳給你。",
+    url: "",
+    custom: false
+  },
+  {
+    id: "geo",
+    cat: "content",
+    tagLabel: "內容優化",
+    title: "GEO 內容優化稽核",
+    desc: "稽核並改寫網頁內容，讓內容更容易被 ChatGPT、Perplexity、Google AI Overviews 這類 AI 搜尋引擎擷取引用。",
+    when: "使用時機：有活動頁/landing page 想確認對 AI 搜尋友不友善、或想優化文案被引用的機率時。",
+    prompt: "幫我稽核這個頁面對 AI 搜尋引擎的友善程度，並提出可以怎麼改寫會更容易被引用。",
+    url: "",
+    custom: false
+  },
+  {
+    id: "template-lib",
+    cat: "ops",
+    tagLabel: "工具管理",
+    title: "指令範本庫",
+    desc: "存放分析框架、報表格式、SQL/程式片段等重複使用的指令範本，之後要用直接叫出來套用。",
+    when: "使用時機：想存下一個做得不錯的分析指令供以後重用，或想找之前存過的範本時。",
+    prompt: "範本庫裡有沒有現成的範本可以用？我想找一個跟「（填入主題）」有關的。",
+    url: "",
+    custom: false
+  }
+];
+
+const STORAGE_KEY = 'toolhub_custom_tools_v1';
+const catLabel = { member: '會員行銷', content: '內容優化', ops: '工具管理' };
+
+function loadCustomTools(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveCustomTools(list){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }catch(e){}
+}
+
+let customTools = loadCustomTools();
+const grid = document.getElementById('grid');
+const noResult = document.getElementById('noResult');
+let activeCat = 'all';
+let openCopyId = null;
+
+function allTools(){ return builtInTools.concat(customTools); }
+
+function render(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filtered = allTools().filter(t=>{
+    const matchCat = activeCat === 'all' || t.cat === activeCat;
+    const haystack = (t.title + t.desc + t.tagLabel).toLowerCase();
+    const matchQ = q === '' || haystack.includes(q);
+    return matchCat && matchQ;
+  });
+
+  grid.innerHTML = '';
+  filtered.forEach((t)=>{
+    const card = document.createElement('div');
+    card.className = 'card';
+    const delBtn = t.custom ? `<button class="del-x" title="刪除" onclick="deleteTool('${t.id}')">×</button>` : '';
+    const linkBtn = t.url ? `<button class="btn" onclick="window.open('${encodeURI(t.url)}', '_blank', 'noopener')">開啟連結 ↗</button>` : '';
+    card.innerHTML = `
+      ${delBtn}
+      <span class="tag ${t.cat}">${t.tagLabel}</span>
+      <h3>${escapeHtml(t.title)}</h3>
+      <p>${escapeHtml(t.desc)}</p>
+      <div class="when"><b>使用時機：</b>${escapeHtml(t.when.replace('使用時機：',''))}</div>
+      <div class="card-actions">
+        <button class="btn primary" onclick="copyPrompt(this, '${t.id}')">複製起手指令</button>
+        ${linkBtn}
+      </div>
+      <div class="copy-hint" id="hint-${t.id}">已嘗試自動複製。若沒反應，請直接框選下面文字手動複製：</div>
+      <div class="copy-box" id="box-${t.id}"></div>
+    `;
+    grid.appendChild(card);
+  });
+
+  if(q === ''){
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-card';
+    addBtn.type = 'button';
+    addBtn.onclick = openModal;
+    addBtn.innerHTML = `<b>+ 新增工具</b>把新訓練好的小工具加進來`;
+    grid.appendChild(addBtn);
+  }
+
+  noResult.style.display = filtered.length === 0 ? 'block' : 'none';
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function setCat(cat){
+  activeCat = cat;
+  document.querySelectorAll('.tab').forEach(el=>{
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  render();
+}
+
+function applyFilter(){ render(); }
+
+function copyPrompt(btn, toolId){
+  const tool = allTools().find(t=>t.id === toolId);
+  if(!tool) return;
+  const text = tool.prompt;
+
+  const box = document.getElementById('box-' + toolId);
+  const hint = document.getElementById('hint-' + toolId);
+  box.textContent = text;
+  box.classList.add('show');
+  hint.classList.add('show');
+
+  const markAttempted = (success)=>{
+    const original = btn.textContent;
+    btn.textContent = success ? '已複製 ✓' : '請手動複製 ↓';
+    btn.classList.toggle('copied', success);
+    setTimeout(()=>{ btn.textContent = original; btn.classList.remove('copied'); }, 2000);
+  };
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text)
+      .then(()=>markAttempted(true))
+      .catch(()=>{ fallbackCopy(text); markAttempted(false); });
+  } else {
+    fallbackCopy(text);
+    markAttempted(false);
+  }
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+}
+
+function openModal(){
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+  ['fTitle','fDesc','fWhen','fPrompt','fUrl'].forEach(id=>document.getElementById(id).value = '');
+  document.getElementById('fCat').value = 'member';
+}
+function saveNewTool(){
+  const title = document.getElementById('fTitle').value.trim();
+  const cat = document.getElementById('fCat').value;
+  const desc = document.getElementById('fDesc').value.trim();
+  const when = document.getElementById('fWhen').value.trim();
+  const prompt = document.getElementById('fPrompt').value.trim();
+  const url = document.getElementById('fUrl').value.trim();
+
+  if(!title || !desc || !prompt){
+    alert('標題、說明、起手指令是必填的喔');
+    return;
+  }
+
+  const newTool = {
+    id: 'custom-' + Date.now(),
+    cat: cat,
+    tagLabel: catLabel[cat],
+    title: title,
+    desc: desc,
+    when: when || '使用時機：（尚未填寫）',
+    prompt: prompt,
+    url: url,
+    custom: true
+  };
+  customTools.push(newTool);
+  saveCustomTools(customTools);
+  closeModal();
+  render();
+}
+function deleteTool(id){
+  if(!confirm('確定要刪除這個工具卡片嗎？')) return;
+  customTools = customTools.filter(t=>t.id !== id);
+  saveCustomTools(customTools);
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
