@@ -433,36 +433,183 @@
     updateRunState();
   });
 
-  function readWorkbook(file){
+  // ---- 大檔安全讀取：改用 Web Worker 背景執行緒解析，避免主執行緒(畫面)被巨量資料卡死或造成分頁當機 ----
+  const LARGE_FILE_WARN_MB = 15;
+  const LARGE_FILE_DANGER_MB = 60;
+
+  function checkFileSize(file, label){
+    const mb = file.size/1024/1024;
+    if(mb >= LARGE_FILE_DANGER_MB){
+      log(`⚠️ ${label}約 ${mb.toFixed(1)}MB，資料量偏大，將以背景執行緒分批處理，請耐心等候（可能需 30 秒～數分鐘，畫面不會被卡住）`, 'dim');
+    } else if(mb >= LARGE_FILE_WARN_MB){
+      log(`${label}約 ${mb.toFixed(1)}MB，處理中...`, 'dim');
+    }
+  }
+
+  function fileToArrayBuffer(file){
     return new Promise((resolve, reject)=>{
       const reader = new FileReader();
-      reader.onload = (e)=>{
-        try{
-          const data = new Uint8Array(e.target.result);
-          const wb = XLSX.read(data, {type:'array'});
-          const sheet = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(sheet, {defval:'', raw:false});
-          resolve(rows);
-        }catch(err){ reject(err); }
-      };
+      reader.onload = e=> resolve(e.target.result);
       reader.onerror = ()=> reject(new Error('檔案讀取失敗：'+file.name));
       reader.readAsArrayBuffer(file);
     });
   }
 
-  function detectColumn(cols, patterns){
-    for(const p of patterns){
-      const found = cols.find(c => c.includes(p));
-      if(found) return found;
+  // Worker 內容：讀檔、比對、彙整全部在背景執行緒完成，主執行緒只收回「彙整後的小結果」，
+  // 避免把百萬列資料轉成 JS 物件塞爆分頁記憶體。
+  const WORKER_SRC = `
+    importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+
+    function detectColumn(cols, patterns){
+      for(const p of patterns){
+        const idx = cols.findIndex(c => c.includes(p));
+        if(idx !== -1) return idx;
+      }
+      return -1;
     }
-    return null;
+    function robustCleanId(v){
+      if(v===undefined || v===null || v==='') return '';
+      let s = String(v).trim();
+      if(s.includes('.')) s = s.split('.')[0];
+      return s.trim();
+    }
+
+    onmessage = function(e){
+      const { mode, buffer, patterns, targetIds } = e.data;
+      try{
+        const data = new Uint8Array(buffer);
+        const wb = XLSX.read(data, {type:'array', dense:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false, blankrows:false});
+        if(!aoa.length) throw new Error('工作表沒有資料');
+        const header = aoa[0].map(h => String(h||'').trim());
+
+        if(mode === 'target'){
+          const idIdx = detectColumn(header, patterns.id);
+          if(idIdx === -1) throw new Error('__NO_ID__');
+          const idSet = new Set();
+          for(let i=1;i<aoa.length;i++){
+            const cid = robustCleanId(aoa[i][idIdx]);
+            if(cid) idSet.add(cid);
+          }
+          postMessage({ ok:true, mode, idColumnFound: header[idIdx], count: idSet.size, ids: Array.from(idSet) });
+          return;
+        }
+
+        // mode === 'detail'
+        const idIdx = detectColumn(header, patterns.id);
+        if(idIdx === -1) throw new Error('__NO_ID__');
+
+        const catDefs = patterns.categories
+          .map(def=>({ key:def.key, idx: detectColumn(header, def.patterns) }))
+          .filter(d=> d.idx !== -1);
+        if(!catDefs.length) throw new Error('__NO_CAT__');
+
+        const metricDefs = patterns.metrics.map(def=>({
+          key:def.key, idx: detectColumn(header, def.patterns), def: def.def
+        }));
+
+        const targetSet = new Set(targetIds);
+        const detailIdSetAll = new Set();
+        const matchedIdSet = new Set();
+        const groups = new Map();
+
+        for(let i=1;i<aoa.length;i++){
+          const row = aoa[i];
+          const cid = robustCleanId(row[idIdx]);
+          if(!cid) continue;
+          detailIdSetAll.add(cid);
+          if(!targetSet.has(cid)) continue;
+          matchedIdSet.add(cid);
+
+          const parts = catDefs.map(c=>{
+            const v = row[c.idx];
+            return (v===undefined || v===null || v==='') ? '未填寫' : String(v).trim();
+          });
+          const key = parts.join('\\u241F');
+          let g = groups.get(key);
+          if(!g){
+            const metrics = {};
+            metricDefs.forEach(m=> metrics[m.key]=0);
+            g = { parts, members:new Set(), metrics };
+            groups.set(key, g);
+          }
+          g.members.add(cid);
+          metricDefs.forEach(m=>{
+            let v;
+            if(m.idx !== -1){
+              v = parseFloat(row[m.idx]);
+              if(isNaN(v)) v = 0;
+            } else {
+              v = m.def;
+            }
+            g.metrics[m.key] += v;
+          });
+        }
+
+        const rows = Array.from(groups.values()).map(g=>({
+          parts: g.parts, members: g.members.size, metrics: g.metrics
+        }));
+
+        postMessage({
+          ok:true, mode,
+          idColumnFound: header[idIdx],
+          categoryKeys: catDefs.map(c=>c.key),
+          metricKeys: metricDefs.map(m=>m.key),
+          detailCount: detailIdSetAll.size,
+          matchedCount: matchedIdSet.size,
+          rows
+        });
+      }catch(err){
+        postMessage({ ok:false, mode, error: (err && err.message) ? err.message : String(err) });
+      }
+    };
+  `;
+
+  let sharedWorker = null;
+  function getWorker(){
+    if(!sharedWorker){
+      const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+      sharedWorker = new Worker(URL.createObjectURL(blob));
+    }
+    return sharedWorker;
   }
 
-  function robustCleanId(v){
-    if(v===undefined || v===null || v==='') return '';
-    let s = String(v).trim();
-    if(s.includes('.')) s = s.split('.')[0];
-    return s.trim();
+  function runInWorker(mode, buffer, patterns, targetIds){
+    if(typeof Worker === 'undefined'){
+      return Promise.reject(new Error('此瀏覽器不支援 Web Worker（背景執行緒），請改用最新版 Chrome / Edge / Firefox'));
+    }
+    return new Promise((resolve, reject)=>{
+      const w = getWorker();
+      const timeoutMs = 6*60*1000; // 6 分鐘保護，避免無限等待
+      const timer = setTimeout(()=>{
+        w.removeEventListener('message', onMsg);
+        reject(new Error('處理逾時（超過 6 分鐘），檔案可能過大或格式異常，建議先用 Excel 篩選縮小資料範圍'));
+      }, timeoutMs);
+
+      function onMsg(e){
+        if(!e.data || e.data.mode !== mode) return; // 避免與其他任務的訊息錯位
+        clearTimeout(timer);
+        w.removeEventListener('message', onMsg);
+        if(e.data.ok){
+          resolve(e.data);
+        } else {
+          const map = {
+            '__NO_ID__': '找不到「會員編號」欄位',
+            '__NO_CAT__': '明細資料中找不到任何分類欄位（類別1-2／類別2／類別3／26碼／商品名稱）'
+          };
+          reject(new Error(map[e.data.error] || e.data.error));
+        }
+      }
+      w.addEventListener('message', onMsg);
+      w.onerror = function(err){
+        clearTimeout(timer);
+        w.removeEventListener('message', onMsg);
+        reject(new Error('背景執行緒處理失敗，瀏覽器可能記憶體不足：' + (err && err.message ? err.message : '未知錯誤')));
+      };
+
+      w.postMessage({ mode, buffer, patterns, targetIds }, [buffer]); // transferable，避免額外複製巨量 buffer
+    });
   }
 
   function fmt(n){
@@ -482,7 +629,7 @@
     {key:'訂單筆數', patterns:['訂單筆數','次數'], def:1},
     {key:'銷售金額(點加金)', patterns:['點加金','銷售金額'], def:0},
     {key:'銷售金額(純金)', patterns:['純金'], def:0},
-    {key:'銷售品項數', patterns:['品項數'], def:1},
+    {key:'銷售品項數', patterns:['品項數','品項'], def:1},
     {key:'銷售數量', patterns:['數量'], def:1},
   ];
 
@@ -490,99 +637,60 @@
     consoleEl.innerHTML = '';
     resultsEl.classList.remove('show');
     runBtn.disabled = true;
-    log('--- 啟動比對流程 ---');
+    const t0 = performance.now();
+    log('--- 啟動比對流程（背景執行緒處理，畫面不會被卡住）---');
     try{
-      log('正在讀取檔案...', 'dim');
-      const [targetRows, detailRows] = await Promise.all([
-        readWorkbook(state.target),
-        readWorkbook(state.detail)
-      ]);
+      checkFileSize(state.target, '指定受眾名單');
+      checkFileSize(state.detail, '商品購買明細');
 
-      if(!targetRows.length) throw new Error('指定受眾名單沒有資料');
-      if(!detailRows.length) throw new Error('商品購買明細沒有資料');
+      log('正在讀取指定受眾名單...', 'dim');
+      const targetBuf = await fileToArrayBuffer(state.target);
+      const targetRes = await runInWorker('target', targetBuf, { id:['會員編號'] });
+      log(`會員編號欄位對應（受眾名單）：「${targetRes.idColumnFound}」`, 'dim');
+      log(`目標清單人數：${fmt(targetRes.count)}`);
+      if(!targetRes.count) throw new Error('指定受眾名單沒有有效的會員編號資料');
 
-      const targetCols = Object.keys(targetRows[0]);
-      const detailCols = Object.keys(detailRows[0]);
+      log('正在讀取商品購買明細...', 'dim');
+      const detailBuf = await fileToArrayBuffer(state.detail);
+      const detailRes = await runInWorker('detail', detailBuf, {
+        id:['會員編號'],
+        categories: CATEGORY_DEFS,
+        metrics: METRIC_DEFS
+      }, targetRes.ids);
 
-      const targetIdCol = detectColumn(targetCols, ['會員編號']);
-      const detailIdCol = detectColumn(detailCols, ['會員編號']);
-      if(!targetIdCol) throw new Error('指定受眾名單找不到「會員編號」欄位');
-      if(!detailIdCol) throw new Error('商品購買明細找不到「會員編號」欄位');
-      log(`會員編號欄位對應 → 受眾名單:「${targetIdCol}」／明細:「${detailIdCol}」`, 'dim');
+      log(`會員編號欄位對應（明細）：「${detailRes.idColumnFound}」`, 'dim');
+      log(`偵測到分類欄位：${detailRes.categoryKeys.join('、')}`, 'dim');
+      log(`明細記錄人數：${fmt(detailRes.detailCount)}`);
+      log(`實際匹配人數：${fmt(detailRes.matchedCount)}`);
 
-      const activeCategoryCols = [];
-      CATEGORY_DEFS.forEach(def=>{
-        const col = detectColumn(detailCols, def.patterns);
-        if(col) activeCategoryCols.push({key:def.key, col});
-      });
-      if(!activeCategoryCols.length) throw new Error('明細資料中找不到任何分類欄位（類別1-2／類別2／類別3／26碼／商品名稱）');
-      log(`偵測到分類欄位：${activeCategoryCols.map(c=>c.key).join('、')}`, 'dim');
+      if(!detailRes.matchedCount) throw new Error('匹配人數為 0，請檢查兩份檔案的會員編號格式（如有無前導零）');
 
-      const metricCols = METRIC_DEFS.map(def=>({...def, col: detectColumn(detailCols, def.patterns)}));
-
-      const targetIdSet = new Set(targetRows.map(r=>robustCleanId(r[targetIdCol])).filter(Boolean));
-      detailRows.forEach(r=> r.__cid = robustCleanId(r[detailIdCol]));
-      const detailIdSetAll = new Set(detailRows.map(r=>r.__cid).filter(Boolean));
-      const filtered = detailRows.filter(r=> r.__cid && targetIdSet.has(r.__cid));
-      const matchedIds = new Set(filtered.map(r=>r.__cid));
-
-      log(`目標清單人數：${targetIdSet.size}`);
-      log(`明細記錄人數：${detailIdSetAll.size}`);
-      log(`實際匹配人數：${matchedIds.size}`);
-
-      if(!matchedIds.size) throw new Error('匹配人數為 0，請檢查兩份檔案的會員編號格式（如有無前導零）');
-
-      const groups = new Map();
-      filtered.forEach(row=>{
-        const parts = activeCategoryCols.map(c=>{
-          const v = row[c.col];
-          return (v===undefined || v===null || v==='') ? '未填寫' : String(v).trim();
-        });
-        const key = parts.join('␟');
-        if(!groups.has(key)){
-          const metrics = {};
-          metricCols.forEach(m=> metrics[m.key]=0);
-          groups.set(key, {parts, members:new Set(), metrics});
-        }
-        const g = groups.get(key);
-        g.members.add(row.__cid);
-        metricCols.forEach(m=>{
-          let v;
-          if(m.col){
-            v = parseFloat(row[m.col]);
-            if(isNaN(v)) v = 0;
-          } else {
-            v = m.def;
-          }
-          g.metrics[m.key] += v;
-        });
-      });
-
-      const summaryRows = Array.from(groups.values()).map(g=>{
+      const summaryRows = detailRes.rows.map(g=>{
         const obj = {};
-        activeCategoryCols.forEach((c,i)=> obj[c.key]=g.parts[i]);
-        obj['購買人數'] = g.members.size;
-        metricCols.forEach(m=> obj[m.key]=g.metrics[m.key]);
+        detailRes.categoryKeys.forEach((k,i)=> obj[k]=g.parts[i]);
+        obj['購買人數'] = g.members;
+        detailRes.metricKeys.forEach(k=> obj[k]=g.metrics[k]);
         return obj;
       });
       summaryRows.sort((a,b)=>{
-        for(const c of activeCategoryCols){
-          if(a[c.key] < b[c.key]) return -1;
-          if(a[c.key] > b[c.key]) return 1;
+        for(const k of detailRes.categoryKeys){
+          if(a[k] < b[k]) return -1;
+          if(a[k] > b[k]) return 1;
         }
         return 0;
       });
 
       const totalRow = {};
-      activeCategoryCols.forEach((c,i)=> totalRow[c.key] = i===0 ? '總計' : '-');
-      totalRow['購買人數'] = matchedIds.size;
-      metricCols.forEach(m=> totalRow[m.key] = summaryRows.reduce((s,r)=>s+r[m.key],0));
+      detailRes.categoryKeys.forEach((k,i)=> totalRow[k] = i===0 ? '總計' : '-');
+      totalRow['購買人數'] = detailRes.matchedCount;
+      detailRes.metricKeys.forEach(k=> totalRow[k] = summaryRows.reduce((s,r)=>s+r[k],0));
 
-      log(`彙整完成，共 ${summaryRows.length} 列`, 'ok');
+      const secs = ((performance.now()-t0)/1000).toFixed(1);
+      log(`彙整完成，共 ${summaryRows.length} 列（耗時 ${secs} 秒）`, 'ok');
       log('✅ 比對完成', 'ok');
 
-      renderResults(activeCategoryCols.map(c=>c.key), metricCols.map(m=>m.key), summaryRows, totalRow,
-        {targetCount:targetIdSet.size, detailCount:detailIdSetAll.size, matchedCount:matchedIds.size});
+      renderResults(detailRes.categoryKeys, detailRes.metricKeys, summaryRows, totalRow,
+        {targetCount:targetRes.count, detailCount:detailRes.detailCount, matchedCount:detailRes.matchedCount});
 
     }catch(err){
       log('🚨 偵測到異常：'+err.message, 'err');
