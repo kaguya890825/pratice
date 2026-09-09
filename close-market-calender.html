@@ -3,17 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>封閉式行銷排程甘特圖</title>
+<title>作業流程公告版</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#232120;
     --ink-soft:#6b6560;
-    --line:#e4dfd8;
-    --paper:#fbf9f5;
+    --line:#bdbdbd;
+    --paper:#f7f6f3;
     --card:#ffffff;
     --accent:#b5482e;
-    --weekend:#f3ede2;
   }
   *{box-sizing:border-box;}
   body{
@@ -21,37 +20,27 @@
     background:var(--paper);
     color:var(--ink);
     font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
-    padding:28px 20px 60px;
+    padding:24px 20px 50px;
   }
-  .wrap{max-width:1400px;margin:0 auto;}
+  .wrap{max-width:1500px;margin:0 auto;}
   header{
     display:flex;
     justify-content:space-between;
     align-items:flex-end;
     flex-wrap:wrap;
     gap:16px;
-    margin-bottom:20px;
+    margin-bottom:16px;
     border-bottom:2px solid var(--ink);
-    padding-bottom:14px;
+    padding-bottom:12px;
   }
-  h1{
-    font-size:22px;
-    font-weight:700;
-    margin:0 0 4px;
-    letter-spacing:.02em;
-  }
-  .subtitle{color:var(--ink-soft);font-size:13px;margin:0;}
-  .controls{
-    display:flex;
-    gap:10px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
+  h1{font-size:20px;font-weight:700;margin:0 0 4px;}
+  .subtitle{color:var(--ink-soft);font-size:12px;margin:0;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   .btn{
     border:1px solid var(--ink);
     background:var(--card);
     color:var(--ink);
-    padding:8px 14px;
+    padding:7px 13px;
     font-size:13px;
     border-radius:3px;
     cursor:pointer;
@@ -62,137 +51,67 @@
   .btn.primary:hover{background:#8f3a24;}
   input[type=file]{display:none;}
   #status{font-size:12px;color:var(--ink-soft);}
+  .monthnav{display:flex;align-items:center;gap:6px;margin-right:8px;}
+  .monthlabel{font-size:14px;font-weight:700;min-width:64px;text-align:center;}
 
-  .month-label{
-    font-size:13px;
-    color:var(--ink-soft);
-    margin:2px 0 14px;
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);background:var(--card);}
+  table{border-collapse:collapse;width:100%;min-width:1700px;table-layout:fixed;}
+  th,td{border:1px solid var(--line);text-align:center;vertical-align:middle;}
+  .titlecell{
+    background:var(--ink);color:#fff;font-size:13px;font-weight:700;
+    text-align:left;padding:6px 10px;white-space:nowrap;
   }
+  .daycol{width:44px;min-width:44px;padding:3px 1px;}
+  .daynum{font-size:12px;font-weight:700;}
+  .weekday{font-size:10px;opacity:.7;}
 
-  .table-scroll{
-    overflow-x:auto;
-    border:1px solid var(--line);
-    background:var(--card);
-  }
-  table{
-    border-collapse:collapse;
-    width:100%;
-    min-width:1500px;
-    table-layout:fixed;
-  }
-  th,td{
-    border:1px solid var(--line);
-    vertical-align:top;
-  }
-  thead th{
-    background:var(--ink);
-    color:var(--paper);
-    position:sticky;
-    top:0;
-    z-index:2;
-  }
-  .corner{
-    position:sticky;
-    left:0;
-    z-index:3;
-    background:var(--ink);
-    color:var(--paper);
-    width:110px;
-    min-width:110px;
-  }
-  .daycol{
-    width:78px;
-    min-width:78px;
-    text-align:center;
-    padding:6px 2px;
-  }
-  .daynum{font-size:14px;font-weight:700;}
-  .weekday{font-size:11px;opacity:.75;}
-  th.weekend, td.weekend{background:var(--weekend);}
-  thead th.weekend{background:#6b4638;}
-
-  .rowlabel{
-    position:sticky;
-    left:0;
-    background:var(--card);
-    z-index:1;
-    font-size:13px;
+  .lbl{
+    font-size:11px;
     font-weight:600;
-    padding:8px 10px;
-    border-right:1px solid var(--ink);
+    padding:4px 6px;
+    background:var(--card);
+    white-space:pre-line;
+    min-width:60px;
   }
-  .rowlabel .en{
-    display:block;
-    font-size:10px;
-    font-weight:400;
-    color:var(--ink-soft);
-    margin-top:2px;
-  }
+  .lbl.group{writing-mode:vertical-rl;text-orientation:upright;letter-spacing:2px;width:26px;min-width:26px;}
+  .lbl.channel{width:78px;min-width:78px;font-size:10px;}
+  .lbl.subtype{width:64px;min-width:64px;font-size:10px;}
 
   td.cell{
-    padding:4px;
-    min-height:52px;
-  }
-  .chip{
-    font-size:11px;
-    line-height:1.3;
-    padding:3px 5px;
-    border-radius:3px;
-    margin-bottom:3px;
+    font-size:10px;
+    line-height:1.2;
+    padding:2px 1px;
+    height:28px;
     color:#232120;
-    cursor:default;
     word-break:break-word;
   }
-  .chip:last-child{margin-bottom:0;}
 
-  .legend{
-    margin-top:22px;
-    padding-top:14px;
-    border-top:1px solid var(--line);
-  }
-  .legend h2{
-    font-size:12px;
-    text-transform:none;
-    color:var(--ink-soft);
-    margin:0 0 10px;
-    font-weight:600;
-  }
-  .legend-items{
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px 14px;
-  }
-  .legend-item{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font-size:12px;
-  }
-  .swatch{
-    width:12px;height:12px;border-radius:2px;flex:none;
-  }
+  .legend{margin-top:20px;padding-top:12px;border-top:1px solid var(--line);}
+  .legend h2{font-size:12px;color:var(--ink-soft);margin:0 0 10px;font-weight:600;}
+  .legend-items{display:flex;flex-wrap:wrap;gap:8px 14px;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+  .swatch{width:14px;height:14px;border:1px solid var(--line);flex:none;}
 
-  .rule-note{
-    margin-top:16px;
-    font-size:12px;
-    color:var(--ink-soft);
-    line-height:1.6;
-  }
+  .rule-note{margin-top:14px;font-size:12px;color:var(--ink-soft);line-height:1.6;}
   .rule-note b{color:var(--ink);}
 
-  @media (max-width:720px){
-    header{flex-direction:column;align-items:flex-start;}
-  }
+  @media (max-width:720px){header{flex-direction:column;align-items:flex-start;}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
-      <h1>封閉式行銷排程甘特圖</h1>
-      <p class="subtitle">自「月曆」工作表自動整理，色塊文字僅保留「)」後、「｜」前的線別名稱</p>
+      <h1 id="titleText">作業流程公告版</h1>
+      <p class="subtitle">格式與色塊直接沿用「04.綜效資源表」原檔樣式</p>
     </div>
     <div class="controls">
+      <div class="monthnav">
+        <button class="btn" id="prevMonthBtn" title="上個月">◀</button>
+        <span id="monthLabel" class="monthlabel"></span>
+        <button class="btn" id="nextMonthBtn" title="下個月">▶</button>
+        <button class="btn" id="resetMonthBtn">回到資料月份</button>
+      </div>
       <input type="file" id="fileInput" accept=".xlsx">
       <button class="btn primary" id="uploadBtn">上傳下月 .xlsx 更新</button>
       <button class="btn" id="copyBtn">複製表格</button>
@@ -200,189 +119,91 @@
     </div>
   </header>
 
-  <p class="month-label" id="monthLabel"></p>
-
   <div class="table-scroll">
     <table id="ganttTable"></table>
   </div>
 
   <div class="legend">
-    <h2>線別色塊圖例</h2>
+    <h2>線別色塊圖例（沿用原檔色碼）</h2>
     <div class="legend-items" id="legendItems"></div>
   </div>
 
   <p class="rule-note">
-    <b>色塊文字規則：</b>取每則活動文字中「最後一個）」之後、到「｜」之前的文字作為線別標籤（例如「(品類)服飾鞋包｜初衣食午」→「服飾鞋包」）；若無括號則從頭取，若無｜則取到底。無｜的附註說明行（如「*舊客...不同文案」）不會顯示為色塊。<br>
-    <b>用字統一：</b>中文／中文出版／中文特刊 → 統一為「中文」；外文／外文出版／外文特刊 → 統一為「外文」；同系列的其餘線別（生活家居、童書、電子書、3C家電、親子、會員、禮享指南）也比照統一用字與顏色。<br>
-    <b>列結構：</b>「全會員EDM」獨立成一列，放在「電子報 EDM」上方，只收原 eDM 中線別為「全站」的活動；其餘 eDM 活動則留在「電子報 EDM」列。兩列皆維持一般白底，不做反色處理。「APP 公眾推播」列同樣維持白底，改用統一灰色色塊呈現該列所有活動，藉此標示「公眾推播」的性質。滑鼠移到色塊上可看完整原文。
-    重新上傳下個月的整體規劃 .xlsx（需含「月曆」工作表，同一種排版）即可自動重繪。
+    <b>資料來源：</b>「04.綜效資源表」工作表，會員行銷區塊（EDM發送／APP推播／SMS發送，全會員｜公眾為淡色列，封閉為兩列供同日多檔期並列）。色塊顏色與文字直接取自原檔儲存格填色與內容，未另外重新配色。<br>
+    重新上傳下個月同樣格式的檔期規劃 .xlsx 即可自動重繪（月份、天數會自動偵測）。
   </p>
 </div>
 
 <script>
-const EMBEDDED_DATA = {"1": {"eDM": ["OMO｜驚喜任你抓"], "APP公眾": ["OMO｜驚喜任你抓"], "SMS": ["(中央)外文｜外文館慶"]}, "2": {"eDM": ["外文出版｜外文館慶"], "APP公眾": ["CB｜動漫祭"], "APP封閉": ["外文出版｜外文館慶"], "SMS": ["(品類)親子用品｜育兒99必修課"]}, "3": {"eDM": ["會員處｜實體5號會員日"], "APP封閉": ["會員｜流失客塞券(預留)"]}, "4": {"eDM": ["全站｜會員日"], "APP公眾": ["SD｜5號會員日"], "APP封閉": ["會員｜月月樂讀用券提醒\n*舊客(OLDOLD)&新客(NEWNEW/OLDNEW)不同文案"], "SMS": ["(中央)全站｜會員日"]}, "6": {"eDM": ["美妝保養｜綠藤生機"], "APP封閉": ["食品保健｜禮盒(塞券)"], "SMS": ["(品類)美妝保養｜綠藤生機"]}, "5": {"APP公眾": ["全站｜會員日"], "APP封閉": ["全站｜週末買書最值得"], "SMS": ["(品類)食品保健｜禮盒(塞券)"]}, "7": {"eDM": ["童書特刊"], "APP公眾": ["全站｜99購物節P4"], "APP封閉": ["休閒戶外｜塞券"]}, "8": {"eDM": ["全站｜99購物節P4"], "APP封閉": ["美妝保養｜綠藤生機"], "SMS": ["(中央)生活家居｜99購物節\n(中央)文具潮藝｜HOBONICHI"]}, "9": {"eDM": ["CB｜動漫祭"], "APP封閉": ["樂活家居｜HOLA開館慶"], "SMS": ["(中央) 全站｜99購物節P4(溝通點數)\n(品類) 中文出版｜限時加碼"]}, "10": {"eDM": ["全站｜99購物節P5"], "APP封閉": ["全站｜99購物節P5"], "SMS": ["全站｜99購物節P5"]}, "11": {"eDM": ["2026 禮享指南_處女座_CDP 已發送名單"], "APP封閉": ["文具潮藝｜HOBONICHI塞券促動"], "SMS": ["(品類)服飾鞋包｜初衣食午"]}, "12": {"eDM": ["會員｜卡精明\n樂活家居｜HOLA開館慶"], "APP公眾": ["會員處｜消費抽"], "APP封閉": ["全站｜週末買書最值得\n*新 3C家電｜IPHONE 18預購"]}, "13": {"eDM": ["外文特刊"], "APP封閉": ["會員｜卡精明"]}, "14": {"eDM": ["SD｜週年慶"], "APP公眾": ["全站｜精明選物日"], "APP封閉": ["服飾鞋包｜塞券\n美妝保養｜歐瓏+CREED"], "SMS": ["全站｜精明選物日"]}, "15": {"eDM": ["全站｜精明選物日"], "APP公眾": ["SD｜松菸會員日"], "APP封閉": ["美妝保養｜AVEDA塞券"]}, "16": {"eDM": ["服飾鞋包｜塞券\n*新 3C家電｜IPHONE 18預購"], "APP封閉": ["美妝保養｜1010塞券"]}, "17": {"eDM": ["全站｜秋日回饋祭P2"], "APP公眾": ["SD｜週年慶首波"], "APP封閉": ["全站｜秋日回饋祭P2\n美妝保養｜SABON塞券"], "SMS": ["(中央-品牌旗艦館)樂活家居｜HOLA"]}, "18": {"eDM": ["服飾鞋包｜初衣食午"], "APP封閉": ["服飾鞋包｜初衣食午\n美妝保養｜DUO塞券"], "SMS": ["(品類)生活家居｜塞券"]}, "19": {"eDM": ["全站｜外文日"], "APP公眾": ["會員處｜扣點抽"], "APP封閉": ["全站｜外文日\n美妝保養｜美妝館塞券"], "SMS": ["(品類)外文｜外文館慶"]}, "20": {"eDM": ["外文特刊"], "APP公眾": ["會員處｜點數攻略"], "APP封閉": ["全站｜週末買書最值得\n樂活家居｜塞券"], "SMS": ["(品類)美妝保養｜塞券"]}, "21": {"eDM": ["童書特刊"], "APP封閉": ["生活｜HOLA塞券"], "SMS": ["(品類) 影音｜盛夏未完音樂節"]}, "22": {"eDM": ["外文｜塞券"], "APP封閉": ["會員｜新會員$50倒數通知"]}, "23": {"eDM": ["會員｜月月樂讀用券提醒"], "APP封閉": ["服飾鞋包｜點睛品(tbc)"]}, "24": {"eDM": ["預留(塞券)"], "APP公眾": ["SD｜週年慶滿送百"], "APP封閉": ["會員｜生日禮用券提醒"]}, "25": {"eDM": ["全站｜愛讀日"], "APP封閉": ["全站｜愛讀日"], "SMS": ["全站｜愛讀日"]}, "26": {"eDM": ["預留"], "APP封閉": ["全站｜週末買書最值得"], "SMS": ["(中央) 中文｜秋季閱讀"]}, "27": {"eDM": ["中文特刊"], "SMS": ["(品類)服飾鞋包｜塞券 \n(未用券名單倒數提醒)"]}, "28": {"eDM": ["電子書特刊"], "APP封閉": ["會員｜禮享指南(天秤座)"]}, "29": {"eDM": ["全站｜秋日回饋祭p4"], "APP公眾": ["全站｜秋日回饋祭p4"], "SMS": ["全站｜秋日回饋祭p4"]}, "30": {"eDM": ["全站｜黑卡會員日"], "APP封閉": ["全站｜黑卡會員日"], "SMS": ["全站｜黑卡會員日"]}};
-const CHANNELS = [
-  {key:'eDM', label:'電子報 EDM', en:'eDM'},
-  {key:'APP公眾', label:'APP 公眾推播', en:'APP public push'},
-  {key:'APP封閉', label:'APP 封閉推播', en:'APP closed push'},
-  {key:'SMS', label:'簡訊 SMS', en:'SMS'}
-];
+const EMBEDDED = {"title": "【新首頁】作業流程公告版", "year": 2026, "month": 8, "numDays": 31, "rows": [{"row": 2, "group": "會員行銷", "channel": "EDM發送", "subtype": "全會員", "cells": {"5": {"text": "全站", "color": "#FFFF00"}, "6": {"text": "(其他單位)", "color": "#D9D9D9"}, "15": {"text": "(其他單位)", "color": "#D9D9D9"}, "31": {"text": "全站", "color": "#FFFF00"}}}, {"row": 3, "group": "會員行銷", "channel": "EDM發送", "subtype": "封閉", "cells": {"2": {"text": "童書", "color": "#FF99FF"}, "3": {"text": "(會員)", "color": "#EAD1DC"}, "4": {"text": "(其他單位)", "color": "#D9D9D9"}, "7": {"text": "全站", "color": "#FFFF00"}, "8": {"text": "(會員)", "color": "#EAD1DC"}, "9": {"text": "電子書", "color": "#CDF8CA"}, "10": {"text": "全站", "color": "#FFFF00"}, "12": {"text": "外文", "color": "#00FF00"}, "16": {"text": "全站", "color": "#FFFF00"}, "18": {"text": "文具", "color": "#FCD5B4"}, "19": {"text": "童書", "color": "#FF99FF"}, "20": {"text": "全站", "color": "#FFFF00"}, "21": {"text": "全站", "color": "#FFFF00"}, "23": {"text": "(會員)", "color": "#EAD1DC"}, "25": {"text": "全站", "color": "#FFFF00"}, "27": {"text": "外文", "color": "#00FF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}, {"row": 4, "group": "會員行銷", "channel": "EDM發送", "subtype": "封閉", "cells": {}}, {"row": 5, "group": "會員行銷", "channel": "APP推播", "subtype": "公眾", "cells": {"1": {"text": "(會員)", "color": "#EAD1DC"}, "3": {"text": "(其他單位)", "color": "#D9D9D9"}, "4": {"text": "(其他單位)", "color": "#D9D9D9"}, "5": {"text": "全站", "color": "#FFFF00"}, "14": {"text": "全站", "color": "#FFFF00"}, "15": {"text": "(其他單位)", "color": "#D9D9D9"}, "22": {"text": "(其他單位)", "color": "#D9D9D9"}, "30": {"text": "全站", "color": "#FFFF00"}}}, {"row": 6, "group": "會員行銷", "channel": "APP推播", "subtype": "封閉", "cells": {"1": {"text": "全站", "color": "#FFFF00"}, "4": {"text": "全站", "color": "#FFFF00"}, "5": {"text": "(會員)", "color": "#EAD1DC"}, "6": {"text": "(會員)", "color": "#EAD1DC"}, "8": {"text": "全站", "color": "#FFFF00"}, "10": {"text": "全站", "color": "#FFFF00"}, "15": {"text": "全站", "color": "#FFFF00"}, "18": {"text": "文具", "color": "#FCD5B4"}, "20": {"text": "全站", "color": "#FFFF00"}, "21": {"text": "(會員)", "color": "#EAD1DC"}, "22": {"text": "全站", "color": "#FFFF00"}, "23": {"text": "全站", "color": "#FFFF00"}, "24": {"text": "(會員)", "color": "#EAD1DC"}, "25": {"text": "全站", "color": "#FFFF00"}, "26": {"text": "(會員)", "color": "#EAD1DC"}, "29": {"text": "全站", "color": "#FFFF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}, {"row": 7, "group": "會員行銷", "channel": "APP推播", "subtype": "封閉", "cells": {"1": {"text": "美妝", "color": "#FF9900"}, "8": {"text": "美妝", "color": "#FF9900"}, "20": {"text": "美妝", "color": "#FF9900"}, "21": {"text": "美妝", "color": "#FF9900"}, "22": {"text": "美妝", "color": "#FF9900"}, "23": {"text": "美妝", "color": "#FF9900"}, "24": {"text": "美妝", "color": "#FF9900"}}}, {"row": 8, "group": "會員行銷", "channel": "SMS發送", "subtype": "", "cells": {"5": {"text": "全站", "color": "#FFFF00"}, "8": {"text": "文具", "color": "#FCD5B4"}, "14": {"text": "全站", "color": "#FFFF00"}, "16": {"text": "親子", "color": "#E6B8AF"}, "25": {"text": "全站", "color": "#FFFF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}], "legend": {"全站": "#FFFF00", "中文": "#C4D79B", "電子書": "#CDF8CA", "3C": "#BF8F00", "文具": "#FCD5B4", "服飾": "#3D85C6", "美妝": "#FF9900", "食品": "#FFF5F5", "生活": "#FF6699", "童書": "#FF99FF", "休閒": "#6AA84F", "外文": "#00FF00", "親子": "#E6B8AF", "影音": "#C9DAF8", "IMC": "#674EA7", "(會員)": "#EAD1DC", "(其他單位)": "#D9D9D9"}};
 
-// Display rows. "全會員EDM" and "電子報 EDM" both read from the same
-// underlying "eDM" data — filter splits them by canonical label so the
-// broad, all-member sends (全站) sit in their own row above the rest.
-const ROWS = [
-  {rowKey:'eDM_all', srcKey:'eDM', label:'全會員EDM', en:'EDM · all members', filter:(label)=> label === '全站', forceColor:null},
-  {rowKey:'eDM', srcKey:'eDM', label:'電子報 EDM', en:'EDM', filter:(label)=> label !== '全站', forceColor:null},
-  {rowKey:'APP公眾', srcKey:'APP公眾', label:'APP 公眾推播', en:'APP public push', filter:()=>true, forceColor:'#b9bec2'},
-  {rowKey:'APP封閉', srcKey:'APP封閉', label:'APP 封閉推播', en:'APP closed push', filter:()=>true, forceColor:null},
-  {rowKey:'SMS', srcKey:'SMS', label:'簡訊 SMS', en:'SMS', filter:()=>true, forceColor:null}
-];
+let current = EMBEDDED;
+current.dataYear = current.year;
+current.dataMonth = current.month;
+let viewYear = current.year;
+let viewMonth = current.month;
 
-const PALETTE = [
-  '#f7c948','#a8d5ba','#f4a688','#8ec6d9','#d9a8d0',
-  '#c9b896','#f2a0a8','#9fc9a3','#e8b4bc','#a3b8d8',
-  '#e0c68a','#b8a8d8','#8fcfc0','#f0b880','#c4d6a0',
-  '#d8a0b8','#a0c4d8','#e8d090','#b0d0c0','#d0a8a0'
-];
-
-function hashLabel(str){
-  let h = 0;
-  for(let i=0;i<str.length;i++){
-    h = (h*31 + str.charCodeAt(i)) >>> 0;
-  }
-  return h;
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function weekdayName(y,m,d){
+  const names=['日','一','二','三','四','五','六'];
+  return names[new Date(y,m-1,d).getDay()];
 }
-function colorFor(label){
-  const idx = hashLabel(label) % PALETTE.length;
-  return PALETTE[idx];
+function isWeekend(y,m,d){
+  const wd = new Date(y,m-1,d).getDay();
+  return wd===0 || wd===6;
 }
 
-// Extraction rule: text after the LAST ")" (or full-width "）") and before the
-// first "|"/"｜" that follows it. No ")" -> start from beginning.
-// No "|" after that point -> go to end of string.
-function extractLabel(raw){
-  let s = (raw || '').trim();
-  if(!s) return '';
-  let parenIdx = Math.max(s.lastIndexOf(')'), s.lastIndexOf('）'));
-  let start = parenIdx >= 0 ? parenIdx + 1 : 0;
-  let rest = s.slice(start);
-  let pipeCandidates = [rest.indexOf('|'), rest.indexOf('｜')].filter(i => i !== -1);
-  let pipeIdx = pipeCandidates.length ? Math.min(...pipeCandidates) : -1;
-  let label = pipeIdx >= 0 ? rest.slice(0, pipeIdx) : rest;
-  return label.trim().replace(/^\*+\s*/, '');
-}
-
-// Lines that are pure annotations/footnotes (start with "*" and carry no
-// "|"/"｜" delimiter of their own) don't represent a separate campaign —
-// e.g. "*舊客(OLDOLD)&新客(NEWNEW/OLDNEW)不同文案". Drop these entirely.
-function isAnnotationLine(line){
-  const t = line.trim();
-  if(!t) return true;
-  if(/^[*※]/.test(t) && !t.includes('|') && !t.includes('｜')) return true;
-  return false;
-}
-
-// Same-series labels get unified wording + color (e.g. 中文/中文出版/中文特刊 -> 中文).
-// First match wins; order longer/more specific roots first where needed.
-const CANONICAL_RULES = [
-  ['中文', '中文'],
-  ['外文', '外文'],
-  ['樂活家居', '生活家居'],
-  ['生活家居', '生活家居'],
-  ['生活', '生活家居'],
-  ['童書', '童書'],
-  ['電子書', '電子書'],
-  ['3C家電', '3C家電'],
-  ['親子', '親子'],
-  ['會員處', '會員'],
-  ['會員', '會員'],
-  ['禮享指南', '禮享指南']
-];
-function canonicalize(label){
-  for(const [root, canon] of CANONICAL_RULES){
-    if(label.includes(root)) return canon;
-  }
-  return label;
-}
-
-// Parse the "月曆" sheet of a workbook using the fixed template:
-// rows where col A == "日期" are header rows; day-number columns are the
-// integer-valued cells in that row; the next 4 rows (in CHANNELS order)
-// hold that day's entries in the same columns. Cells containing only "V"
-// are checklist ticks and are ignored.
-function parseCalendarSheet(ws){
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  const data = {};
-  let r = range.s.r;
-  while (r <= range.e.r) {
-    const a = ws[XLSX.utils.encode_cell({r, c:0})];
-    if (a && String(a.v).trim() === '日期') {
-      const dayCols = [];
-      for(let c = 1; c <= range.e.c; c++){
-        const cell = ws[XLSX.utils.encode_cell({r, c})];
-        if (cell && typeof cell.v === 'number' && Number.isInteger(cell.v) && cell.v >= 1 && cell.v <= 31) {
-          dayCols.push({c, day: cell.v});
-        }
-      }
-      CHANNELS.forEach((ch, i) => {
-        const cr = r + 1 + i;
-        const labelCell = ws[XLSX.utils.encode_cell({r:cr, c:0})];
-        if (!labelCell || String(labelCell.v).trim() !== ch.key) return;
-        dayCols.forEach(({c, day}) => {
-          const cell = ws[XLSX.utils.encode_cell({r:cr, c})];
-          if (cell && typeof cell.v === 'string') {
-            const v = cell.v.trim();
-            if (v && v.toUpperCase() !== 'V') {
-              const key = String(day);
-              data[key] = data[key] || {};
-              data[key][ch.key] = data[key][ch.key] || [];
-              data[key][ch.key].push(v);
-            }
-          }
-        });
-      });
-      r += 5;
+function computeSpans(rows, keyPath){
+  // returns array same length as rows: {span, isTop} — span>0 means "render here with rowspan=span", 0 means "skip, covered by a previous rowspan"
+  const res = [];
+  for(let i=0;i<rows.length;i++){
+    if(i>0 && sameChain(rows[i], rows[i-1], keyPath) ){
+      res.push({span:0,isTop:false});
     } else {
-      r += 1;
+      let span=1;
+      for(let j=i+1;j<rows.length;j++){
+        if(sameChain(rows[j], rows[i], keyPath)) span++; else break;
+      }
+      res.push({span, isTop:true});
     }
   }
-  return data;
+  return res;
 }
-
-let currentYear = 2026, currentMonth = 9; // default context for the embedded data
-let currentData = EMBEDDED_DATA;
-
-function weekdayLabel(y, m, d){
-  const names = ['日','一','二','三','四','五','六'];
-  const dt = new Date(y, m-1, d);
-  return names[dt.getDay()];
-}
-function isWeekend(y, m, d){
-  const dt = new Date(y, m-1, d);
-  const wd = dt.getDay();
-  return wd === 0 || wd === 6;
-}
-function daysInMonth(y, m){
-  return new Date(y, m, 0).getDate();
+// "same chain" means all keys up to and including keyPath match the previous row
+function sameChain(a,b,keyPath){
+  for(const k of keyPath){ if(a[k]!==b[k]) return false; }
+  return true;
 }
 
 function render(){
-  document.getElementById('monthLabel').textContent = `${currentYear} 年 ${currentMonth} 月`;
-  const nDays = daysInMonth(currentYear, currentMonth);
+  const { rows, legend, title, dataYear, dataMonth } = current;
+  const y = viewYear, m = viewMonth;
+  const numDays = daysInMonth(y, m);
+  const isDataMonth = (y === dataYear && m === dataMonth);
+
+  document.getElementById('titleText').textContent = title || '作業流程公告版';
+  document.getElementById('monthLabel').textContent = `${y}/${m}`;
+  document.getElementById('resetMonthBtn').style.visibility = isDataMonth ? 'hidden' : 'visible';
+
   const table = document.getElementById('ganttTable');
   table.innerHTML = '';
+
+  const groupSpans = computeSpans(rows, ['group']);
+  const channelSpans = computeSpans(rows, ['group','channel']);
+  const subtypeSpans = computeSpans(rows, ['group','channel','subtype']);
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
   const corner = document.createElement('th');
-  corner.className = 'corner';
-  corner.textContent = '發送管道';
+  corner.className='titlecell';
+  corner.colSpan = 3;
+  corner.textContent = `${y}/${m}` + (isDataMonth ? '' : '（僅預覽日期，無檔期資料）');
   headRow.appendChild(corner);
-  for(let d=1; d<=nDays; d++){
+  for(let d=1; d<=numDays; d++){
     const th = document.createElement('th');
-    th.className = 'daycol' + (isWeekend(currentYear,currentMonth,d) ? ' weekend' : '');
-    th.innerHTML = `<div class="daynum">${currentMonth}/${d}</div><div class="weekday">${weekdayLabel(currentYear,currentMonth,d)}</div>`;
+    th.className='daycol';
+    th.style.background = isWeekend(y,m,d) ? '#f4cccc' : '#e0f7fa';
+    th.innerHTML = `<div class="daynum">${d}</div><div class="weekday">${weekdayName(y,m,d)}</div>`;
     headRow.appendChild(th);
   }
   thead.appendChild(headRow);
@@ -391,34 +212,41 @@ function render(){
   const tbody = document.createElement('tbody');
   const usedLabels = new Set();
 
-  ROWS.forEach(row => {
+  rows.forEach((row, i) => {
     const tr = document.createElement('tr');
-    tr.className = 'row-' + row.rowKey;
-    const th = document.createElement('td');
-    th.className = 'rowlabel';
-    th.innerHTML = `${row.label}<span class="en">${row.en}</span>`;
-    tr.appendChild(th);
 
-    for(let d=1; d<=nDays; d++){
+    if(groupSpans[i].isTop){
       const td = document.createElement('td');
-      td.className = 'cell' + (isWeekend(currentYear,currentMonth,d) ? ' weekend' : '');
-      const entries = (currentData[String(d)] && currentData[String(d)][row.srcKey]) || [];
-      entries.forEach(raw => {
-        raw.split('\n').forEach(line => {
-          if(isAnnotationLine(line)) return;
-          const rawLabel = extractLabel(line);
-          if(!rawLabel) return;
-          const label = canonicalize(rawLabel);
-          if(!row.filter(label)) return;
-          usedLabels.add(label);
-          const chip = document.createElement('div');
-          chip.className = 'chip';
-          chip.style.background = row.forceColor || colorFor(label);
-          chip.title = line.trim();
-          chip.textContent = label;
-          td.appendChild(chip);
-        });
-      });
+      td.className='lbl group';
+      td.rowSpan = groupSpans[i].span;
+      td.textContent = row.group;
+      tr.appendChild(td);
+    }
+    if(channelSpans[i].isTop){
+      const td = document.createElement('td');
+      td.className='lbl channel';
+      td.rowSpan = channelSpans[i].span;
+      td.textContent = row.channel;
+      tr.appendChild(td);
+    }
+    if(subtypeSpans[i].isTop){
+      const td = document.createElement('td');
+      td.className='lbl subtype';
+      td.rowSpan = subtypeSpans[i].span;
+      td.textContent = row.subtype || '';
+      tr.appendChild(td);
+    }
+
+    for(let d=1; d<=numDays; d++){
+      const td = document.createElement('td');
+      td.className='cell';
+      const c = isDataMonth ? row.cells[String(d)] : null;
+      if(c){
+        td.style.background = c.color || '#ffffff';
+        td.textContent = c.text;
+        td.title = c.text;
+        usedLabels.add(JSON.stringify([c.text, c.color]));
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -427,18 +255,141 @@ function render(){
 
   const legendWrap = document.getElementById('legendItems');
   legendWrap.innerHTML = '';
-  Array.from(usedLabels).sort((a,b)=>a.localeCompare(b,'zh-Hant')).forEach(label => {
+  const legendEntries = legend ? Object.entries(legend) : [];
+  legendEntries.forEach(([label,color]) => {
     const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML = `<span class="swatch" style="background:${colorFor(label)}"></span>${label}`;
+    item.className='legend-item';
+    item.innerHTML = `<span class="swatch" style="background:${color||'#fff'}"></span>${label}`;
     legendWrap.appendChild(item);
   });
+}
+
+document.getElementById('prevMonthBtn').addEventListener('click', () => {
+  viewMonth -= 1;
+  if(viewMonth < 1){ viewMonth = 12; viewYear -= 1; }
+  render();
+});
+document.getElementById('nextMonthBtn').addEventListener('click', () => {
+  viewMonth += 1;
+  if(viewMonth > 12){ viewMonth = 1; viewYear += 1; }
+  render();
+});
+document.getElementById('resetMonthBtn').addEventListener('click', () => {
+  viewYear = current.dataYear;
+  viewMonth = current.dataMonth;
+  render();
+});
+
+// ---- Parsing an uploaded workbook of the same template ----
+function colLetterToIdx(){} // unused placeholder
+
+function findMergeTopLeft(merges, r, c){
+  for(const mc of merges){
+    // mc format: {s:{r,c}, e:{r,c}} 0-indexed from SheetJS
+    if(mc.s.r<=r && r<=mc.e.r && mc.s.c<=c && c<=mc.e.c){
+      return {r:mc.s.r, c:mc.s.c};
+    }
+  }
+  return {r,c};
+}
+function cellVal(ws, r, c){
+  const addr = XLSX.utils.encode_cell({r,c});
+  const cell = ws[addr];
+  return cell ? cell.v : undefined;
+}
+function cellColor(ws, r, c){
+  const addr = XLSX.utils.encode_cell({r,c});
+  const cell = ws[addr];
+  if(cell && cell.s && cell.s.fgColor && cell.s.fgColor.rgb){
+    return '#' + cell.s.fgColor.rgb.slice(-6);
+  }
+  return null;
+}
+
+function parseTemplate(wb){
+  const sheetName = wb.SheetNames.find(n => n.includes('綜效資源')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const merges = ws['!merges'] || [];
+
+  // date columns from row 0 (row1 in 1-indexed)
+  const dateCols = [];
+  for(let c=6; c<=range.e.c; c++){
+    const v = cellVal(ws, 0, c);
+    if(v instanceof Date){
+      dateCols.push({c, day: v.getDate()});
+    } else if (dateCols.length) {
+      break;
+    }
+  }
+  if(!dateCols.length) throw new Error('找不到日期欄');
+  const firstDate = new Date(cellVal(ws,0,dateCols[0].c));
+  const year = firstDate.getFullYear(), month = firstDate.getMonth()+1;
+
+  // find the row where col A (0) has the group label (e.g. 會員行銷) — first non-empty after row 0
+  let groupRow = -1;
+  for(let r=1; r<=range.e.r; r++){
+    const v = cellVal(ws, r, 0);
+    if(v){ groupRow = r; break; }
+  }
+  if(groupRow === -1) throw new Error('找不到分區標籤（如「會員行銷」）');
+
+  // Walk downward from groupRow while column A's merge-resolved value stays the same,
+  // OR any of columns A-D / date columns have content — stop at first fully blank row.
+  const rowsOut = [];
+  let r = groupRow;
+  while (r <= range.e.r) {
+    const hasLabel = [0,2,3].some(c => cellVal(ws, r, c) !== undefined);
+    const hasDay = dateCols.some(({c}) => cellVal(ws, r, c) !== undefined);
+    if(!hasLabel && !hasDay){
+      // allow one blank row (rare) then stop
+      break;
+    }
+    const gTL = findMergeTopLeft(merges, r, 0);
+    const cTL = findMergeTopLeft(merges, r, 2);
+    const sTL = findMergeTopLeft(merges, r, 3);
+    const group = cellVal(ws, gTL.r, gTL.c) || '';
+    const channel = cellVal(ws, cTL.r, cTL.c) || '';
+    const subtype = cellVal(ws, sTL.r, sTL.c) || '';
+    const cells = {};
+    dateCols.forEach(({c, day}) => {
+      const v = cellVal(ws, r, c);
+      if(v !== undefined && String(v).trim() !== ''){
+        cells[String(day)] = { text: String(v).trim(), color: cellColor(ws, r, c) };
+      }
+    });
+    rowsOut.push({group, channel, subtype, cells});
+    r++;
+  }
+
+  // legend: scan rows after the data block for a row with several short, colored, distinct cells
+  let legend = {};
+  for(let lr = r+1; lr <= Math.min(r+15, range.e.r); lr++){
+    let hits = 0;
+    const found = {};
+    dateCols.forEach(({c}) => {
+      const v = cellVal(ws, lr, c);
+      const col = cellColor(ws, lr, c);
+      if(v && String(v).trim() && col){
+        found[String(v).trim()] = col;
+        hits++;
+      }
+    });
+    if(hits >= 5){ legend = found; break; }
+  }
+
+  return {
+    title: cellVal(ws,0,0) || '作業流程公告版',
+    year, month,
+    numDays: daysInMonth(year, month),
+    rows: rowsOut,
+    legend
+  };
 }
 
 document.getElementById('uploadBtn').addEventListener('click', () => {
   document.getElementById('fileInput').click();
 });
-
 document.getElementById('fileInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if(!file) return;
@@ -447,22 +398,14 @@ document.getElementById('fileInput').addEventListener('change', (e) => {
   const reader = new FileReader();
   reader.onload = (evt) => {
     try{
-      const wb = XLSX.read(evt.target.result, {type:'array'});
-      const sheetName = wb.SheetNames.find(n => n === '月曆') || wb.SheetNames.find(n => n.includes('月曆'));
-      if(!sheetName){
-        status.textContent = '找不到「月曆」工作表';
-        return;
-      }
-      const ws = wb.Sheets[sheetName];
-      // try to read the month/year hint from cell A3 (e.g. "9/1-9/30")
-      const hintCell = ws[XLSX.utils.encode_cell({r:2,c:0})];
-      if(hintCell && typeof hintCell.v === 'string'){
-        const m = hintCell.v.match(/(\d{1,2})\/\d{1,2}/);
-        if(m) currentMonth = parseInt(m[1],10);
-      }
-      currentData = parseCalendarSheet(ws);
+      const wb = XLSX.read(evt.target.result, {type:'array', cellStyles:true});
+      current = parseTemplate(wb);
+      current.dataYear = current.year;
+      current.dataMonth = current.month;
+      viewYear = current.year;
+      viewMonth = current.month;
       render();
-      status.textContent = `已更新：${sheetName}`;
+      status.textContent = `已更新：${current.year}/${current.month}`;
     }catch(err){
       status.textContent = '解析失敗：' + err.message;
     }
@@ -477,9 +420,7 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
     const html = table.outerHTML;
     const blobHtml = new Blob([html], {type:'text/html'});
     const blobText = new Blob([table.innerText], {type:'text/plain'});
-    await navigator.clipboard.write([
-      new ClipboardItem({'text/html': blobHtml, 'text/plain': blobText})
-    ]);
+    await navigator.clipboard.write([new ClipboardItem({'text/html': blobHtml, 'text/plain': blobText})]);
     status.textContent = '已複製表格，可直接貼到 Excel／Word';
   }catch(err){
     status.textContent = '複製失敗，請手動選取表格複製';
