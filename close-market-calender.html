@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業流程公告版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#232120;
+    --ink-soft:#6b6560;
+    --line:#bdbdbd;
+    --paper:#f7f6f3;
+    --card:#ffffff;
+    --accent:#b5482e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+    padding:24px 20px 50px;
+  }
+  .wrap{max-width:1500px;margin:0 auto;}
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+    margin-bottom:16px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:12px;
+  }
+  h1{font-size:20px;font-weight:700;margin:0 0 4px;}
+  .subtitle{color:var(--ink-soft);font-size:12px;margin:0;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .btn{
+    border:1px solid var(--ink);
+    background:var(--card);
+    color:var(--ink);
+    padding:7px 13px;
+    font-size:13px;
+    border-radius:3px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .btn:hover{background:var(--ink);color:var(--paper);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{background:#8f3a24;}
+  input[type=file]{display:none;}
+  #status{font-size:12px;color:var(--ink-soft);}
+  .monthnav{display:flex;align-items:center;gap:6px;margin-right:8px;}
+  .monthlabel{font-size:14px;font-weight:700;min-width:64px;text-align:center;}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);background:var(--card);}
+  table{border-collapse:collapse;width:100%;min-width:1700px;table-layout:fixed;}
+  th,td{border:1px solid var(--line);text-align:center;vertical-align:middle;}
+  .titlecell{
+    background:var(--ink);color:#fff;font-size:13px;font-weight:700;
+    text-align:left;padding:6px 10px;white-space:nowrap;
+  }
+  .daycol{width:44px;min-width:44px;padding:3px 1px;}
+  .daynum{font-size:12px;font-weight:700;}
+  .weekday{font-size:10px;opacity:.7;}
+
+  .lbl{
+    font-size:11px;
+    font-weight:600;
+    padding:4px 6px;
+    background:var(--card);
+    white-space:pre-line;
+    min-width:60px;
+  }
+  .lbl.group{writing-mode:vertical-rl;text-orientation:upright;letter-spacing:2px;width:26px;min-width:26px;}
+  .lbl.channel{width:78px;min-width:78px;font-size:10px;}
+  .lbl.subtype{width:64px;min-width:64px;font-size:10px;}
+
+  td.cell{
+    font-size:10px;
+    line-height:1.2;
+    padding:2px 1px;
+    height:28px;
+    color:#232120;
+    word-break:break-word;
+  }
+
+  .legend{margin-top:20px;padding-top:12px;border-top:1px solid var(--line);}
+  .legend h2{font-size:12px;color:var(--ink-soft);margin:0 0 10px;font-weight:600;}
+  .legend-items{display:flex;flex-wrap:wrap;gap:8px 14px;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+  .swatch{width:14px;height:14px;border:1px solid var(--line);flex:none;}
+
+  .rule-note{margin-top:14px;font-size:12px;color:var(--ink-soft);line-height:1.6;}
+  .rule-note b{color:var(--ink);}
+
+  @media (max-width:720px){header{flex-direction:column;align-items:flex-start;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="titleText">作業流程公告版</h1>
+      <p class="subtitle">格式與色塊直接沿用「04.綜效資源表」原檔樣式</p>
+    </div>
+    <div class="controls">
+      <div class="monthnav">
+        <button class="btn" id="prevMonthBtn" title="上個月">◀</button>
+        <span id="monthLabel" class="monthlabel"></span>
+        <button class="btn" id="nextMonthBtn" title="下個月">▶</button>
+        <button class="btn" id="resetMonthBtn">回到資料月份</button>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx">
+      <button class="btn primary" id="uploadBtn">上傳下月 .xlsx 更新</button>
+      <button class="btn" id="copyBtn">複製表格</button>
+      <span id="status"></span>
+    </div>
+  </header>
+
+  <div class="table-scroll">
+    <table id="ganttTable"></table>
+  </div>
+
+  <div class="legend">
+    <h2>線別色塊圖例（沿用原檔色碼）</h2>
+    <div class="legend-items" id="legendItems"></div>
+  </div>
+
+  <p class="rule-note">
+    <b>資料來源：</b>目前支援兩種上傳檔案：<br>
+    ①「月曆」工作表（每月排程原始檔）：文字取「最後一個）」後、「｜」前作為線別（如「(品類)服飾鞋包｜初衣食午」→「服飾鞋包」），同系列用字自動統一（中文/中文出版/中文特刊→中文，外文同理），再對應成本表官方色碼；「全站」歸入全會員EDM／其餘歸入封閉EDM，同日多檔期時第二檔會落在下一列（EDM封閉、APP封閉各有兩列可用）。<br>
+    ②「04.綜效資源表」工作表（公告成品檔）：直接讀取儲存格文字與填色，不做額外轉換。<br>
+    上傳時會自動判斷是哪一種格式並用對應規則解析；月份、天數、星期也會自動偵測重繪。
+  </p>
+</div>
+
+<script>
+const EMBEDDED = {"title": "【新首頁】作業流程公告版", "year": 2026, "month": 9, "numDays": 30, "rows": [{"group": "會員行銷", "channel": "EDM發送\n*灰底為其他單位", "subtype": "全會員*每月2檔", "cells": {"4": {"text": "全站", "color": "#FFFF00"}, "8": {"text": "全站", "color": "#FFFF00"}, "10": {"text": "全站", "color": "#FFFF00"}, "15": {"text": "全站", "color": "#FFFF00"}, "17": {"text": "全站", "color": "#FFFF00"}, "19": {"text": "全站", "color": "#FFFF00"}, "25": {"text": "全站", "color": "#FFFF00"}, "29": {"text": "全站", "color": "#FFFF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}, {"group": "會員行銷", "channel": "EDM發送\n*灰底為其他單位", "subtype": "封閉", "cells": {"1": {"text": "OMO", "color": "#c9b896"}, "2": {"text": "外文", "color": "#00FF00"}, "3": {"text": "(會員)", "color": "#EAD1DC"}, "6": {"text": "美妝", "color": "#FF9900"}, "7": {"text": "童書", "color": "#FF99FF"}, "9": {"text": "CB", "color": "#8ec6d9"}, "11": {"text": "禮享指南", "color": "#c9b896"}, "12": {"text": "(會員)", "color": "#EAD1DC"}, "13": {"text": "外文", "color": "#00FF00"}, "14": {"text": "SD", "color": "#a8d5ba"}, "16": {"text": "服飾", "color": "#3D85C6"}, "18": {"text": "服飾", "color": "#3D85C6"}, "20": {"text": "外文", "color": "#00FF00"}, "21": {"text": "童書", "color": "#FF99FF"}, "22": {"text": "外文", "color": "#00FF00"}, "23": {"text": "(會員)", "color": "#EAD1DC"}, "26": {"text": "預留", "color": "#a3b8d8"}, "27": {"text": "中文", "color": "#C4D79B"}, "28": {"text": "電子書", "color": "#CDF8CA"}}}, {"group": "會員行銷", "channel": "EDM發送\n*灰底為其他單位", "subtype": "封閉", "cells": {"12": {"text": "生活", "color": "#FF6699"}, "16": {"text": "3C", "color": "#BF8F00"}}}, {"group": "會員行銷", "channel": "APP推播 \n*灰底為其他單位", "subtype": "公眾*每月4檔", "cells": {"1": {"text": "OMO", "color": "#c9b896"}, "2": {"text": "CB", "color": "#8ec6d9"}, "4": {"text": "SD", "color": "#a8d5ba"}, "5": {"text": "全站", "color": "#FFFF00"}, "7": {"text": "全站", "color": "#FFFF00"}, "12": {"text": "(會員)", "color": "#EAD1DC"}, "14": {"text": "全站", "color": "#FFFF00"}, "15": {"text": "SD", "color": "#a8d5ba"}, "17": {"text": "SD", "color": "#a8d5ba"}, "19": {"text": "(會員)", "color": "#EAD1DC"}, "20": {"text": "(會員)", "color": "#EAD1DC"}, "24": {"text": "SD", "color": "#a8d5ba"}, "29": {"text": "全站", "color": "#FFFF00"}}}, {"group": "會員行銷", "channel": "APP推播 \n*灰底為其他單位", "subtype": "封閉", "cells": {"2": {"text": "外文", "color": "#00FF00"}, "4": {"text": "(會員)", "color": "#EAD1DC"}, "5": {"text": "全站", "color": "#FFFF00"}, "7": {"text": "休閒", "color": "#6AA84F"}, "8": {"text": "美妝", "color": "#FF9900"}, "9": {"text": "生活", "color": "#FF6699"}, "10": {"text": "全站", "color": "#FFFF00"}, "11": {"text": "文具", "color": "#FCD5B4"}, "12": {"text": "全站", "color": "#FFFF00"}, "13": {"text": "(會員)", "color": "#EAD1DC"}, "14": {"text": "服飾", "color": "#3D85C6"}, "15": {"text": "美妝", "color": "#FF9900"}, "16": {"text": "美妝", "color": "#FF9900"}, "17": {"text": "全站", "color": "#FFFF00"}, "18": {"text": "服飾", "color": "#3D85C6"}, "19": {"text": "全站", "color": "#FFFF00"}, "20": {"text": "全站", "color": "#FFFF00"}, "21": {"text": "生活", "color": "#FF6699"}, "22": {"text": "(會員)", "color": "#EAD1DC"}, "24": {"text": "(會員)", "color": "#EAD1DC"}, "25": {"text": "全站", "color": "#FFFF00"}, "26": {"text": "全站", "color": "#FFFF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}, {"group": "會員行銷", "channel": "APP推播 \n*灰底為其他單位", "subtype": "封閉", "cells": {"12": {"text": "3C", "color": "#BF8F00"}, "14": {"text": "美妝", "color": "#FF9900"}, "17": {"text": "美妝", "color": "#FF9900"}, "18": {"text": "美妝", "color": "#FF9900"}, "19": {"text": "美妝", "color": "#FF9900"}, "20": {"text": "生活", "color": "#FF6699"}}}, {"group": "會員行銷", "channel": "SMS發送", "subtype": "*待每月簡訊排程公告後補上", "cells": {"1": {"text": "外文", "color": "#00FF00"}, "2": {"text": "親子", "color": "#E6B8AF"}, "4": {"text": "全站", "color": "#FFFF00"}, "6": {"text": "美妝", "color": "#FF9900"}, "8": {"text": "生活、文具", "color": "#FF6699"}, "9": {"text": "中文", "color": "#C4D79B"}, "10": {"text": "全站", "color": "#FFFF00"}, "11": {"text": "服飾", "color": "#3D85C6"}, "14": {"text": "全站", "color": "#FFFF00"}, "17": {"text": "生活", "color": "#FF6699"}, "18": {"text": "生活", "color": "#FF6699"}, "19": {"text": "外文", "color": "#00FF00"}, "20": {"text": "美妝", "color": "#FF9900"}, "21": {"text": "影音", "color": "#C9DAF8"}, "25": {"text": "全站", "color": "#FFFF00"}, "26": {"text": "中文", "color": "#C4D79B"}, "27": {"text": "服飾", "color": "#3D85C6"}, "29": {"text": "全站", "color": "#FFFF00"}, "30": {"text": "全站", "color": "#FFFF00"}}}], "legend": {"全站": "#FFFF00", "OMO": "#c9b896", "外文": "#00FF00", "(會員)": "#EAD1DC", "美妝": "#FF9900", "童書": "#FF99FF", "CB": "#8ec6d9", "禮享指南": "#c9b896", "SD": "#a8d5ba", "服飾": "#3D85C6", "預留": "#a3b8d8", "中文": "#C4D79B", "電子書": "#CDF8CA", "生活": "#FF6699", "3C": "#BF8F00", "休閒": "#6AA84F", "文具": "#FCD5B4", "親子": "#E6B8AF", "生活、文具": "#FF6699", "影音": "#C9DAF8"}};
+let current = EMBEDDED;
+current.dataYear = current.year;
+current.dataMonth = current.month;
+let viewYear = current.year;
+let viewMonth = current.month;
+
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function weekdayName(y,m,d){
+  const names=['日','一','二','三','四','五','六'];
+  return names[new Date(y,m-1,d).getDay()];
+}
+function isWeekend(y,m,d){
+  const wd = new Date(y,m-1,d).getDay();
+  return wd===0 || wd===6;
+}
+
+function computeSpans(rows, keyPath){
+  // returns array same length as rows: {span, isTop} — span>0 means "render here with rowspan=span", 0 means "skip, covered by a previous rowspan"
+  const res = [];
+  for(let i=0;i<rows.length;i++){
+    if(i>0 && sameChain(rows[i], rows[i-1], keyPath) ){
+      res.push({span:0,isTop:false});
+    } else {
+      let span=1;
+      for(let j=i+1;j<rows.length;j++){
+        if(sameChain(rows[j], rows[i], keyPath)) span++; else break;
+      }
+      res.push({span, isTop:true});
+    }
+  }
+  return res;
+}
+// "same chain" means all keys up to and including keyPath match the previous row
+function sameChain(a,b,keyPath){
+  for(const k of keyPath){ if(a[k]!==b[k]) return false; }
+  return true;
+}
+
+function render(){
+  const { rows, legend, title, dataYear, dataMonth } = current;
+  const y = viewYear, m = viewMonth;
+  const numDays = daysInMonth(y, m);
+  const isDataMonth = (y === dataYear && m === dataMonth);
+
+  document.getElementById('titleText').textContent = title || '作業流程公告版';
+  document.getElementById('monthLabel').textContent = `${y}/${m}`;
+  document.getElementById('resetMonthBtn').style.visibility = isDataMonth ? 'hidden' : 'visible';
+
+  const table = document.getElementById('ganttTable');
+  table.innerHTML = '';
+
+  const groupSpans = computeSpans(rows, ['group']);
+  const channelSpans = computeSpans(rows, ['group','channel']);
+  const subtypeSpans = computeSpans(rows, ['group','channel','subtype']);
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  const corner = document.createElement('th');
+  corner.className='titlecell';
+  corner.colSpan = 3;
+  corner.textContent = `${y}/${m}` + (isDataMonth ? '' : '（僅預覽日期，無檔期資料）');
+  headRow.appendChild(corner);
+  for(let d=1; d<=numDays; d++){
+    const th = document.createElement('th');
+    th.className='daycol';
+    th.style.background = isWeekend(y,m,d) ? '#f4cccc' : '#e0f7fa';
+    th.innerHTML = `<div class="daynum">${d}</div><div class="weekday">${weekdayName(y,m,d)}</div>`;
+    headRow.appendChild(th);
+  }
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const usedLabels = new Set();
+
+  rows.forEach((row, i) => {
+    const tr = document.createElement('tr');
+
+    if(groupSpans[i].isTop){
+      const td = document.createElement('td');
+      td.className='lbl group';
+      td.rowSpan = groupSpans[i].span;
+      td.textContent = row.group;
+      tr.appendChild(td);
+    }
+    if(channelSpans[i].isTop){
+      const td = document.createElement('td');
+      td.className='lbl channel';
+      td.rowSpan = channelSpans[i].span;
+      td.textContent = row.channel;
+      tr.appendChild(td);
+    }
+    if(subtypeSpans[i].isTop){
+      const td = document.createElement('td');
+      td.className='lbl subtype';
+      td.rowSpan = subtypeSpans[i].span;
+      td.textContent = row.subtype || '';
+      tr.appendChild(td);
+    }
+
+    for(let d=1; d<=numDays; d++){
+      const td = document.createElement('td');
+      td.className='cell';
+      const c = isDataMonth ? row.cells[String(d)] : null;
+      if(c){
+        td.style.background = c.color || '#ffffff';
+        td.textContent = c.text;
+        td.title = c.text;
+        usedLabels.add(JSON.stringify([c.text, c.color]));
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  const legendWrap = document.getElementById('legendItems');
+  legendWrap.innerHTML = '';
+  const legendEntries = legend ? Object.entries(legend) : [];
+  legendEntries.forEach(([label,color]) => {
+    const item = document.createElement('div');
+    item.className='legend-item';
+    item.innerHTML = `<span class="swatch" style="background:${color||'#fff'}"></span>${label}`;
+    legendWrap.appendChild(item);
+  });
+}
+
+document.getElementById('prevMonthBtn').addEventListener('click', () => {
+  viewMonth -= 1;
+  if(viewMonth < 1){ viewMonth = 12; viewYear -= 1; }
+  render();
+});
+document.getElementById('nextMonthBtn').addEventListener('click', () => {
+  viewMonth += 1;
+  if(viewMonth > 12){ viewMonth = 1; viewYear += 1; }
+  render();
+});
+document.getElementById('resetMonthBtn').addEventListener('click', () => {
+  viewYear = current.dataYear;
+  viewMonth = current.dataMonth;
+  render();
+});
+
+// ---- Parsing an uploaded workbook: two known source formats ----
+// (A) "04.綜效資源表" — final published template, cells already carry the
+//     official category text + fill color directly.
+// (B) "月曆" — the raw monthly planning calendar. Cell text is longer
+//     ("(品類)服飾鞋包｜活動名"), needs label extraction + canonicalising,
+//     then mapping onto the same official category colors.
+
+const OFFICIAL_COLORS = {
+  '全站':['全站','#FFFF00'], '中文':['中文','#C4D79B'], '外文':['外文','#00FF00'],
+  '生活家居':['生活','#FF6699'], '童書':['童書','#FF99FF'], '電子書':['電子書','#CDF8CA'],
+  '3C家電':['3C','#BF8F00'], '親子':['親子','#E6B8AF'], '服飾鞋包':['服飾','#3D85C6'],
+  '美妝保養':['美妝','#FF9900'], '文具潮藝':['文具','#FCD5B4'], '休閒戶外':['休閒','#6AA84F'],
+  '影音':['影音','#C9DAF8'], '會員':['(會員)','#EAD1DC'], 'IMC':['IMC','#674EA7'],
+  '(其他單位)':['(其他單位)','#D9D9D9'], '食品保健':['食品','#FFF5F5']
+};
+const FALLBACK_PALETTE = ['#f7c948','#a8d5ba','#f4a688','#8ec6d9','#d9a8d0','#c9b896','#f2a0a8','#9fc9a3','#e8b4bc','#a3b8d8'];
+function hashColor(s){
+  let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0;
+  return FALLBACK_PALETTE[h % FALLBACK_PALETTE.length];
+}
+function resolveOfficial(label){
+  if(OFFICIAL_COLORS[label]) return OFFICIAL_COLORS[label];
+  return [label, hashColor(label)];
+}
+
+function extractLabel(raw){
+  let s=(raw||'').trim(); if(!s) return '';
+  let parenIdx = Math.max(s.lastIndexOf(')'), s.lastIndexOf('）'));
+  let start = parenIdx>=0 ? parenIdx+1 : 0;
+  let rest = s.slice(start);
+  let pipes = [rest.indexOf('|'), rest.indexOf('｜')].filter(i=>i!==-1);
+  let pipeIdx = pipes.length ? Math.min(...pipes) : -1;
+  let label = pipeIdx>=0 ? rest.slice(0,pipeIdx) : rest;
+  return label.trim().replace(/^\*+\s*/, '');
+}
+function isAnnotationLine(line){
+  const t=line.trim();
+  if(!t) return true;
+  if(/^[*※]/.test(t) && !t.includes('|') && !t.includes('｜')) return true;
+  return false;
+}
+const CANON_RULES = [
+  ['中文','中文'],['外文','外文'],['樂活家居','生活家居'],['生活家居','生活家居'],
+  ['生活','生活家居'],['童書','童書'],['電子書','電子書'],['3C家電','3C家電'],
+  ['親子','親子'],['會員處','會員'],['會員','會員'],['禮享指南','禮享指南']
+];
+function canonicalize(label){
+  for(const [root,c] of CANON_RULES){ if(label.includes(root)) return c; }
+  return label;
+}
+
+function parseCalendarSheet(ws, range){
+  const CH = ['eDM','APP公眾','APP封閉','SMS'];
+  const data = {};
+  let r = range.s.r;
+  while(r <= range.e.r){
+    const a = cellVal(ws, r, 0);
+    if(a !== undefined && String(a).trim() === '日期'){
+      const dayCols = [];
+      for(let c=1;c<=range.e.c;c++){
+        const v = cellVal(ws, r, c);
+        if(typeof v === 'number' && Number.isInteger(v) && v>=1 && v<=31) dayCols.push({c, day:v});
+      }
+      CH.forEach((ch,i) => {
+        const cr = r+1+i;
+        const lv = cellVal(ws, cr, 0);
+        if(lv === undefined || String(lv).trim() !== ch) return;
+        dayCols.forEach(({c,day}) => {
+          const v = cellVal(ws, cr, c);
+          if(typeof v === 'string'){
+            const t = v.trim();
+            if(t && t.toUpperCase() !== 'V'){
+              data[day] = data[day] || {};
+              data[day][ch] = data[day][ch] || [];
+              data[day][ch].push(t);
+            }
+          }
+        });
+      });
+      r += 5;
+    } else r += 1;
+  }
+  // flatten to ordered canonical label lists per day/channel
+  const processed = {};
+  Object.keys(data).forEach(day => {
+    processed[day] = {};
+    Object.keys(data[day]).forEach(ch => {
+      const labels = [];
+      data[day][ch].forEach(entry => {
+        entry.split('\n').forEach(line => {
+          if(isAnnotationLine(line)) return;
+          const raw = extractLabel(line);
+          if(raw) labels.push(canonicalize(raw));
+        });
+      });
+      processed[day][ch] = labels;
+    });
+  });
+  return processed;
+}
+
+function buildRow(processed, numDays, chKey, filterFn, group, channel, subtype){
+  const cells = {};
+  for(let d=1; d<=numDays; d++){
+    const labels = ((processed[d]||{})[chKey]||[]).filter(filterFn);
+    if(labels.length){
+      const seen = new Set(); const texts=[]; let color=null;
+      labels.forEach(l => {
+        const [t,c] = resolveOfficial(l);
+        if(!seen.has(t)){ seen.add(t); texts.push(t); if(color===null) color=c; }
+      });
+      cells[d] = {text: texts.join('、'), color};
+    }
+  }
+  return {group, channel, subtype, cells};
+}
+function buildSplitRows(processed, numDays, chKey, filterFn, group, channel, subtype){
+  const primary={}, overflow={};
+  for(let d=1; d<=numDays; d++){
+    const labels = ((processed[d]||{})[chKey]||[]).filter(filterFn);
+    if(labels.length>=1){ const [t,c]=resolveOfficial(labels[0]); primary[d]={text:t,color:c}; }
+    if(labels.length>=2){
+      const rest=labels.slice(1); const seen=new Set(); const texts=[]; let color=null;
+      rest.forEach(l => { const [t,c]=resolveOfficial(l); if(!seen.has(t)){seen.add(t);texts.push(t); if(color===null) color=c;} });
+      overflow[d] = {text: texts.join('、'), color};
+    }
+  }
+  return [
+    {group, channel, subtype, cells:primary},
+    {group, channel, subtype, cells:overflow}
+  ];
+}
+
+function parseCalendarWorkbook(wb, sheetName){
+  const ws = wb.Sheets[sheetName];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const processed = parseCalendarSheet(ws, range);
+
+  // month/year hint from a "9/1-9/30"-style string near the top of the sheet
+  let year = new Date().getFullYear(), month = new Date().getMonth()+1;
+  outer:
+  for(let r=0;r<Math.min(5,range.e.r+1);r++){
+    for(let c=0;c<Math.min(5,range.e.c+1);c++){
+      const v = cellVal(ws,r,c);
+      if(typeof v === 'string'){
+        const m = v.match(/(\d{1,2})\/(\d{1,2})-\d{1,2}\/\d{1,2}/);
+        if(m){ month = parseInt(m[1],10); break outer; }
+      }
+    }
+  }
+  const numDays = daysInMonth(year, month);
+
+  const rows = [];
+  rows.push(buildRow(processed, numDays, 'eDM', l=>l==='全站', '會員行銷', 'EDM發送\n*灰底為其他單位', '全會員*每月2檔'));
+  rows.push(...buildSplitRows(processed, numDays, 'eDM', l=>l!=='全站', '會員行銷', 'EDM發送\n*灰底為其他單位', '封閉'));
+  rows.push(buildRow(processed, numDays, 'APP公眾', ()=>true, '會員行銷', 'APP推播 \n*灰底為其他單位', '公眾*每月4檔'));
+  rows.push(...buildSplitRows(processed, numDays, 'APP封閉', ()=>true, '會員行銷', 'APP推播 \n*灰底為其他單位', '封閉'));
+  rows.push(buildRow(processed, numDays, 'SMS', ()=>true, '會員行銷', 'SMS發送', '*待每月簡訊排程公告後補上'));
+
+  const legend = {};
+  rows.forEach(row => Object.values(row.cells).forEach(c => { legend[c.text] = c.color; }));
+
+  return { title:'【新首頁】作業流程公告版', year, month, numDays, rows, legend };
+}
+
+function findMergeTopLeft(merges, r, c){
+  for(const mc of merges){
+    // mc format: {s:{r,c}, e:{r,c}} 0-indexed from SheetJS
+    if(mc.s.r<=r && r<=mc.e.r && mc.s.c<=c && c<=mc.e.c){
+      return {r:mc.s.r, c:mc.s.c};
+    }
+  }
+  return {r,c};
+}
+function cellVal(ws, r, c){
+  const addr = XLSX.utils.encode_cell({r,c});
+  const cell = ws[addr];
+  return cell ? cell.v : undefined;
+}
+function cellColor(ws, r, c){
+  const addr = XLSX.utils.encode_cell({r,c});
+  const cell = ws[addr];
+  if(cell && cell.s && cell.s.fgColor && cell.s.fgColor.rgb){
+    return '#' + cell.s.fgColor.rgb.slice(-6);
+  }
+  return null;
+}
+
+function parseTemplate(wb){
+  const calSheet = wb.SheetNames.find(n => n === '月曆' || n.includes('月曆'));
+  if(calSheet) return parseCalendarWorkbook(wb, calSheet);
+
+  const sheetName = wb.SheetNames.find(n => n.includes('綜效資源')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const merges = ws['!merges'] || [];
+
+  // date columns from row 0 (row1 in 1-indexed)
+  const dateCols = [];
+  for(let c=6; c<=range.e.c; c++){
+    const v = cellVal(ws, 0, c);
+    if(v instanceof Date){
+      dateCols.push({c, day: v.getDate()});
+    } else if (dateCols.length) {
+      break;
+    }
+  }
+  if(!dateCols.length) throw new Error('找不到日期欄');
+  const firstDate = new Date(cellVal(ws,0,dateCols[0].c));
+  const year = firstDate.getFullYear(), month = firstDate.getMonth()+1;
+
+  // find the row where col A (0) has the group label (e.g. 會員行銷) — first non-empty after row 0
+  let groupRow = -1;
+  for(let r=1; r<=range.e.r; r++){
+    const v = cellVal(ws, r, 0);
+    if(v){ groupRow = r; break; }
+  }
+  if(groupRow === -1) throw new Error('找不到分區標籤（如「會員行銷」）');
+
+  // Walk downward from groupRow while column A's merge-resolved value stays the same,
+  // OR any of columns A-D / date columns have content — stop at first fully blank row.
+  const rowsOut = [];
+  let r = groupRow;
+  while (r <= range.e.r) {
+    const hasLabel = [0,2,3].some(c => cellVal(ws, r, c) !== undefined);
+    const hasDay = dateCols.some(({c}) => cellVal(ws, r, c) !== undefined);
+    if(!hasLabel && !hasDay){
+      // allow one blank row (rare) then stop
+      break;
+    }
+    const gTL = findMergeTopLeft(merges, r, 0);
+    const cTL = findMergeTopLeft(merges, r, 2);
+    const sTL = findMergeTopLeft(merges, r, 3);
+    const group = cellVal(ws, gTL.r, gTL.c) || '';
+    const channel = cellVal(ws, cTL.r, cTL.c) || '';
+    const subtype = cellVal(ws, sTL.r, sTL.c) || '';
+    const cells = {};
+    dateCols.forEach(({c, day}) => {
+      const v = cellVal(ws, r, c);
+      if(v !== undefined && String(v).trim() !== ''){
+        cells[String(day)] = { text: String(v).trim(), color: cellColor(ws, r, c) };
+      }
+    });
+    rowsOut.push({group, channel, subtype, cells});
+    r++;
+  }
+
+  // legend: scan rows after the data block for a row with several short, colored, distinct cells
+  let legend = {};
+  for(let lr = r+1; lr <= Math.min(r+15, range.e.r); lr++){
+    let hits = 0;
+    const found = {};
+    dateCols.forEach(({c}) => {
+      const v = cellVal(ws, lr, c);
+      const col = cellColor(ws, lr, c);
+      if(v && String(v).trim() && col){
+        found[String(v).trim()] = col;
+        hits++;
+      }
+    });
+    if(hits >= 5){ legend = found; break; }
+  }
+
+  return {
+    title: cellVal(ws,0,0) || '作業流程公告版',
+    year, month,
+    numDays: daysInMonth(year, month),
+    rows: rowsOut,
+    legend
+  };
+}
+
+document.getElementById('uploadBtn').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const status = document.getElementById('status');
+  status.textContent = '解析中…';
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'array', cellStyles:true});
+      current = parseTemplate(wb);
+      current.dataYear = current.year;
+      current.dataMonth = current.month;
+      viewYear = current.year;
+      viewMonth = current.month;
+      render();
+      status.textContent = `已更新：${current.year}/${current.month}`;
+    }catch(err){
+      status.textContent = '解析失敗：' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const table = document.getElementById('ganttTable');
+  const status = document.getElementById('status');
+  try{
+    const html = table.outerHTML;
+    const blobHtml = new Blob([html], {type:'text/html'});
+    const blobText = new Blob([table.innerText], {type:'text/plain'});
+    await navigator.clipboard.write([new ClipboardItem({'text/html': blobHtml, 'text/plain': blobText})]);
+    status.textContent = '已複製表格，可直接貼到 Excel／Word';
+  }catch(err){
+    status.textContent = '複製失敗，請手動選取表格複製';
+  }
+});
+
+render();
+</script>
+</body>
+</html>
