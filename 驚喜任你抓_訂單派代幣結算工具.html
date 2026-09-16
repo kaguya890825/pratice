@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>「驚喜任你抓」訂單派代幣結算工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#12172B;
+    --ink-soft:#2B3358;
+    --paper:#F3F1EA;
+    --paper-dim:#E7E3D6;
+    --gold:#C9A227;
+    --gold-bright:#E4BC3F;
+    --line:#D8D2BF;
+    --good:#3F6E4E;
+    --bad:#B4432E;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --serif: "Noto Serif TC", "Songti TC", Georgia, serif;
+    --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.6;
+    padding:0 0 80px;
+  }
+  .band{
+    background:var(--ink);
+    color:var(--paper);
+    padding:44px 24px 40px;
+    position:relative;
+    overflow:hidden;
+  }
+  .band::after{
+    content:"";
+    position:absolute;
+    right:-60px;top:-60px;
+    width:220px;height:220px;
+    border:2px dashed rgba(228,188,63,0.25);
+    border-radius:50%;
+  }
+  .band-inner{
+    max-width:880px;
+    margin:0 auto;
+    position:relative;
+  }
+  .eyebrow-coin{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--gold-bright);
+    letter-spacing:0.02em;
+  }
+  .coin-dot{
+    width:22px;height:22px;
+    border-radius:50%;
+    border:1.5px solid var(--gold-bright);
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    font-size:11px;
+    font-weight:700;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:34px;
+    margin:14px 0 10px;
+    max-width:640px;
+  }
+  .band p{
+    margin:0;
+    max-width:560px;
+    color:rgba(243,241,234,0.75);
+    font-size:15px;
+  }
+  main{
+    max-width:880px;
+    margin:0 auto;
+    padding:0 24px;
+  }
+  .rule-panel{
+    margin-top:-26px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    position:relative;
+    z-index:5;
+  }
+  .rule-panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 20px;
+    border-bottom:1px solid var(--line);
+    background:var(--paper-dim);
+    position:relative;
+    z-index:5;
+  }
+  .rule-panel-head .t{
+    font-family:var(--mono);
+    font-size:12px;
+    font-weight:700;
+    color:var(--ink);
+    letter-spacing:0.02em;
+    position:relative;
+    z-index:2;
+  }
+  .rule-panel-head .cap{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--bad);
+  }
+  .rule-strip{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+  }
+  .rule-cell{
+    padding:20px 18px;
+    text-align:center;
+    position:relative;
+  }
+  .rule-cell + .rule-cell{
+    border-left:1px solid var(--line);
+  }
+  .rule-cell .tier-label{
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--gold);
+    letter-spacing:0.06em;
+    margin-bottom:8px;
+  }
+  .rule-cell .amt{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .rule-cell .amt b{
+    color:var(--ink);
+    font-weight:600;
+  }
+  .rule-cell .arrow{
+    color:var(--ink-soft);
+    font-size:13px;
+    margin:8px 0 4px;
+  }
+  .rule-cell .coins{
+    font-family:var(--serif);
+    font-size:30px;
+    color:var(--ink);
+  }
+  .rule-cell .coins span{
+    font-size:14px;
+    color:var(--gold);
+    margin-left:2px;
+    font-family:var(--sans);
+  }
+  section{
+    margin-top:52px;
+  }
+  .step-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:16px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:10px;
+  }
+  .step-num{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--gold);
+    border:1px solid var(--gold);
+    border-radius:50%;
+    width:24px;height:24px;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .step-head h2{
+    font-family:var(--serif);
+    font-size:20px;
+    font-weight:600;
+    margin:0;
+  }
+  .dropzone{
+    border:2px dashed var(--ink-soft);
+    background:var(--paper-dim);
+    padding:44px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, transform .1s ease;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--gold);
+    background:#EEE8D3;
+  }
+  .dropzone.drag{ transform:scale(0.995); }
+  .dropzone input{display:none;}
+  .dz-icon{
+    width:52px;height:52px;
+    border-radius:50%;
+    background:var(--paper);
+    border:1.5px solid var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:16px;
+    transition:background .15s ease;
+  }
+  .dropzone:hover .dz-icon, .dropzone.drag .dz-icon{ background:var(--gold-bright); }
+  .dz-icon svg{ width:24px;height:24px; stroke:var(--ink); }
+  .dropzone .dz-title{
+    font-size:16.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .dropzone .dz-title u{
+    text-decoration:none;
+    border-bottom:1.5px solid var(--gold);
+  }
+  .dropzone .dz-sub{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:10px;
+  }
+  .dz-badges{
+    display:flex;
+    gap:6px;
+    margin-top:12px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .dz-badge{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-soft);
+    border:1px solid var(--line);
+    background:var(--paper);
+    padding:3px 9px;
+  }
+  .filename-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-top:16px;
+    font-family:var(--mono);
+    font-size:13px;
+    background:var(--ink);
+    color:var(--paper);
+    padding:8px 14px;
+  }
+  .filename-tag .check{ color:var(--gold-bright); }
+  button.primary{
+    margin-top:22px;
+    background:var(--gold);
+    color:var(--ink);
+    border:none;
+    padding:15px 32px;
+    font-size:15.5px;
+    font-weight:600;
+    font-family:var(--sans);
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease, box-shadow .15s ease;
+    box-shadow:0 3px 0 0 #9C7E1D;
+  }
+  button.primary:hover:not(:disabled){ background:var(--gold-bright); }
+  button.primary:active:not(:disabled){ transform:translateY(2px); box-shadow:0 1px 0 0 #9C7E1D; }
+  button.primary:disabled{
+    background:var(--paper-dim);
+    color:var(--ink-soft);
+    box-shadow:none;
+    border:1.5px dashed var(--line);
+    cursor:not-allowed;
+  }
+  .status-line{
+    font-family:var(--mono);
+    font-size:13px;
+    margin-top:14px;
+    min-height:18px;
+  }
+  .status-line.err{color:var(--bad);}
+  .status-line.ok{color:var(--good);}
+  .record-panel{
+    margin-top:20px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    padding:14px 18px;
+    border:1px solid var(--line);
+    background:var(--paper-dim);
+  }
+  .record-info{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .record-info b{
+    color:var(--ink);
+    font-family:var(--mono);
+  }
+  .record-dot{
+    width:8px;height:8px;
+    border-radius:50%;
+    background:var(--gold);
+    flex-shrink:0;
+  }
+  button.ghost{
+    background:transparent;
+    color:var(--bad);
+    border:1.5px solid var(--bad);
+    padding:8px 16px;
+    font-size:13px;
+    font-weight:600;
+    font-family:var(--sans);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+    flex-shrink:0;
+  }
+  button.ghost:hover{ background:var(--bad); color:var(--paper); }
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    margin-top:24px;
+  }
+  .stat-cell{
+    background:var(--paper);
+    padding:18px 14px;
+  }
+  .stat-cell .label{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--ink-soft);
+  }
+  .stat-cell .value{
+    font-family:var(--serif);
+    font-size:24px;
+    margin-top:4px;
+  }
+  .out-block{
+    margin-top:26px;
+    border:1px solid var(--line);
+    background:var(--paper-dim);
+    padding:22px;
+  }
+  .out-block h3{
+    font-family:var(--serif);
+    font-size:17px;
+    margin:0 0 6px;
+  }
+  .out-block p{
+    margin:0 0 14px;
+    font-size:13.5px;
+    color:var(--ink-soft);
+  }
+  .out-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  a.dl{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    text-decoration:none;
+    background:var(--ink);
+    color:var(--paper);
+    padding:12px 20px;
+    font-size:14px;
+    font-weight:600;
+    font-family:var(--sans);
+    border:1.5px solid var(--ink);
+    transition:background .15s ease, transform .1s ease;
+  }
+  a.dl .ext{
+    font-family:var(--mono);
+    font-size:11px;
+    font-weight:400;
+    color:var(--gold-bright);
+    border:1px solid rgba(228,188,63,0.5);
+    padding:1px 6px;
+  }
+  a.dl:hover{ background:var(--ink-soft); }
+  a.dl:active{ transform:translateY(1px); }
+  a.dl.disabled{
+    background:transparent;
+    color:var(--ink-soft);
+    border:1.5px dashed var(--line);
+    opacity:0.6;
+    pointer-events:none;
+  }
+  a.dl.disabled .ext{ color:var(--ink-soft); border-color:var(--line); }
+  table.preview{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:16px;
+    font-size:13.5px;
+  }
+  table.preview th, table.preview td{
+    padding:8px 10px;
+    text-align:left;
+    border-bottom:1px solid var(--line);
+  }
+  table.preview th{
+    font-family:var(--mono);
+    font-weight:400;
+    color:var(--ink-soft);
+    font-size:11.5px;
+  }
+  table.preview td.num, table.preview th.num{text-align:right;font-family:var(--mono);}
+  .preview-note{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  footer{
+    max-width:880px;
+    margin:60px auto 0;
+    padding:0 24px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--ink-soft);
+    border-top:1px solid var(--line);
+    padding-top:16px;
+  }
+  @media (max-width:600px){
+    .rule-strip{grid-template-columns:1fr;}
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    h1{font-size:26px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="band">
+  <div class="band-inner">
+    <span class="eyebrow-coin"><span class="coin-dot">枚</span>「驚喜任你抓」訂單派代幣</span>
+    <h1>「驚喜任你抓」訂單派代幣結算工具</h1>
+    <p>上傳訂單明細，依實付金額換算代幣兌換券數，再依會員編號彙總結果，並產生兩份可下載清單。已派過獎的訂單號碼會自動排除，不會重複計算。</p>
+  </div>
+</div>
+
+<main>
+
+  <div class="rule-panel">
+    <div class="rule-panel-head">
+      <span class="t">代幣兌換券換算對照表 · 依單筆訂單實付金額判定</span>
+      <span class="cap">單筆訂單上限 5 枚</span>
+    </div>
+    <div class="rule-strip">
+      <div class="rule-cell">
+        <div class="tier-label">第一階</div>
+        <div class="amt"><b>888</b> ～ 1,587 元</div>
+        <div class="arrow">↓ 兌換</div>
+        <div class="coins">1<span>枚</span></div>
+      </div>
+      <div class="rule-cell">
+        <div class="tier-label">第二階</div>
+        <div class="amt"><b>1,588</b> ～ 2,587 元</div>
+        <div class="arrow">↓ 兌換</div>
+        <div class="coins">3<span>枚</span></div>
+      </div>
+      <div class="rule-cell">
+        <div class="tier-label">第三階</div>
+        <div class="amt"><b>2,588</b> 元以上</div>
+        <div class="arrow">↓ 兌換</div>
+        <div class="coins">5<span>枚</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <h2>上傳訂單檔案</h2>
+    </div>
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="dz-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 15V3"/>
+          <path d="M7 8l5-5 5 5"/>
+          <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+        </svg>
+      </div>
+      <div class="dz-title">點擊<u>選擇檔案</u>，或將檔案拖曳至此</div>
+      <div class="dz-sub">需包含欄位：會員編號 / 訂單號碼 / 訂單實付金額</div>
+      <div class="dz-badges">
+        <span class="dz-badge">.xlsx</span>
+        <span class="dz-badge">.xls</span>
+        <span class="dz-badge">.csv</span>
+      </div>
+      <div id="fileTag"></div>
+    </label>
+    <div>
+      <button class="primary" id="processBtn" disabled>開始結算</button>
+    </div>
+    <div class="status-line" id="statusLine"></div>
+
+    <div class="record-panel">
+      <div class="record-info">
+        <span class="record-dot"></span>
+        <span>目前已記錄 <b id="recordCount">0</b> 筆已派獎訂單號碼（同一訂單不會被重複計算）</span>
+      </div>
+      <button class="ghost" id="clearRecordBtn" type="button">清除派獎紀錄</button>
+    </div>
+  </section>
+
+  <section id="resultSection" style="display:none;">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <h2>結算結果</h2>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-cell">
+        <div class="label">訂單總數</div>
+        <div class="value" id="statOrders">-</div>
+      </div>
+      <div class="stat-cell">
+        <div class="label">符合資格訂單數</div>
+        <div class="value" id="statQualified">-</div>
+      </div>
+      <div class="stat-cell">
+        <div class="label">代幣兌換券總枚數</div>
+        <div class="value" id="statCoins">-</div>
+      </div>
+      <div class="stat-cell">
+        <div class="label">領取會員人數</div>
+        <div class="value" id="statMembers">-</div>
+      </div>
+      <div class="stat-cell">
+        <div class="label">已排除重複派獎訂單數</div>
+        <div class="value" id="statDuplicate">-</div>
+      </div>
+    </div>
+
+    <div class="out-block">
+      <h3>a) 會員代幣兌換券統計表</h3>
+      <p>每一位會員編號，及其依所有訂單累計可領到的代幣兌換券總枚數，共一列。</p>
+      <div class="out-actions">
+        <a class="dl disabled" id="dlSummaryXlsx">↓ 下載統計表 <span class="ext">XLSX</span></a>
+        <a class="dl disabled" id="dlSummaryCsv">↓ 下載統計表 <span class="ext">CSV</span></a>
+      </div>
+      <table class="preview" id="summaryPreview"></table>
+      <div class="preview-note" id="summaryNote"></div>
+    </div>
+
+    <div class="out-block">
+      <h3>b) 會員代幣兌換券展開清單</h3>
+      <p>依每位會員可領到的枚數，該會員編號重複出現對應次數（例：可領 3 枚即列出 3 列），可直接作為抽獎池或核發名單使用。</p>
+      <div class="out-actions">
+        <a class="dl disabled" id="dlExpandXlsx">↓ 下載展開清單 <span class="ext">XLSX</span></a>
+        <a class="dl disabled" id="dlExpandCsv">↓ 下載展開清單 <span class="ext">CSV</span></a>
+      </div>
+      <table class="preview" id="expandPreview"></table>
+      <div class="preview-note" id="expandNote"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  代幣兌換券換算規則：實付金額 ≥ 888 → 1 枚｜≥ 1588 → 3 枚｜≥ 2588 → 5 枚（單筆訂單最多 5 枚）。每筆訂單僅能派獎一次，已派過獎的訂單號碼會被記錄於本機瀏覽器並自動排除。所有運算皆於瀏覽器本機完成，檔案不會上傳至伺服器。
+</footer>
+
+<script>
+(function(){
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileTag = document.getElementById('fileTag');
+  const processBtn = document.getElementById('processBtn');
+  const statusLine = document.getElementById('statusLine');
+  const resultSection = document.getElementById('resultSection');
+
+  let workbookRows = null;
+  let currentFileName = '';
+
+  const STORAGE_KEY = 'surpriseGrab_paidOrders_v1';
+
+  function loadPaidOrders(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return new Set();
+      const arr = JSON.parse(raw);
+      return new Set(Array.isArray(arr) ? arr : []);
+    }catch(e){
+      console.error('讀取派獎紀錄失敗', e);
+      return new Set();
+    }
+  }
+
+  function savePaidOrders(set){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+    }catch(e){
+      console.error('儲存派獎紀錄失敗', e);
+    }
+  }
+
+  function updateRecordCount(){
+    document.getElementById('recordCount').textContent = loadPaidOrders().size.toLocaleString();
+  }
+  updateRecordCount();
+
+  document.getElementById('clearRecordBtn').addEventListener('click', function(){
+    const set = loadPaidOrders();
+    if(set.size === 0){
+      alert('目前沒有派獎紀錄可以清除。');
+      return;
+    }
+    const ok = confirm('確定要清除全部 ' + set.size.toLocaleString() + ' 筆已派獎訂單紀錄嗎？\n清除後，這些訂單號碼將可以被重新計算派獎，此動作無法復原。');
+    if(!ok) return;
+    localStorage.removeItem(STORAGE_KEY);
+    updateRecordCount();
+    setStatus('已清除派獎紀錄。', 'ok');
+  });
+
+  function setStatus(msg, cls){
+    statusLine.textContent = msg || '';
+    statusLine.className = 'status-line' + (cls ? (' ' + cls) : '');
+  }
+
+  function resetOutputs(){
+    resultSection.style.display = 'none';
+    ['dlSummaryXlsx','dlSummaryCsv','dlExpandXlsx','dlExpandCsv'].forEach(id=>{
+      const el = document.getElementById(id);
+      el.classList.add('disabled');
+      el.removeAttribute('href');
+      el.removeAttribute('download');
+    });
+  }
+
+  dropzone.addEventListener('dragover', e=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', e=>{
+    e.preventDefault();
+    dropzone.classList.remove('drag');
+    if(e.dataTransfer.files && e.dataTransfer.files[0]){
+      fileInput.files = e.dataTransfer.files;
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+  fileInput.addEventListener('change', e=>{
+    if(e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file){
+    currentFileName = file.name.replace(/\.[^.]+$/, '');
+    fileTag.innerHTML = '<span class="filename-tag"><span class="check">✓</span>' + file.name + '</span>';
+    resetOutputs();
+    setStatus('');
+    processBtn.disabled = true;
+    workbookRows = null;
+
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      try{
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type:'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:true, defval:'' });
+        if(!rows || rows.length < 2){
+          setStatus('檔案中沒有可讀取的資料列。', 'err');
+          return;
+        }
+        const header = rows[0].map(h => String(h).trim());
+        const idxMember = header.findIndex(h => h.includes('會員'));
+        const idxOrder = header.findIndex(h => h.includes('訂單號碼') || (h.includes('訂單') && h.includes('號')));
+        const idxAmount = header.findIndex(h => h.includes('實付') || h.includes('金額'));
+
+        if(idxMember === -1 || idxOrder === -1 || idxAmount === -1){
+          setStatus('找不到「會員編號」「訂單號碼」「訂單實付金額」欄位，請確認檔案欄位名稱。', 'err');
+          return;
+        }
+
+        const parsed = [];
+        for(let i=1;i<rows.length;i++){
+          const r = rows[i];
+          if(!r || r.length === 0) continue;
+          const member = String(r[idxMember] ?? '').trim();
+          const order = String(r[idxOrder] ?? '').trim();
+          let amount = r[idxAmount];
+          if(typeof amount === 'string') amount = parseFloat(amount.replace(/[^0-9.\-]/g,''));
+          if(!member && !order) continue;
+          parsed.push({ member, order, amount: (typeof amount === 'number' && !isNaN(amount)) ? amount : 0 });
+        }
+
+        if(parsed.length === 0){
+          setStatus('沒有解析到有效的資料列。', 'err');
+          return;
+        }
+
+        workbookRows = parsed;
+        processBtn.disabled = false;
+        setStatus('已讀取 ' + parsed.length + ' 筆訂單資料，可以開始結算。', 'ok');
+      }catch(err){
+        console.error(err);
+        setStatus('檔案讀取失敗：' + err.message, 'err');
+      }
+    };
+    reader.onerror = function(){ setStatus('檔案讀取失敗，請重新選擇檔案。', 'err'); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function coinsForAmount(amount){
+    if(amount >= 2588) return 5;
+    if(amount >= 1588) return 3;
+    if(amount >= 888) return 1;
+    return 0;
+  }
+
+  function csvEscape(v){
+    const s = String(v);
+    if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+    return s;
+  }
+
+  function makeCsvBlob(headerArr, rowsArr){
+    const lines = [headerArr.map(csvEscape).join(',')];
+    rowsArr.forEach(r => lines.push(r.map(csvEscape).join(',')));
+    return new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8;' });
+  }
+
+  function makeXlsxBlob(headerArr, rowsArr, sheetName){
+    const wsData = [headerArr, ...rowsArr];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+    return new Blob([out], { type:'application/octet-stream' });
+  }
+
+  function setDownload(id, blob, filename){
+    const el = document.getElementById(id);
+    const url = URL.createObjectURL(blob);
+    el.href = url;
+    el.download = filename;
+    el.classList.remove('disabled');
+  }
+
+  function renderPreview(tableEl, headerArr, rowsArr, maxRows){
+    let html = '<thead><tr>' + headerArr.map((h,i)=>'<th class="'+(i>0?'num':'')+'">'+h+'</th>').join('') + '</tr></thead><tbody>';
+    rowsArr.slice(0, maxRows).forEach(r=>{
+      html += '<tr>' + r.map((c,i)=>'<td class="'+(i>0?'num':'')+'">'+c+'</td>').join('') + '</tr>';
+    });
+    html += '</tbody>';
+    tableEl.innerHTML = html;
+  }
+
+  processBtn.addEventListener('click', function(){
+    if(!workbookRows) return;
+    setStatus('結算中…');
+    processBtn.disabled = true;
+
+    setTimeout(() => {
+      try{
+        const paidOrders = loadPaidOrders();
+        const seenInThisRun = new Set();
+        const newlyPaidOrders = [];
+
+        const totalOrders = workbookRows.length;
+        let qualifiedOrders = 0;
+        let duplicateOrders = 0;
+        const memberCoins = new Map();
+
+        workbookRows.forEach(row => {
+          const coins = coinsForAmount(row.amount);
+          if(coins <= 0) return;
+
+          const orderKey = row.order;
+          if(orderKey){
+            if(paidOrders.has(orderKey) || seenInThisRun.has(orderKey)){
+              duplicateOrders++;
+              return;
+            }
+            seenInThisRun.add(orderKey);
+            newlyPaidOrders.push(orderKey);
+          }
+
+          qualifiedOrders++;
+          const prev = memberCoins.get(row.member) || 0;
+          memberCoins.set(row.member, prev + coins);
+        });
+
+        let totalCoins = 0;
+        memberCoins.forEach(v => totalCoins += v);
+
+        // a) summary table, sorted by coins desc then member asc
+        const summaryEntries = Array.from(memberCoins.entries())
+          .sort((a,b) => b[1]-a[1] || (a[0] > b[0] ? 1 : -1));
+
+        // b) expanded list
+        const expandedRows = [];
+        summaryEntries.forEach(([member, coins]) => {
+          for(let i=0;i<coins;i++) expandedRows.push(member);
+        });
+
+        document.getElementById('statOrders').textContent = totalOrders.toLocaleString();
+        document.getElementById('statQualified').textContent = qualifiedOrders.toLocaleString();
+        document.getElementById('statCoins').textContent = totalCoins.toLocaleString();
+        document.getElementById('statMembers').textContent = memberCoins.size.toLocaleString();
+        document.getElementById('statDuplicate').textContent = duplicateOrders.toLocaleString();
+
+        const summaryHeader = ['會員編號','累計代幣兌換券枚數'];
+        const summaryRowsForFile = summaryEntries.map(([m,c]) => [m, c]);
+        const expandHeader = ['會員編號'];
+        const expandRowsForFile = expandedRows.map(m => [m]);
+
+        setDownload('dlSummaryXlsx', makeXlsxBlob(summaryHeader, summaryRowsForFile, '會員代幣兌換券統計'), currentFileName + '_會員代幣兌換券統計.xlsx');
+        setDownload('dlSummaryCsv', makeCsvBlob(summaryHeader, summaryRowsForFile), currentFileName + '_會員代幣兌換券統計.csv');
+        setDownload('dlExpandXlsx', makeXlsxBlob(expandHeader, expandRowsForFile, '會員代幣兌換券展開清單'), currentFileName + '_會員代幣兌換券展開清單.xlsx');
+        setDownload('dlExpandCsv', makeCsvBlob(expandHeader, expandRowsForFile), currentFileName + '_會員代幣兌換券展開清單.csv');
+
+        renderPreview(document.getElementById('summaryPreview'), summaryHeader, summaryRowsForFile, 8);
+        document.getElementById('summaryNote').textContent = '共 ' + summaryRowsForFile.length + ' 筆會員資料（預覽前 8 筆，完整資料請下載檔案）。';
+
+        renderPreview(document.getElementById('expandPreview'), expandHeader, expandRowsForFile, 8);
+        document.getElementById('expandNote').textContent = '共 ' + expandRowsForFile.length + ' 列展開資料（預覽前 8 筆，完整資料請下載檔案）。';
+
+        if(newlyPaidOrders.length > 0){
+          newlyPaidOrders.forEach(o => paidOrders.add(o));
+          savePaidOrders(paidOrders);
+          updateRecordCount();
+        }
+
+        resultSection.style.display = 'block';
+        setStatus('結算完成' + (duplicateOrders > 0 ? '（已自動排除 ' + duplicateOrders.toLocaleString() + ' 筆重複派獎訂單，不重複發放）' : '') + '。', 'ok');
+      }catch(err){
+        console.error(err);
+        setStatus('結算過程發生錯誤：' + err.message, 'err');
+      }finally{
+        processBtn.disabled = false;
+      }
+    }, 30);
+  });
+})();
+</script>
+
+</body>
+</html>
