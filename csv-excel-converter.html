@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CSV ⇄ Excel 轉檔工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --paper: #F6F4EE;
+    --paper-raised: #FFFFFF;
+    --ink: #1B2420;
+    --ink-soft: #5B6660;
+    --rule: #D8D3C4;
+    --rule-strong: #B9B2A0;
+    --excel: #2F6F4E;
+    --excel-soft: #E7F0EA;
+    --csv: #2C4A7C;
+    --csv-soft: #E7ECF4;
+    --danger: #A23B2E;
+    --radius: 3px;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100%;
+  }
+
+  body {
+    padding: 48px 20px 80px;
+    padding-top: calc(48px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sheet {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 36px;
+  }
+
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: 30px;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .lede {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 52ch;
+  }
+
+  /* ---------- Mode toggle ---------- */
+  .mode-toggle {
+    display: flex;
+    border: 1.5px solid var(--ink);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 32px 0 24px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 16px 12px;
+    background: var(--paper-raised);
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .mode-btn:first-child {
+    border-right: 1.5px solid var(--ink);
+  }
+
+  .mode-btn .arrow {
+    opacity: 0.5;
+    margin: 0 2px;
+  }
+
+  .mode-btn[data-active="true"] {
+    color: #fff;
+  }
+
+  .mode-btn[data-mode="csv2xlsx"][data-active="true"] {
+    background: var(--excel);
+  }
+
+  .mode-btn[data-mode="xlsx2csv"][data-active="true"] {
+    background: var(--csv);
+  }
+
+  /* ---------- Drop zone ---------- */
+  .dropzone {
+    border: 1.5px dashed var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .dropzone[data-drag="true"] {
+    background: var(--excel-soft);
+    border-color: var(--excel);
+  }
+
+  body[data-mode="xlsx2csv"] .dropzone[data-drag="true"] {
+    background: var(--csv-soft);
+    border-color: var(--csv);
+  }
+
+  .dropzone .dz-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .dropzone .dz-sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .dropzone .dz-ext {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 10px;
+  }
+
+  input[type="file"] { display: none; }
+
+  /* ---------- Options row ---------- */
+  .options {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 20px 2px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .options label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+  }
+
+  .options select {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    color: var(--ink);
+  }
+
+  .options input[type="checkbox"] {
+    accent-color: var(--ink);
+    width: 15px;
+    height: 15px;
+  }
+
+  /* ---------- File table (ledger style) ---------- */
+  .ledger {
+    margin-top: 28px;
+    border-top: 1.5px solid var(--ink);
+  }
+
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--rule);
+    font-size: 13.5px;
+  }
+
+  .ledger-row.head {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: none;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 8px;
+  }
+
+  .file-name {
+    font-family: 'IBM Plex Mono', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .status[data-state="working"] { color: var(--ink-soft); }
+  .status[data-state="done"] { color: var(--excel); font-weight: 600; }
+  .status[data-state="error"] { color: var(--danger); font-weight: 600; }
+
+  .dl-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--ink);
+    border-radius: var(--radius);
+    background: var(--paper-raised);
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .dl-btn:hover { background: var(--ink); color: var(--paper-raised); }
+  .dl-btn[disabled] {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .empty-note {
+    padding: 20px 4px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* ---------- Footer actions ---------- */
+  .footer-actions {
+    margin-top: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .zip-btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--paper-raised);
+    cursor: pointer;
+  }
+
+  .zip-btn[disabled] {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .clear-btn {
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .privacy-note {
+    margin-top: 44px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+
+  .privacy-note strong { color: var(--ink); }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #17201B;
+      --paper-raised: #1F2A23;
+      --ink: #EDEBE3;
+      --ink-soft: #9CA69F;
+      --rule: #34413A;
+      --rule-strong: #46564C;
+      --excel-soft: #1D3327;
+      --csv-soft: #1B2A40;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #17201B;
+    --paper-raised: #1F2A23;
+    --ink: #EDEBE3;
+    --ink-soft: #9CA69F;
+    --rule: #34413A;
+    --rule-strong: #46564C;
+    --excel-soft: #1D3327;
+    --csv-soft: #1B2A40;
+  }
+</style>
+</head>
+<body data-mode="csv2xlsx">
+<div class="sheet">
+
+  <header>
+    <p class="kicker">本機轉檔・不經任何伺服器</p>
+    <h1>CSV ⇄ Excel 轉檔工具</h1>
+    <p class="lede">拖曳檔案進來，馬上轉成另一種格式。整個過程都在你的瀏覽器裡完成，檔案不會被上傳到任何地方。</p>
+  </header>
+
+  <div class="mode-toggle">
+    <button class="mode-btn" data-mode="csv2xlsx" data-active="true">CSV <span class="arrow">→</span> Excel</button>
+    <button class="mode-btn" data-mode="xlsx2csv" data-active="false">Excel <span class="arrow">→</span> CSV</button>
+  </div>
+
+  <div class="dropzone" id="dropzone" tabindex="0">
+    <div class="dz-title" id="dzTitle">將 .csv 檔案拖曳到這裡</div>
+    <div class="dz-sub">或點擊選擇檔案，可一次選多個</div>
+    <div class="dz-ext" id="dzExt">接受 .csv</div>
+  </div>
+  <input type="file" id="fileInput" multiple accept=".csv">
+
+  <div class="options" id="csvOptions">
+    <label>來源編碼
+      <select id="csvEncoding">
+        <option value="utf-8">UTF-8</option>
+        <option value="big5">Big5（系統內碼）</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="options" id="xlsxOptions" style="display:none;">
+    <label>
+      <input type="checkbox" id="allSheets">
+      每個工作表各轉一個 CSV
+    </label>
+  </div>
+
+  <div class="ledger" id="ledger">
+    <div class="ledger-row head">
+      <span>檔案</span>
+      <span>狀態</span>
+      <span>下載</span>
+    </div>
+    <div class="empty-note" id="emptyNote">還沒有選擇檔案</div>
+  </div>
+
+  <div class="footer-actions">
+    <button class="clear-btn" id="clearBtn" style="visibility:hidden;">清空清單</button>
+    <button class="zip-btn" id="zipBtn" disabled>全部下載（.zip）</button>
+  </div>
+
+  <p class="privacy-note">
+    <strong>關於隱私：</strong>這個工具不會把你的檔案傳到任何伺服器 —— 所有解析與轉檔都用瀏覽器內建的 JavaScript 完成，重新整理頁面後資料就會消失。適合處理內部或含個資的檔案。
+  </p>
+
+</div>
+
+<script>
+(function () {
+  const body = document.body;
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const dzTitle = document.getElementById('dzTitle');
+  const dzExt = document.getElementById('dzExt');
+  const csvOptions = document.getElementById('csvOptions');
+  const xlsxOptions = document.getElementById('xlsxOptions');
+  const csvEncodingSel = document.getElementById('csvEncoding');
+  const allSheetsChk = document.getElementById('allSheets');
+  const ledger = document.getElementById('ledger');
+  const emptyNote = document.getElementById('emptyNote');
+  const zipBtn = document.getElementById('zipBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const modeButtons = document.querySelectorAll('.mode-btn');
+
+  let mode = 'csv2xlsx'; // or 'xlsx2csv'
+  let outputs = []; // { name, blob }
+
+  // ---------- Mode switching ----------
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => setMode(btn.dataset.mode));
+  });
+
+  function setMode(newMode) {
+    mode = newMode;
+    body.setAttribute('data-mode', mode);
+    modeButtons.forEach(b => b.setAttribute('data-active', String(b.dataset.mode === mode)));
+
+    if (mode === 'csv2xlsx') {
+      dzTitle.textContent = '將 .csv 檔案拖曳到這裡';
+      dzExt.textContent = '接受 .csv';
+      fileInput.accept = '.csv';
+      csvOptions.style.display = '';
+      xlsxOptions.style.display = 'none';
+    } else {
+      dzTitle.textContent = '將 Excel 檔案拖曳到這裡';
+      dzExt.textContent = '接受 .xlsx .xlsm .xls';
+      fileInput.accept = '.xlsx,.xlsm,.xls';
+      csvOptions.style.display = 'none';
+      xlsxOptions.style.display = '';
+    }
+    clearOutputs();
+  }
+
+  // ---------- Drag & drop ----------
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
+  });
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.setAttribute('data-drag', 'true');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.setAttribute('data-drag', 'false');
+    });
+  });
+  dropzone.addEventListener('drop', e => {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) handleFiles(files);
+  });
+
+  fileInput.addEventListener('change', () => {
+    const files = Array.from(fileInput.files);
+    if (files.length) handleFiles(files);
+    fileInput.value = '';
+  });
+
+  clearBtn.addEventListener('click', clearOutputs);
+
+  function clearOutputs() {
+    outputs = [];
+    ledger.querySelectorAll('.ledger-row:not(.head)').forEach(r => r.remove());
+    emptyNote.style.display = '';
+    zipBtn.disabled = true;
+    clearBtn.style.visibility = 'hidden';
+  }
+
+  // ---------- File handling ----------
+  function handleFiles(files) {
+    emptyNote.style.display = 'none';
+    clearBtn.style.visibility = 'visible';
+
+    files.forEach(file => {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const isCsv = ext === 'csv';
+      const isExcel = ['xlsx', 'xlsm', 'xls'].includes(ext);
+
+      if (mode === 'csv2xlsx' && !isCsv) return;
+      if (mode === 'xlsx2csv' && !isExcel) return;
+
+      const row = createRow(file.name);
+      if (mode === 'csv2xlsx') {
+        convertCsvToXlsx(file, row);
+      } else {
+        convertXlsxToCsv(file, row);
+      }
+    });
+  }
+
+  function createRow(name) {
+    const row = document.createElement('div');
+    row.className = 'ledger-row';
+    row.innerHTML =
+      '<span class="file-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>' +
+      '<span class="status" data-state="working">轉檔中…</span>' +
+      '<a class="dl-btn" download disabled>下載</a>';
+    ledger.appendChild(row);
+    return row;
+  }
+
+  function setRowDone(row, blob, filename) {
+    const status = row.querySelector('.status');
+    const link = row.querySelector('.dl-btn');
+    status.textContent = '完成';
+    status.setAttribute('data-state', 'done');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = filename;
+    link.removeAttribute('disabled');
+    outputs.push({ name: filename, blob });
+    zipBtn.disabled = outputs.length === 0;
+  }
+
+  function setRowError(row, message) {
+    const status = row.querySelector('.status');
+    status.textContent = message || '失敗';
+    status.setAttribute('data-state', 'error');
+  }
+
+  function setRowSkipped(row, message) {
+    const status = row.querySelector('.status');
+    status.textContent = message;
+    status.setAttribute('data-state', 'working');
+    status.style.opacity = '0.6';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- CSV -> XLSX ----------
+  function convertCsvToXlsx(file, row) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const buffer = reader.result;
+        const encoding = csvEncodingSel.value;
+        const text = new TextDecoder(encoding).decode(buffer);
+
+        if (!text.trim()) {
+          setRowError(row, '檔案是空的');
+          return;
+        }
+
+        const wb = XLSX.read(text, { type: 'string' });
+        const arrayBuf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([arrayBuf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const outName = file.name.replace(/\.csv$/i, '') + '.xlsx';
+        setRowDone(row, blob, outName);
+      } catch (err) {
+        setRowError(row, '解析失敗');
+        console.error(err);
+      }
+    };
+    reader.onerror = () => setRowError(row, '讀取失敗');
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ---------- XLSX -> CSV ----------
+  function convertXlsxToCsv(file, row) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = new Uint8Array(reader.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const baseName = file.name.replace(/\.(xlsx|xlsm|xls)$/i, '');
+
+        const sheetNames = allSheetsChk.checked ? wb.SheetNames : [wb.SheetNames[0]];
+        const results = [];
+
+        sheetNames.forEach(name => {
+          const ws = wb.Sheets[name];
+          const csv = XLSX.utils.sheet_to_csv(ws);
+          if (!csv.trim()) return; // skip empty sheets
+          const fname = (allSheetsChk.checked && wb.SheetNames.length > 1)
+            ? baseName + '_' + name.replace(/[\\/:*?"<>|]/g, '_') + '.csv'
+            : baseName + '.csv';
+          const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+          results.push({ fname, blob });
+        });
+
+        if (results.length === 0) {
+          setRowError(row, '沒有資料可轉出');
+          return;
+        }
+
+        if (results.length === 1) {
+          setRowDone(row, results[0].blob, results[0].fname);
+        } else {
+          // Multiple sheets: turn this row into one entry per sheet
+          row.remove();
+          results.forEach(r => {
+            const subRow = createRow(r.fname);
+            setRowDone(subRow, r.blob, r.fname);
+          });
+        }
+      } catch (err) {
+        setRowError(row, '解析失敗');
+        console.error(err);
+      }
+    };
+    reader.onerror = () => setRowError(row, '讀取失敗');
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ---------- Zip download ----------
+  zipBtn.addEventListener('click', async () => {
+    if (outputs.length === 0) return;
+    zipBtn.disabled = true;
+    zipBtn.textContent = '打包中…';
+
+    const zip = new JSZip();
+    outputs.forEach(o => zip.file(o.name, o.blob));
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'converted-files.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    zipBtn.textContent = '全部下載（.zip）';
+    zipBtn.disabled = false;
+  });
+})();
+</script>
+</body>
+</html>
