@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>點數換算小工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --paper:#F5F6F3; --panel:#FFFFFF; --ink:#1E2530; --muted:#6A7280; --line:#DDE0DA;
+  --accent:#3A4FB8; --accent-soft:#E8EBF8; --warn:#B4541E; --warn-soft:#FBEDE4; --ok:#2F7A55;
+  --black:#23262D; --gold:#B8912F;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:15px;line-height:1.6}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 60px}
+header h1{font-size:28px;font-weight:900;margin:0;letter-spacing:.02em}
+header p{margin:4px 0 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:400px 1fr;gap:20px;margin-top:22px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+section.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+section.box h2{font-size:16px;font-weight:700;margin:0 0 12px}
+.drop{border:2px dashed #C3C8D6;border-radius:8px;padding:22px 14px;text-align:center;cursor:pointer;color:var(--muted);transition:background .15s}
+.drop:hover,.drop.over{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.drop strong{display:block;color:var(--ink);font-size:15px}
+.filename{margin-top:10px;font-size:13px;color:var(--ok)}
+label.row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0;font-size:14px}
+select,input[type=number]{font:inherit;border:1px solid var(--line);border-radius:6px;padding:5px 8px;background:#fff;color:var(--ink)}
+select{max-width:210px}
+input[type=number]{width:78px;text-align:right;font-variant-numeric:tabular-nums}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* rule sentence: the signature element */
+.rule{font-size:17px;line-height:2.3;background:var(--accent-soft);border-radius:8px;padding:12px 16px;margin-bottom:14px}
+.rule input{width:64px;font-weight:700;color:var(--accent);border-color:#BFC7EA}
+.hint{font-size:12.5px;color:var(--muted);margin:4px 0 0}
+table.cards{width:100%;border-collapse:collapse;font-size:14px}
+table.cards td{padding:6px 4px;border-bottom:1px solid var(--line)}
+table.cards td:last-child{text-align:right}
+.chip{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:8px;vertical-align:middle;border:1px solid #999}
+.cap-head{display:flex;align-items:center;gap:8px;font-weight:500}
+.cap-body{margin-top:8px;padding-left:24px}
+.cap-body.off{opacity:.4;pointer-events:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:#fff;padding:5px 12px;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#fff}
+.btn{font:inherit;font-weight:700;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:var(--accent);color:#fff}
+.btn:disabled{background:#B9BECB;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--accent);border:1px solid var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.stat{background:var(--panel);padding:14px 16px}
+.stat .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .k{font-size:13px;color:var(--muted)}
+.stat.main .v{color:var(--accent)}
+.stat.warn .v{color:var(--warn)}
+.tablewrap{overflow-x:auto;max-height:460px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+table.data{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+table.data th{position:sticky;top:0;background:#EEF0EC;text-align:left;font-weight:500;padding:8px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.data td{padding:6px 10px;border-bottom:1px solid #EEF0EC;white-space:nowrap}
+table.data td.n,table.data th.n{text-align:right}
+table.data tr.capped td{background:var(--warn-soft)}
+.tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 14px;cursor:pointer}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar input[type=search]{font:inherit;border:1px solid var(--line);border-radius:6px;padding:6px 10px;width:220px}
+.empty{color:var(--muted);text-align:center;padding:60px 20px}
+.msg{font-size:13px;margin-top:8px}
+.msg.err{color:var(--warn)}
+.formula{font-size:13px;color:var(--muted);margin:0 0 14px}
+.tag{font-size:12px;background:var(--warn);color:#fff;border-radius:4px;padding:1px 6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>點數換算小工具</h1>
+  <p>上傳 EC 訂單明細，依卡別倍率與活動倍數算出每筆訂單、每位會員的加贈點數。</p>
+</header>
+
+<div class="grid">
+<!-- ===== 左側：設定 ===== -->
+<div>
+  <section class="box">
+    <h2>上傳訂單明細</h2>
+    <div class="drop" id="drop" tabindex="0" role="button">
+      <strong>拖曳檔案到這裡，或點擊選擇</strong>
+      支援 .xlsx / .xls / .csv
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+    <div class="filename" id="filename"></div>
+  </section>
+
+  <section class="box" id="mapBox" hidden>
+    <h2>欄位對應</h2>
+    <label class="row">訂單編號 <select id="colOrder"></select></label>
+    <label class="row">會員編號 <select id="colMember"></select></label>
+    <label class="row">會員卡別 <select id="colCard"></select></label>
+    <label class="row">計點金額 <select id="colAmt"></select></label>
+    <p class="hint">計點金額預設用「銷售金額(純金)」，點數折抵的部分不回饋。</p>
+  </section>
+
+  <section class="box">
+    <h2>計點規則</h2>
+    <div class="rule">
+      每滿 $<input type="number" id="unit" min="1" value="50"> 為 1 單位，<br>
+      單位 × 卡別倍率 × <input type="number" id="times" min="1" step="1" value="5"> 倍送
+    </div>
+    <p class="formula" id="formulaText"></p>
+
+    <table class="cards" id="cardTable"></table>
+    <p class="hint">上傳檔案後會自動列出檔案中出現的所有卡別。沒有設定的卡別倍率為 0（不計點）。</p>
+  </section>
+
+  <section class="box">
+    <h2>加贈點數封頂</h2>
+    <label class="cap-head"><input type="checkbox" id="capOn"> 啟用封頂</label>
+    <div class="cap-body off" id="capBody">
+      <label class="row">最多加贈 <span><input type="number" id="capVal" min="0" value="300"> 點</span></label>
+      <label class="row">封頂計算 
+        <span class="seg" id="capScope">
+          <button type="button" data-v="member" class="on">每位會員</button>
+          <button type="button" data-v="order">每筆訂單</button>
+        </span>
+      </label>
+      <p class="hint" id="capHint"></p>
+    </div>
+  </section>
+
+  <button class="btn" id="runBtn" disabled style="width:100%">計算點數</button>
+  <div class="msg" id="msg"></div>
+</div>
+
+<!-- ===== 右側：結果 ===== -->
+<div>
+  <div id="result">
+    <div class="box empty" style="background:var(--panel);border:1px solid var(--line);border-radius:10px">
+      上傳訂單明細並按「計算點數」後，結果會顯示在這裡。
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<script>
+/* ---------- 預設值 ---------- */
+const DEFAULT_CARDS = { "01_黑卡":2, "02_金卡":2, "03_白卡":1 };
+const CHIP = { "黑卡":"var(--black)", "金卡":"var(--gold)", "白卡":"#fff" };
+const GUESS = {
+  order:["母訂單號碼","訂單號碼","訂單編號","訂單"],
+  member:["會員編號","會員ID","會員"],
+  card:["會員卡別","卡別"],
+  amt:["銷售金額(純金)","純金","銷售金額","金額"]
+};
+// 匯出時排除原檔已經算好的點數欄，避免重複
+const OLD_CALC = /^(基本點數|既有點數回饋|活動點數回饋|點數查核|最終點數回饋|點數\d+倍送總計)$/;
+
+const $ = id => document.getElementById(id);
+let rows = [], headers = [], cardMult = {}, capScope = "member", lastResult = null, fileBase = "";
+
+/* ---------- 記住上次的設定 ---------- */
+function loadSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem("pointsCalcSettings")||"null");
+    if(!s) return;
+    $("unit").value = s.unit ?? 50; $("times").value = s.times ?? 5;
+    $("capOn").checked = !!s.capOn; $("capVal").value = s.capVal ?? 300;
+    capScope = s.capScope || "member"; Object.assign(cardMult, s.cards||{});
+  }catch(e){}
+}
+function saveSettings(){
+  try{
+    localStorage.setItem("pointsCalcSettings", JSON.stringify({
+      unit:+$("unit").value, times:+$("times").value, capOn:$("capOn").checked,
+      capVal:+$("capVal").value, capScope, cards:cardMult
+    }));
+  }catch(e){}
+}
+
+/* ---------- 上傳 ---------- */
+const drop = $("drop");
+drop.onclick = () => $("file").click();
+drop.onkeydown = e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); $("file").click(); } };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); };
+$("file").onchange = e => { if(e.target.files[0]) readFile(e.target.files[0]); };
+
+function readFile(f){
+  fileBase = f.name.replace(/\.[^.]+$/,"");
+  const r = new FileReader();
+  r.onload = ev => {
+    try{
+      const wb = XLSX.read(ev.target.result, {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:"", raw:true});
+      headers = (aoa[0]||[]).map(h=>String(h).trim());
+      rows = aoa.slice(1).filter(r => r.some(v => v!=="" && v!=null))
+                .map(r => Object.fromEntries(headers.map((h,i)=>[h, r[i]])));
+      if(!rows.length) throw new Error("檔案沒有資料列");
+      $("filename").textContent = `已讀取 ${f.name}，共 ${rows.length.toLocaleString()} 筆`;
+      setupMapping(); setMsg("");
+      $("runBtn").disabled = false;
+    }catch(err){ setMsg("讀取失敗：" + err.message + "。請確認第一列是欄位名稱。", true); }
+  };
+  r.readAsArrayBuffer(f);
+}
+
+function setupMapping(){
+  $("mapBox").hidden = false;
+  const fill = (id, keys) => {
+    const sel = $(id);
+    sel.innerHTML = headers.map(h=>`<option>${esc(h)}</option>`).join("");
+    const hit = keys.map(k=>headers.find(h=>h===k)).find(Boolean) || keys.map(k=>headers.find(h=>h.includes(k))).find(Boolean);
+    if(hit) sel.value = hit;
+  };
+  fill("colOrder",GUESS.order); fill("colMember",GUESS.member);
+  fill("colCard",GUESS.card); fill("colAmt",GUESS.amt);
+  $("colCard").onchange = buildCardTable;
+  buildCardTable();
+}
+
+/* ---------- 卡別倍率表 ---------- */
+function buildCardTable(){
+  let cards = Object.keys(DEFAULT_CARDS);
+  if(rows.length){
+    const col = $("colCard").value;
+    const counts = {};
+    rows.forEach(r => { const c = String(r[col] ?? "").trim() || "(空白)"; counts[c]=(counts[c]||0)+1; });
+    cards = Object.keys(counts).sort();
+    cards.forEach(c => { if(!(c in cardMult)) cardMult[c] = DEFAULT_CARDS[c] ?? 0; });
+    $("cardTable").innerHTML = "<tr><td style='color:var(--muted)'>卡別</td><td style='color:var(--muted)'>筆數</td><td style='color:var(--muted)'>倍率</td></tr>" +
+      cards.map(c => cardRow(c, counts[c])).join("");
+  } else {
+    cards.forEach(c => { if(!(c in cardMult)) cardMult[c] = DEFAULT_CARDS[c]; });
+    $("cardTable").innerHTML = "<tr><td style='color:var(--muted)'>卡別</td><td></td><td style='color:var(--muted)'>倍率</td></tr>" +
+      cards.map(c => cardRow(c, "")).join("");
+  }
+  $("cardTable").querySelectorAll("input").forEach(inp => {
+    inp.oninput = () => { cardMult[inp.dataset.card] = +inp.value || 0; saveSettings(); };
+  });
+}
+function cardRow(c, n){
+  const color = Object.entries(CHIP).find(([k])=>c.includes(k));
+  return `<tr><td><span class="chip" style="background:${color?color[1]:"#ddd"}"></span>${esc(c)}</td>
+    <td style="color:var(--muted)">${n!==""?n.toLocaleString():""}</td>
+    <td><input type="number" min="0" step="0.5" data-card="${esc(c)}" value="${cardMult[c]}"></td></tr>`;
+}
+
+/* ---------- 規則說明文字 ---------- */
+function updateTexts(){
+  const u = +$("unit").value||50, t = +$("times").value||1;
+  $("formulaText").innerHTML = `既有點數 = 無條件捨去(金額 ÷ ${u}) × 卡別倍率<br>活動加贈 = 既有點數 × ${t-1}（${t} 倍送扣掉原本的 1 倍）`;
+  $("capBody").classList.toggle("off", !$("capOn").checked);
+  const v = +$("capVal").value||0;
+  $("capHint").textContent = capScope==="member"
+    ? `同一會員所有訂單的加贈點數合計最多 ${v} 點，依檔案中的訂單順序分配到各筆訂單。`
+    : `每一筆訂單的加贈點數最多 ${v} 點。`;
+}
+["unit","times","capVal"].forEach(id => $(id).addEventListener("input", ()=>{updateTexts();saveSettings();}));
+$("capOn").onchange = ()=>{updateTexts();saveSettings();};
+$("capScope").querySelectorAll("button").forEach(b => b.onclick = () => {
+  capScope = b.dataset.v;
+  $("capScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+  updateTexts(); saveSettings();
+});
+
+/* ---------- 核心計算 ---------- */
+function calculate(rows, cfg){
+  const { colOrder, colMember, colCard, colAmt, unit, times, cards, capOn, capVal, capScope } = cfg;
+  const used = {};   // 會員已用掉的封頂額度
+  const orders = rows.map(r => {
+    const card = String(r[colCard] ?? "").trim() || "(空白)";
+    const amt = Number(String(r[colAmt]).replace(/,/g,"")) || 0;
+    const mult = cards[card] ?? 0;
+    const units = Math.max(0, Math.floor(amt / unit));
+    const base = Math.floor(units * mult);           // 既有點數回饋
+    const extraRaw = base * (times - 1);             // 活動點數回饋（封頂前）
+    let extra = extraRaw;
+    if(capOn){
+      if(capScope === "order") extra = Math.min(extraRaw, capVal);
+      else {
+        const m = String(r[colMember]);
+        const left = Math.max(0, capVal - (used[m]||0));
+        extra = Math.min(extraRaw, left);
+        used[m] = (used[m]||0) + extra;
+      }
+    }
+    return { src:r, order:String(r[colOrder]), member:String(r[colMember]), card, amt, mult, units, base, extraRaw, extra, total: base + extra, capped: extra < extraRaw };
+  });
+  // 會員彙總
+  const mm = new Map();
+  orders.forEach(o => {
+    if(!mm.has(o.member)) mm.set(o.member, {member:o.member, card:o.card, orders:0, amt:0, base:0, extraRaw:0, extra:0});
+    const m = mm.get(o.member);
+    m.orders++; m.amt += o.amt; m.base += o.base; m.extraRaw += o.extraRaw; m.extra += o.extra;
+  });
+  const members = [...mm.values()].map(m => ({...m, total:m.base+m.extra, capped:m.extra<m.extraRaw}))
+                   .sort((a,b)=>b.extra-a.extra);
+  // 卡別彙總
+  const cm = {};
+  orders.forEach(o => {
+    const c = cm[o.card] ||= {card:o.card, mult:o.mult, orders:0, members:new Set(), amt:0, base:0, extraRaw:0, extra:0};
+    c.orders++; c.members.add(o.member); c.amt+=o.amt; c.base+=o.base; c.extraRaw+=o.extraRaw; c.extra+=o.extra;
+  });
+  const byCard = Object.values(cm).map(c=>({...c, members:c.members.size})).sort((a,b)=>a.card.localeCompare(b.card));
+  const sum = k => orders.reduce((s,o)=>s+o[k],0);
+  return { orders, members, byCard, totals:{
+    orders:orders.length, members:members.length, amt:sum("amt"), base:sum("base"),
+    extraRaw:sum("extraRaw"), extra:sum("extra"), total:sum("total"),
+    cappedMembers:members.filter(m=>m.capped).length, cappedOrders:orders.filter(o=>o.capped).length,
+    zeroOrders:orders.filter(o=>o.base===0).length
+  }};
+}
+
+function getCfg(){
+  return {
+    colOrder:$("colOrder").value, colMember:$("colMember").value, colCard:$("colCard").value, colAmt:$("colAmt").value,
+    unit:+$("unit").value||50, times:Math.max(1,+$("times").value||1), cards:{...cardMult},
+    capOn:$("capOn").checked, capVal:+$("capVal").value||0, capScope
+  };
+}
+
+$("runBtn").onclick = () => {
+  if(!rows.length) return;
+  const cfg = getCfg();
+  lastResult = { ...calculate(rows, cfg), cfg };
+  renderResult();
+};
+
+/* ---------- 顯示結果 ---------- */
+let view = "card", q = "";
+const fmt = n => Number(n).toLocaleString("zh-TW");
+
+function renderResult(){
+  const {totals:t, cfg} = lastResult;
+  const capText = cfg.capOn ? `封頂 ${fmt(cfg.capVal)} 點／${cfg.capScope==="member"?"每位會員":"每筆訂單"}` : "未設封頂";
+  $("result").innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="v">${fmt(t.orders)}</div><div class="k">訂單數</div></div>
+      <div class="stat"><div class="v">${fmt(t.members)}</div><div class="k">會員數</div></div>
+      <div class="stat"><div class="v">${fmt(t.base)}</div><div class="k">既有點數回饋（原本 1 倍）</div></div>
+      <div class="stat main"><div class="v">${fmt(t.extra)}</div><div class="k">最終加贈點數（需額外發放）</div></div>
+      <div class="stat"><div class="v">${fmt(t.total)}</div><div class="k">點數 ${cfg.times} 倍送總計</div></div>
+      ${cfg.capOn ? `<div class="stat warn"><div class="v">${fmt(t.extraRaw - t.extra)}</div><div class="k">封頂省下 ${fmt(t.extraRaw-t.extra)} 點，${fmt(cfg.capScope==="member"?t.cappedMembers:t.cappedOrders)} ${cfg.capScope==="member"?"位會員":"筆訂單"}被封頂</div></div>`:""}
+    </div>
+    <section class="box">
+      <div class="toolbar">
+        <div class="tabs" id="tabs">
+          <button data-v="card">卡別彙總</button>
+          <button data-v="member">會員彙總</button>
+          <button data-v="order">訂單明細</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="search" id="search" placeholder="搜尋會員編號或訂單號碼" value="${esc(q)}">
+          <button class="btn" id="dlBtn">下載 Excel</button>
+        </div>
+      </div>
+      <p class="hint" style="margin:0 0 10px">規則：每滿 $${cfg.unit} 為 1 單位 × 卡別倍率 × ${cfg.times} 倍送；${capText}。${t.zeroOrders?`有 ${fmt(t.zeroOrders)} 筆訂單未達門檻或卡別倍率為 0，點數為 0。`:""}</p>
+      <div class="tablewrap" id="tableArea"></div>
+    </section>`;
+  $("tabs").querySelectorAll("button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.v===view);
+    b.onclick = ()=>{ view=b.dataset.v; renderResult(); };
+  });
+  $("search").oninput = e => { q = e.target.value.trim(); renderTable(); };
+  $("search").style.display = view==="card" ? "none" : "";
+  $("dlBtn").onclick = exportXlsx;
+  renderTable();
+}
+
+function renderTable(){
+  const {orders, members, byCard, cfg} = lastResult;
+  const T = cfg.times, capCol = cfg.capOn;
+  let html = "";
+  if(view==="card"){
+    html = `<table class="data"><tr><th>卡別</th><th class="n">倍率</th><th class="n">訂單數</th><th class="n">會員數</th><th class="n">計點金額</th><th class="n">既有點數</th>${capCol?'<th class="n">加贈（封頂前）</th>':""}<th class="n">最終加贈</th><th class="n">${T}倍送總計</th></tr>` +
+      byCard.map(c=>`<tr><td>${esc(c.card)}</td><td class="n">${c.mult}</td><td class="n">${fmt(c.orders)}</td><td class="n">${fmt(c.members)}</td><td class="n">${fmt(c.amt)}</td><td class="n">${fmt(c.base)}</td>${capCol?`<td class="n">${fmt(c.extraRaw)}</td>`:""}<td class="n"><b>${fmt(c.extra)}</b></td><td class="n">${fmt(c.base+c.extra)}</td></tr>`).join("") + "</table>";
+  } else if(view==="member"){
+    const list = members.filter(m=>!q || m.member.includes(q));
+    html = `<table class="data"><tr><th>會員編號</th><th>卡別</th><th class="n">訂單數</th><th class="n">計點金額</th><th class="n">既有點數</th>${capCol?'<th class="n">加贈（封頂前）</th>':""}<th class="n">最終加贈</th><th class="n">${T}倍送總計</th></tr>` +
+      list.slice(0,500).map(m=>`<tr class="${m.capped?"capped":""}"><td>${esc(m.member)} ${m.capped?'<span class="tag">封頂</span>':""}</td><td>${esc(m.card)}</td><td class="n">${m.orders}</td><td class="n">${fmt(m.amt)}</td><td class="n">${fmt(m.base)}</td>${capCol?`<td class="n">${fmt(m.extraRaw)}</td>`:""}<td class="n"><b>${fmt(m.extra)}</b></td><td class="n">${fmt(m.total)}</td></tr>`).join("") + "</table>" + more(list.length);
+  } else {
+    const list = orders.filter(o=>!q || o.member.includes(q) || o.order.includes(q));
+    html = `<table class="data"><tr><th>訂單號碼</th><th>會員編號</th><th>卡別</th><th class="n">計點金額</th><th class="n">基本點數</th><th class="n">既有點數回饋</th>${capCol?'<th class="n">活動點數（封頂前）</th>':""}<th class="n">最終點數回饋</th><th class="n">${T}倍送總計</th></tr>` +
+      list.slice(0,500).map(o=>`<tr class="${o.capped?"capped":""}"><td>${esc(o.order)}</td><td>${esc(o.member)}</td><td>${esc(o.card)}</td><td class="n">${fmt(o.amt)}</td><td class="n">${o.mult}</td><td class="n">${fmt(o.base)}</td>${capCol?`<td class="n">${fmt(o.extraRaw)}</td>`:""}<td class="n"><b>${fmt(o.extra)}</b></td><td class="n">${fmt(o.total)}</td></tr>`).join("") + "</table>" + more(list.length);
+  }
+  $("tableArea").innerHTML = html;
+}
+const more = n => n>500 ? `<div class="hint" style="padding:8px 10px">畫面只顯示前 500 筆（共 ${fmt(n)} 筆），完整資料請下載 Excel。</div>` : (n===0?`<div class="empty" style="padding:30px">找不到符合的資料</div>`:"");
+
+/* ---------- 匯出 ---------- */
+function exportXlsx(){
+  const {orders, members, byCard, totals:t, cfg} = lastResult;
+  const T = cfg.times;
+  const keep = headers.filter(h => !OLD_CALC.test(h));
+  const orderSheet = orders.map(o => {
+    const row = {}; keep.forEach(h => row[h] = o.src[h]);
+    row["基本點數"] = o.mult; row["既有點數回饋"] = o.base;
+    if(cfg.capOn) row["活動點數回饋(封頂前)"] = o.extraRaw;
+    row["最終點數回饋"] = o.extra; row[`點數${T}倍送總計`] = o.total;
+    if(cfg.capOn) row["是否封頂"] = o.capped ? "Y" : "";
+    return row;
+  });
+  const memberSheet = members.map(m => {
+    const row = {"會員編號":m.member, "會員卡別":m.card, "訂單數":m.orders, "計點金額":m.amt, "既有點數回饋":m.base};
+    if(cfg.capOn) row["活動點數回饋(封頂前)"] = m.extraRaw;
+    row["最終點數回饋"] = m.extra; row[`點數${T}倍送總計`] = m.total;
+    if(cfg.capOn) row["是否封頂"] = m.capped ? "Y" : "";
+    return row;
+  });
+  const cardSheet = byCard.map(c => ({"會員卡別":c.card, "倍率":c.mult, "訂單數":c.orders, "會員數":c.members, "計點金額":c.amt, "既有點數回饋":c.base, ...(cfg.capOn?{"活動點數回饋(封頂前)":c.extraRaw}:{}), "最終點數回饋":c.extra, [`點數${T}倍送總計`]:c.base+c.extra}));
+  const settings = [
+    ["項目","設定"],
+    ["計點金額欄位", cfg.colAmt],
+    ["每滿多少元為 1 單位", cfg.unit],
+    ["活動倍數", `${T} 倍送（加贈 = 既有 × ${T-1}）`],
+    ...Object.entries(cfg.cards).filter(([c])=>byCard.some(b=>b.card===c)).map(([c,v])=>[`卡別倍率：${c}`, v]),
+    ["加贈點數封頂", cfg.capOn ? `${cfg.capVal} 點／${cfg.capScope==="member"?"每位會員":"每筆訂單"}` : "未啟用"],
+    [],
+    ["訂單數", t.orders], ["會員數", t.members], ["既有點數回饋合計", t.base],
+    ...(cfg.capOn?[["活動點數回饋(封頂前)合計", t.extraRaw]]:[]),
+    ["最終點數回饋合計（需額外發放）", t.extra], [`點數${T}倍送總計`, t.total]
+  ];
+  const wb = XLSX.utils.book_new();
+  const add = (name, ws, widths) => { if(widths) ws["!cols"] = widths.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb, ws, name); };
+  add("設定與總計", XLSX.utils.aoa_to_sheet(settings), [30,32]);
+  add("卡別彙總", XLSX.utils.json_to_sheet(cardSheet));
+  add("會員彙總", XLSX.utils.json_to_sheet(memberSheet), [14,10,8,10,12,18,12,14,8]);
+  add("訂單明細", XLSX.utils.json_to_sheet(orderSheet));
+  XLSX.writeFile(wb, `${fileBase||"點數換算"}_點數換算結果.xlsx`);
+}
+
+function setMsg(t, err){ $("msg").textContent = t; $("msg").className = "msg" + (err?" err":""); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ---------- 初始化 ---------- */
+loadSettings();
+$("capScope").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.v===capScope));
+buildCardTable(); updateTexts();
+</script>
+</body>
+</html>
