@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>封閉式行銷成效回填工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#EEF2EF; --surface:#FFFFFF; --sunken:#F5F8F6;
+    --ink:#16241C; --muted:#5B6B62; --line:#CFD9D2; --grid:#DCE4DE;
+    --accent:#1D6B45; --accent-ink:#FFFFFF; --accent-soft:#DDEFE4;
+    --err:#B3261E; --err-soft:#FBE4E1;
+    --warn:#955300; --warn-soft:#FBEFD9;
+    --info:#2B5A86; --info-soft:#E1ECF7;
+    --sans:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+    color-scheme: light;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#111814; --surface:#18211C; --sunken:#141C17;
+      --ink:#E2EAE5; --muted:#9AAAA1; --line:#2E3A33; --grid:#222C26;
+      --accent:#5FC08D; --accent-ink:#0E1A13; --accent-soft:#1D3327;
+      --err:#F28B82; --err-soft:#3A1F1C;
+      --warn:#E6AE5C; --warn-soft:#352914;
+      --info:#8DB8E3; --info-soft:#1B2A39;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#111814; --surface:#18211C; --sunken:#141C17;
+    --ink:#E2EAE5; --muted:#9AAAA1; --line:#2E3A33; --grid:#222C26;
+    --accent:#5FC08D; --accent-ink:#0E1A13; --accent-soft:#1D3327;
+    --err:#F28B82; --err-soft:#3A1F1C;
+    --warn:#E6AE5C; --warn-soft:#352914;
+    --info:#8DB8E3; --info-soft:#1B2A39;
+    color-scheme: dark;
+  }
+  *,*::before,*::after{box-sizing:inherit;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:15px; line-height:1.6;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:40px 20px 72px;}
+  header h1{font-size:clamp(26px,4vw,34px);line-height:1.25;margin:0 0 10px;font-weight:700;letter-spacing:.01em;}
+  header p{margin:0;color:var(--muted);max-width:62ch;}
+  .ref{font-family:var(--mono);font-size:.92em;}
+
+  section{margin-top:28px;}
+  .step-title{display:flex;align-items:baseline;gap:10px;font-size:17px;font-weight:700;margin:0 0 12px;}
+  .step-title .n{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:6px;background:var(--ink);color:var(--bg);
+    font-size:13px;font-weight:700;flex:none;transform:translateY(-1px);
+  }
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;}
+
+  .drop{
+    position:relative;border:2px dashed var(--line);border-radius:10px;padding:26px 18px;text-align:center;
+    background:
+      linear-gradient(var(--grid) 1px,transparent 1px) 0 0/100% 26px,
+      linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/90px 100%,
+      var(--sunken);
+    cursor:pointer;transition:border-color .15s;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);}
+  .drop:focus-within{outline:3px solid var(--accent);outline-offset:2px;}
+  .drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
+  .drop strong{font-size:16px;margin-bottom:2px;background:var(--sunken);display:inline-block;padding:0 8px;}
+  .drop span{color:var(--muted);font-size:13.5px;background:var(--sunken);padding:0 8px;}
+  .slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;}
+  @media (max-width:720px){.slots{grid-template-columns:1fr;}}
+  .slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--surface);min-height:92px;position:relative;}
+  .slot .role{font-size:13px;color:var(--muted);padding-right:22px;}
+  .slot .role b{color:var(--ink);font-weight:500;}
+  .slot .fname{margin-top:6px;font-size:13.5px;word-break:break-all;}
+  .slot .meta{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .slot.filled{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent);}
+  .slot .empty{margin-top:6px;font-size:13.5px;color:var(--muted);}
+  .slot button.x{
+    position:absolute;top:8px;right:8px;border:none;background:transparent;color:var(--muted);
+    font-size:18px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:4px;
+  }
+  .slot button.x:hover{background:var(--sunken);color:var(--ink);}
+  .notice{margin-top:12px;font-size:13.5px;padding:10px 12px;border-radius:8px;display:none;}
+  .notice.show{display:block;}
+  .notice.err{background:var(--err-soft);color:var(--err);}
+  .notice.ok{background:var(--accent-soft);color:var(--accent);}
+
+  .opts{display:grid;gap:14px;}
+  .opt{display:flex;gap:12px;align-items:flex-start;}
+  .opt input{width:18px;height:18px;margin-top:3px;accent-color:var(--accent);flex:none;}
+  .opt label{cursor:pointer;}
+  .opt .d{display:block;color:var(--muted);font-size:13px;}
+  .rules{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted);}
+  .rules p{margin:4px 0;}
+
+  .btn{
+    font:inherit;font-weight:700;border:none;border-radius:8px;padding:13px 22px;cursor:pointer;
+    background:var(--accent);color:var(--accent-ink);
+  }
+  .btn:hover{filter:brightness(1.07);}
+  .btn:disabled{background:var(--line);color:var(--muted);cursor:not-allowed;filter:none;}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);}
+  .btn:focus-visible,.chip:focus-visible,.slot button.x:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  .run{width:100%;margin-top:22px;font-size:16px;}
+  .status{margin-top:10px;font-size:13.5px;color:var(--muted);min-height:1.6em;}
+
+  #result{display:none;}
+  #result.show{display:block;}
+  .verdict{border-radius:10px;padding:20px 22px;border:1px solid var(--line);background:var(--surface);}
+  .verdict h2{margin:0 0 4px;font-size:20px;}
+  .verdict p{margin:0;color:var(--muted);font-size:14px;}
+  .verdict.bad{border-color:var(--err);box-shadow:inset 4px 0 0 var(--err);}
+  .verdict.mid{border-color:var(--warn);box-shadow:inset 4px 0 0 var(--warn);}
+  .verdict.good{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent);}
+  .tally{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:14px;}
+  .tally .t b{font-size:18px;margin-right:4px;}
+  .tally .e b{color:var(--err);} .tally .w b{color:var(--warn);} .tally .i b{color:var(--info);}
+  .downloads{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}
+
+  .tbl-wrap{overflow-x:auto;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);}
+  table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px;}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;}
+  thead th{background:var(--sunken);font-weight:500;color:var(--muted);font-size:12.5px;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.low{color:var(--err);font-weight:700;} td.mid{color:var(--warn);font-weight:700;}
+  details.map{margin-top:10px;font-size:13px;}
+  details.map summary{cursor:pointer;color:var(--muted);}
+  .maplist{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 16px;margin:8px 0 0;padding:10px 12px;background:var(--sunken);border-radius:8px;}
+  .maplist div{display:flex;justify-content:space-between;gap:8px;}
+  .maplist .miss{color:var(--warn);}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;}
+  .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+  .issues{list-style:none;margin:12px 0 0;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--surface);max-height:460px;overflow-y:auto;}
+  .issues li{display:grid;grid-template-columns:62px 1fr;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .issues li:last-child{border-bottom:none;}
+  .lv{font-size:12px;font-weight:700;border-radius:4px;padding:1px 0;text-align:center;align-self:start;margin-top:2px;}
+  .lv.fatal,.lv.error{background:var(--err-soft);color:var(--err);}
+  .lv.warn{background:var(--warn-soft);color:var(--warn);}
+  .lv.info{background:var(--info-soft);color:var(--info);}
+  .issues .where{color:var(--muted);font-size:12.5px;}
+  .issues .empty{display:block;color:var(--muted);text-align:center;}
+  .sub{font-size:13px;color:var(--muted);margin:6px 0 0;}
+  footer{margin-top:40px;font-size:12.5px;color:var(--muted);}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>封閉式行銷成效回填工具</h1>
+    <p>把點擊發送統計與封閉式行銷成效統計的數字，回填到各月份設定檔的 SMS／EDM／APP 分頁。回填前後都會自動檢查，有疑慮的地方會列在檢查報告裡。檔案只在你的瀏覽器中處理，不會上傳。</p>
+  </header>
+
+  <section aria-labelledby="s1">
+    <h2 class="step-title" id="s1"><span class="n">1</span>上傳三個檔案</h2>
+    <div class="panel">
+      <div class="drop" id="drop">
+        <input type="file" id="fileInput" accept=".xlsx" multiple aria-label="選擇 Excel 檔案（可複選）">
+        <strong>拖曳檔案到這裡，或點擊選擇</strong><br>
+        <span>可以一次選三個檔案，工具會依頁籤內容自動判斷每個檔案的用途</span>
+      </div>
+      <div class="slots">
+        <div class="slot" id="slot-src1"></div>
+        <div class="slot" id="slot-src2"></div>
+        <div class="slot" id="slot-target"></div>
+      </div>
+      <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 class="step-title" id="s2"><span class="n">2</span>確認寫入方式</h2>
+    <div class="panel">
+      <div class="opts">
+        <div class="opt">
+          <input type="checkbox" id="optOverwrite" checked>
+          <label for="optOverwrite">覆蓋既有數值
+            <span class="d">目標欄位已經有數字時，以這次來源檔的數字為準。每一格被改動的原值與新值都會記錄在檢查報告的「數值異動」。取消勾選則只填空白格。</span>
+          </label>
+        </div>
+        <div class="opt">
+          <input type="checkbox" id="optProtect" checked>
+          <label for="optProtect">保留既有公式
+            <span class="d">目標欄位如果原本是公式，不覆蓋、只記錄在報告裡。APP 的「實際發送數」依規則本來就寫入公式，不受此設定影響。</span>
+          </label>
+        </div>
+      </div>
+      <div class="rules">
+        <p>比對規則：依「活動ID」對應發送統計、依「分群ID」對應成效統計，比對不到的一律掛 0。</p>
+        <p>APP 實際發送數 = 分群人數 − 排除衝突（以公式寫入）。</p>
+        <p>SMS 實際發送數比對不到時，若總金額有比對到則填分群人數；兩者都比對不到則掛 0。</p>
+        <p>欄位依標題文字定位，不限欄位字母；資料中間的總計／小計列（活動ID空白）會自動略過，不會截斷後面的資料。</p>
+      </div>
+    </div>
+    <button class="btn run" id="runBtn" disabled>請先上傳三個檔案</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="result" aria-labelledby="s3">
+    <h2 class="step-title" id="s3"><span class="n">3</span>檢查結果</h2>
+    <div class="verdict" id="verdict"></div>
+
+    <h3 class="step-title" style="font-size:15px;margin-top:24px;">各分頁回填狀況</h3>
+    <div class="tbl-wrap"><table id="sheetTable"></table></div>
+    <p class="sub">比對率低於 50% 會標示顏色：常見原因是來源檔與設定檔不是同一個月份。</p>
+    <div id="maps"></div>
+
+    <h3 class="step-title" style="font-size:15px;margin-top:24px;">問題清單</h3>
+    <div class="chips" id="chips"></div>
+    <ul class="issues" id="issues"></ul>
+    <p class="sub" id="issuesNote"></p>
+  </section>
+
+  <footer>欄位對應、比對不到明細、來源未使用 ID、數值異動與受保護儲存格的完整清單，都在「檢查報告」檔案中。</footer>
+</div>
+
+<script id="core">
+/* ================= FillerCore：純資料處理，不操作畫面 ================= */
+const FillerCore = (function(){
+  'use strict';
+  const L = { FATAL:'fatal', ERROR:'error', WARN:'warn', INFO:'info' };
+  const LEVEL_LABEL = { fatal:'無法執行', error:'錯誤', warn:'警告', info:'提示' };
+  const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+  const SOURCE_SPEC = {
+    send: {
+      EDM: { sheet:'EDM發送', key:'(活動)Campaign代碼', fields:['成功發送次數','信件開啟次數','URL 點擊次數'] },
+      SMS: { sheet:'SMS發送', key:'(活動)Campaign代碼', fields:['成功發送次數'] },
+      APP: { sheet:'APP',     key:'(活動)Campaign代碼', fields:['(活動)Campaign URL 已讀數'] },
+    },
+    perf: {
+      EDM: { sheet:'成效統計edm', key:'分群ID', fields:['總金額','訂單數','購買會員數'] },
+      SMS: { sheet:'成效統計sms', key:'分群ID', fields:['總金額','訂單數','購買會員數'] },
+      APP: { sheet:'成效統計app', key:'分群ID', fields:['總金額','訂單數','購買會員數'] },
+    }
+  };
+  const TARGET_FIELDS = {
+    SMS: { groupSize:['活動組分群人數','分群人數'], sent:['實際發送數'], amt:['總金額'], ord:['訂單數'], buy:['購買會員數'] },
+    EDM: { sent:['實際發送數'], open:['開啟數'], click:['點擊數'], amt:['總金額'], ord:['訂單數'], buy:['購買會員數'] },
+    APP: { groupSize:['分群人數'], conflict:['排除衝突'], sent:['實際發送數'], click:['點擊數'], amt:['總金額'], ord:['訂單數'], buy:['購買會員數'] },
+  };
+  const FIELD_LABEL = { group:'分群ID', groupSize:'分群人數', conflict:'排除衝突', sent:'實際發送數', open:'開啟數', click:'點擊數', amt:'總金額', ord:'訂單數', buy:'購買會員數' };
+
+  /* ---------- 小工具 ---------- */
+  function normHeader(h){
+    if(h===null || h===undefined) return '';
+    return String(h).replace(/[\s\u3000]+/g,'').replace(/（/g,'(').replace(/）/g,')').toLowerCase();
+  }
+  function normKey(v){
+    if(v===null || v===undefined) return null;
+    if(typeof v==='number'){
+      if(!isFinite(v)) return null;
+      if(Math.abs(v-Math.round(v))<1e-9) return String(Math.round(v));
+      return String(v);
+    }
+    let s = String(v).trim();
+    if(s==='') return null;
+    if(/^-?\d+\.0+$/.test(s)) s = s.split('.')[0];
+    if(/^\d+$/.test(s)) s = s.replace(/^0+(?=\d)/,'');   // 0000055533 → 55533
+    return s;
+  }
+  const isIdKey = k => typeof k==='string' && /^\d+$/.test(k);
+  function toNumber(v){
+    if(v===null || v===undefined) return { ok:true, value:null };
+    if(typeof v==='number') return isFinite(v) ? { ok:true, value:v } : { ok:false, value:null };
+    if(typeof v==='boolean') return { ok:false, value:null };
+    let s = String(v).trim();
+    if(s==='') return { ok:true, value:null };
+    s = s.replace(/,/g,'');
+    if(/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s)) return { ok:true, value:parseFloat(s) };
+    return { ok:false, value:null };
+  }
+  function colToNum(s){ let n=0; for(const ch of s) n = n*26 + (ch.charCodeAt(0)-64); return n; }
+  function numToCol(n){ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+  function splitRef(ref){ const m=/^([A-Z]+)(\d+)$/.exec(ref||''); return m ? { col:m[1], row:parseInt(m[2],10) } : null; }
+  const normFormula = s => String(s||'').replace(/^=/,'').replace(/\s+/g,'').replace(/\$/g,'').toUpperCase();
+  function listSample(arr, n){ n=n||10; const a=arr.slice(0,n).join('、'); return arr.length>n ? `${a} 等 ${arr.length} 筆` : a; }
+  function fmtRows(rows){ const a=rows.slice(0,12).join('、'); return rows.length>12 ? `${a} 等 ${rows.length} 列` : a; }
+  function sheetTypeOf(name){
+    const m = /(SMS|EDM|APP)\s*$/i.exec(String(name||''));
+    return m ? m[1].toUpperCase() : null;
+  }
+  function sniff(buf){
+    const u = new Uint8Array(buf, 0, Math.min(8, buf.byteLength));
+    if(u[0]===0x50 && u[1]===0x4B) return 'zip';
+    if(u[0]===0xD0 && u[1]===0xCF && u[2]===0x11 && u[3]===0xE0) return 'cfb';
+    return 'other';
+  }
+  function xmlError(doc){ return doc.getElementsByTagName('parsererror').length>0; }
+  function kids(el, name){ const out=[]; for(const ch of Array.from(el.childNodes)) if(ch.nodeType===1 && ch.localName===name) out.push(ch); return out; }
+  function siText(si){
+    let s='';
+    for(const ch of Array.from(si.childNodes)){
+      if(ch.nodeType!==1) continue;
+      if(ch.localName==='t') s += ch.textContent;
+      else if(ch.localName==='r') for(const t of kids(ch,'t')) s += t.textContent;
+    }
+    return s;
+  }
+
+  /* ---------- 判斷檔案用途 ---------- */
+  function classify(buf){
+    const kind = sniff(buf);
+    if(kind==='cfb') return { role:null, error:'這是舊版 .xls 或有密碼保護的檔案，請用 Excel 另存為 .xlsx（並移除密碼）後再上傳' };
+    if(kind!=='zip') return { role:null, error:'不是有效的 Excel (.xlsx) 檔案' };
+    let wb;
+    try{ wb = XLSX.read(buf, { type:'array', bookSheets:true }); }
+    catch(e){ return { role:null, error:'檔案無法解析：' + e.message }; }
+    const names = wb.SheetNames || [];
+    const n = names.map(normHeader);
+    const isSrc1 = n.includes(normHeader('EDM發送')) || n.includes(normHeader('SMS發送'));
+    const isSrc2 = n.some(x => x.startsWith('成效統計'));
+    const targetSheets = names.filter(x => sheetTypeOf(x));
+    if(isSrc1 && isSrc2) return { role:null, error:'同時含有發送統計與成效統計的頁籤，無法判斷用途' };
+    if(isSrc1) return { role:'src1', sheets:names };
+    if(isSrc2) return { role:'src2', sheets:names };
+    if(targetSheets.length) return { role:'target', sheets:names, targetSheets };
+    return { role:null, error:'無法辨識用途：找不到「EDM發送／SMS發送」、「成效統計」或名稱以 SMS／EDM／APP 結尾的頁籤' };
+  }
+
+  /* ---------- 讀取來源頁籤 ---------- */
+  function readSourceTable(wb, spec, fileLabel, add){
+    const want = normHeader(spec.sheet);
+    const realName = wb.SheetNames.find(x => normHeader(x)===want);
+    if(!realName){
+      add(L.ERROR, fileLabel, `找不到「${spec.sheet}」頁籤，對應欄位這次不回填（不會掛 0，避免蓋掉正確的數字）`);
+      return null;
+    }
+    const scope = `${fileLabel}／${realName}`;
+    const ws = wb.Sheets[realName];
+
+    const errCells = [];
+    for(const addr of Object.keys(ws)){
+      if(addr[0]==='!') continue;
+      const c = ws[addr];
+      if(c && c.t==='e') errCells.push(`${addr}（${c.w || '錯誤值'}）`);
+    }
+    if(errCells.length) add(L.WARN, scope, `有 ${errCells.length} 格是錯誤值，會被當成空白（比對不到則掛 0）：${listSample(errCells,8)}`);
+
+    const aoa = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:true, blankrows:true });
+    const nk = normHeader(spec.key);
+    let hIdx = -1;
+    for(let i=0;i<Math.min(10, aoa.length);i++){
+      if((aoa[i]||[]).some(h => normHeader(h)===nk)){ hIdx=i; break; }
+    }
+    if(hIdx<0){
+      add(L.ERROR, scope, `找不到比對欄位「${spec.key}」，此頁籤無法使用，對應欄位這次不回填`);
+      return null;
+    }
+    const header = aoa[hIdx];
+    const idxOf = label => { const t=normHeader(label); const out=[]; header.forEach((h,i)=>{ if(normHeader(h)===t) out.push(i); }); return out; };
+    const keyIdx = idxOf(spec.key);
+    if(keyIdx.length>1) add(L.WARN, scope, `標題「${spec.key}」出現 ${keyIdx.length} 次，使用第一個`);
+    const fieldIdx = {};
+    const missing = [];
+    for(const f of spec.fields){
+      const ix = idxOf(f);
+      if(!ix.length) missing.push(f); else fieldIdx[f] = ix[0];
+      if(ix.length>1) add(L.WARN, scope, `標題「${f}」出現 ${ix.length} 次，使用第一個`);
+    }
+    if(missing.length) add(L.ERROR, scope, `缺少欄位：${missing.join('、')}，這些欄位這次不回填`);
+
+    const map = new Map();
+    let blankKeyRows = 0;
+    const badKeys=[], dupSame=[], dupDiff=[], badVals=[], negatives=[];
+    for(let r=hIdx+1; r<aoa.length; r++){
+      const row = aoa[r] || [];
+      const rawKey = row[keyIdx[0]];
+      const k = normKey(rawKey);
+      if(k===null){
+        if(row.some((v,i)=> i!==keyIdx[0] && v!==null && v!=='')) blankKeyRows++;
+        continue;
+      }
+      if(!isIdKey(k)){ badKeys.push(`第${r+1}列「${rawKey}」`); continue; }
+      const values = {};
+      for(const f of Object.keys(fieldIdx)){
+        const raw = row[fieldIdx[f]];
+        const n = toNumber(raw);
+        if(!n.ok){ badVals.push(`${k} 的${f}「${raw}」`); values[f]=null; }
+        else { values[f]=n.value; if(n.value!==null && n.value<0) negatives.push(`${k} 的${f}=${n.value}`); }
+      }
+      if(map.has(k)){
+        const prev = map.get(k);
+        const same = Object.keys(values).every(f => prev.values[f]===values[f]);
+        (same ? dupSame : dupDiff).push(`${k}（第${prev.excelRow}、${r+1}列）`);
+        continue;
+      }
+      map.set(k, { values, excelRow:r+1 });
+    }
+    if(blankKeyRows) add(L.INFO, scope, `${blankKeyRows} 列的${spec.key}空白（可能是合計列），已略過`);
+    if(badKeys.length) add(L.WARN, scope, `${spec.key}不是數字，已略過：${listSample(badKeys)}`);
+    if(dupDiff.length) add(L.ERROR, scope, `${spec.key}重複且數字不同，只採用第一筆，請確認哪一筆才正確：${listSample(dupDiff)}`);
+    if(dupSame.length) add(L.INFO, scope, `${spec.key}重複但數字相同，已合併為一筆：${listSample(dupSame)}`);
+    if(badVals.length) add(L.WARN, scope, `數值欄位不是數字，視為空白：${listSample(badVals)}`);
+    if(negatives.length) add(L.WARN, scope, `出現負數，請確認來源是否正確：${listSample(negatives)}`);
+    return { name:realName, scope, keyLabel:spec.key, map, fields:Object.keys(fieldIdx), used:new Set() };
+  }
+
+  function sourceSanityChecks(tables, add){
+    const edm = tables.send.EDM;
+    if(edm && edm.fields.includes('信件開啟次數') && edm.fields.includes('成功發送次數')){
+      const odd=[];
+      for(const [k,rec] of edm.map){
+        const s=rec.values['成功發送次數'], o=rec.values['信件開啟次數'];
+        if(s!==null && o!==null && o>s) odd.push(`${k}（發送 ${s}／開啟 ${o}）`);
+      }
+      if(odd.length) add(L.WARN, edm.scope, `開啟數大於成功發送數，請確認：${listSample(odd)}`);
+    }
+    for(const t of ['EDM','SMS','APP']){
+      const p = tables.perf[t];
+      if(!p) continue;
+      const buyGtOrd=[], ordNoAmt=[], amtNoOrd=[];
+      for(const [k,rec] of p.map){
+        const a=rec.values['總金額'], o=rec.values['訂單數'], b=rec.values['購買會員數'];
+        if(b!==null && b!==undefined && o!==null && o!==undefined && b>o) buyGtOrd.push(k);
+        if(o!==null && o!==undefined && o>0 && (a===null || a===undefined || a<=0)) ordNoAmt.push(k);
+        if(a!==null && a!==undefined && a>0 && (o===null || o===undefined || o===0)) amtNoOrd.push(k);
+      }
+      if(buyGtOrd.length) add(L.WARN, p.scope, `購買會員數大於訂單數（邏輯上不可能），分群ID：${listSample(buyGtOrd)}`);
+      if(ordNoAmt.length) add(L.WARN, p.scope, `有訂單但總金額為 0 或空白，分群ID：${listSample(ordNoAmt)}`);
+      if(amtNoOrd.length) add(L.WARN, p.scope, `有總金額但訂單數為 0 或空白，分群ID：${listSample(amtNoOrd)}`);
+    }
+  }
+
+  /* ---------- 目標分頁的 XML 包裝 ---------- */
+  class Sheet{
+    constructor(doc, sst){
+      this.doc = doc; this.sst = sst;
+      this.sd = doc.getElementsByTagName('sheetData')[0];
+      if(!this.sd) throw new Error('找不到 sheetData');
+      this.ns = this.sd.namespaceURI;
+      this.rows = new Map(); this.cache = new Map(); this.maxRow = 0;
+      for(const rEl of kids(this.sd,'row')){
+        const n = parseInt(rEl.getAttribute('r'),10);
+        if(!n) throw new Error('分頁中有未標示列號的資料列，格式不支援');
+        this.rows.set(n, rEl);
+        if(n>this.maxRow) this.maxRow = n;
+      }
+    }
+    cells(r){
+      if(this.cache.has(r)) return this.cache.get(r);
+      const m = new Map();
+      const rEl = this.rows.get(r);
+      if(rEl){
+        for(const c of kids(rEl,'c')){
+          const sp = splitRef(c.getAttribute('r'));
+          if(!sp) throw new Error(`第 ${r} 列有未標示位置的儲存格，格式不支援`);
+          m.set(sp.col, c);
+        }
+      }
+      this.cache.set(r, m);
+      return m;
+    }
+    info(r, col){
+      const c = this.cells(r).get(col);
+      if(!c) return { exists:false, text:null, f:null, isError:false };
+      const t = c.getAttribute('t');
+      const fEl = kids(c,'f')[0] || null, vEl = kids(c,'v')[0] || null, isEl = kids(c,'is')[0] || null;
+      let text = null;
+      if(t==='s'){ if(vEl){ const i=parseInt(vEl.textContent,10); text = (this.sst[i]!==undefined) ? this.sst[i] : null; } }
+      else if(t==='inlineStr'){ text = isEl ? siText(isEl) : null; }
+      else text = vEl ? vEl.textContent : null;
+      let f = null;
+      if(fEl){
+        const shared = fEl.getAttribute('t')==='shared', master = shared && fEl.hasAttribute('ref');
+        let ftext = fEl.textContent;
+        if(shared && !master) ftext = this.sharedFormulaAt(fEl.getAttribute('si'), r, col);
+        f = { text:ftext, shared, master, array:fEl.getAttribute('t')==='array' };
+      }
+      return { exists:true, t, text, f, isError: t==='e' };
+    }
+    // 共用公式（Excel 往下填滿產生）的從屬格沒有公式文字，依起始格推算實際公式
+    sharedFormulaAt(si, r, col){
+      if(!this._sm){
+        this._sm = new Map();
+        for(const f of Array.from(this.doc.getElementsByTagName('f'))){
+          if(f.getAttribute('t')==='shared' && f.hasAttribute('ref')){
+            const sp = splitRef(f.parentNode.getAttribute('r'));
+            if(sp) this._sm.set(f.getAttribute('si'), { text:f.textContent, col:colToNum(sp.col), row:sp.row });
+          }
+        }
+      }
+      const m = this._sm.get(si);
+      if(!m) return '';
+      const dr = r - m.row, dc = colToNum(col) - m.col;
+      return m.text.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)(?![\w(])/g, (all, cAbs, c, rAbs, rn) =>
+        (cAbs ? cAbs + c : numToCol(colToNum(c) + dc)) + (rAbs ? rAbs + rn : String(parseInt(rn,10) + dr)));
+    }
+    isBlank(r, col){ const i=this.info(r,col); return !i.exists || i.text===null || String(i.text).trim()===''; }
+    rowHasContent(r, exceptCol){
+      for(const [col,c] of this.cells(r)){
+        if(col===exceptCol) continue;
+        for(const ch of Array.from(c.childNodes)) if(ch.nodeType===1 && ch.textContent.trim()!=='') return true;
+      }
+      return false;
+    }
+    ensureRow(r){
+      if(this.rows.has(r)) return this.rows.get(r);
+      const el = this.doc.createElementNS(this.ns,'row');
+      el.setAttribute('r', String(r));
+      let before=null, beforeN=Infinity;
+      for(const [n,rEl] of this.rows) if(n>r && n<beforeN){ beforeN=n; before=rEl; }
+      if(before) this.sd.insertBefore(el, before); else this.sd.appendChild(el);
+      this.rows.set(r, el); this.cache.delete(r);
+      if(r>this.maxRow) this.maxRow = r;
+      return el;
+    }
+    write(r, col, value, formula){
+      const rEl = this.ensureRow(r);
+      rEl.removeAttribute('spans');
+      const cells = this.cells(r);
+      let c = cells.get(col);
+      if(!c){
+        c = this.doc.createElementNS(this.ns,'c');
+        c.setAttribute('r', col + r);
+        const target = colToNum(col);
+        let before=null, bn=Infinity;
+        for(const [k,el] of cells){ const kn=colToNum(k); if(kn>target && kn<bn){ bn=kn; before=el; } }
+        if(before) rEl.insertBefore(c, before); else rEl.appendChild(c);
+        cells.set(col, c);
+      }
+      c.removeAttribute('t'); c.removeAttribute('cm'); c.removeAttribute('vm');
+      while(c.firstChild) c.removeChild(c.firstChild);
+      if(formula){ const f=this.doc.createElementNS(this.ns,'f'); f.textContent=formula; c.appendChild(f); }
+      const v = this.doc.createElementNS(this.ns,'v'); v.textContent = String(value); c.appendChild(v);
+    }
+  }
+
+  async function loadSharedStrings(zip, parser){
+    const f = zip.file('xl/sharedStrings.xml');
+    if(!f) return [];
+    const doc = parser.parseFromString(await f.async('string'), 'application/xml');
+    if(xmlError(doc)) throw new Error('共用字串表（sharedStrings）解析失敗');
+    return Array.from(doc.getElementsByTagName('si')).map(siText);
+  }
+
+  /* ---------- 處理一個目標分頁 ---------- */
+  function processSheet(sheet, t, tables, opt, add, result){
+    const scope = t.name, type = t.type;
+    const idNorm = normHeader('活動ID');
+
+    let headerRow = 0;
+    for(let r=1; r<=5 && !headerRow; r++){
+      for(const [col] of sheet.cells(r)){ if(normHeader(sheet.info(r,col).text)===idNorm){ headerRow=r; break; } }
+    }
+    if(!headerRow){ add(L.ERROR, scope, '找不到「活動ID」標題欄位，此分頁已略過，沒有任何修改'); return null; }
+
+    const hmap = new Map();
+    for(const [col] of sheet.cells(headerRow)){
+      const k = normHeader(sheet.info(headerRow,col).text);
+      if(!k) continue;
+      if(!hmap.has(k)) hmap.set(k, []);
+      hmap.get(k).push(colToNum(col));
+    }
+    for(const v of hmap.values()) v.sort((a,b)=>a-b);
+
+    // 活動ID 若出現多次，選「非公式的數字最多」的那一欄當作真正的資料欄
+    const idCands = hmap.get(idNorm);
+    let anchor = idCands[0];
+    if(idCands.length>1){
+      let best=-1;
+      for(const cn of idCands){
+        const col = numToCol(cn); let score=0;
+        for(let r=headerRow+1; r<=Math.min(sheet.maxRow, headerRow+80); r++){
+          const inf = sheet.info(r,col);
+          if(inf.exists && !inf.f && inf.text!==null && /^\d+(\.0+)?$/.test(String(inf.text).trim())) score++;
+        }
+        if(score>best){ best=score; anchor=cn; }
+      }
+      add(L.INFO, scope, `標題「活動ID」出現 ${idCands.length} 次（${idCands.map(numToCol).join('、')} 欄），已自動選用資料欄 ${numToCol(anchor)}`);
+    }
+    const keyCol = numToCol(anchor);
+
+    // 欄位只在活動ID右側找，避免抓到前段用公式鏡射的顯示欄
+    const resolve = labels => {
+      for(const lb of labels){
+        const c = hmap.get(normHeader(lb));
+        if(c){ const after = c.filter(x=>x>anchor); if(after.length) return { col:numToCol(after[0]) }; }
+      }
+      for(const lb of labels){
+        const c = hmap.get(normHeader(lb));
+        if(c && c.length) return { col:null, onlyBefore:c.map(numToCol) };
+      }
+      return { col:null };
+    };
+    const spec = Object.assign({ group:['分群ID'] }, TARGET_FIELDS[type]);
+    const cols = {}; const mapping = [];
+    const usedCols = new Map();
+    for(const fk of Object.keys(spec)){
+      const res = resolve(spec[fk]);
+      if(res.col && usedCols.has(res.col)){
+        add(L.ERROR, scope, `「${FIELD_LABEL[fk]}」與「${FIELD_LABEL[usedCols.get(res.col)]}」對應到同一欄 ${res.col}，為避免寫錯已略過「${FIELD_LABEL[fk]}」`);
+        mapping.push({ field:FIELD_LABEL[fk], col:null, note:'欄位衝突' });
+        continue;
+      }
+      if(res.col){ cols[fk]=res.col; usedCols.set(res.col, fk); mapping.push({ field:FIELD_LABEL[fk], col:res.col }); }
+      else if(res.onlyBefore){
+        add(L.WARN, scope, `「${FIELD_LABEL[fk]}」只出現在活動ID左側的顯示區（${res.onlyBefore.join('、')} 欄），為避免覆蓋公式，此欄位不回填`);
+        mapping.push({ field:FIELD_LABEL[fk], col:null, note:'只在顯示區' });
+      } else {
+        add(L.WARN, scope, `找不到標題「${spec[fk].join('／')}」，此欄位不回填`);
+        mapping.push({ field:FIELD_LABEL[fk], col:null, note:'找不到' });
+      }
+    }
+    mapping.unshift({ field:'活動ID', col:keyCol });
+
+    const sendTab = tables.send[type], perfTab = tables.perf[type];
+    if(!cols.group && perfTab) add(L.ERROR, scope, '找不到「分群ID」，成效欄位（總金額／訂單數／購買會員數）這次不回填');
+
+    // 找資料範圍：允許中間夾少量空白（總計列），連續空白達門檻才算結束
+    let lastData = headerRow, blankRun = 0;
+    for(let r=headerRow+1; r<=sheet.maxRow; r++){
+      if(sheet.isBlank(r,keyCol)){ if(++blankRun >= opt.blankRunThreshold) break; }
+      else { blankRun=0; lastData=r; }
+    }
+    const tail=[];
+    for(let r=lastData+1; r<=sheet.maxRow; r++) if(!sheet.isBlank(r,keyCol)) tail.push(r);
+    if(tail.length) add(L.INFO, scope, `資料區到第 ${lastData} 列結束；更下方的第 ${fmtRows(tail)} 列另有內容（研判是合計區），沒有處理。如果那些其實是活動資料，請刪掉中間的空白列再執行一次`);
+
+    // 預先比對：某份來源整頁都比對不到時，不寫入該來源的欄位，避免把設定檔原有的數字全部蓋成 0
+    let preRows=0, preSend=0, prePerf=0;
+    for(let r=headerRow+1; r<=lastData; r++){
+      if(sheet.isBlank(r,keyCol)) continue;
+      const kInf = sheet.info(r,keyCol); if(kInf.isError) continue;
+      const key = normKey(kInf.text); if(!isIdKey(key)) continue;
+      preRows++;
+      if(sendTab && sendTab.map.has(key)) preSend++;
+      if(perfTab && cols.group){ const g=sheet.info(r,cols.group); const gk = g.isError ? null : normKey(g.text); if(isIdKey(gk) && perfTab.map.has(gk)) prePerf++; }
+    }
+    const sendT = (sendTab && (preSend>0 || preRows===0)) ? sendTab : null;
+    const perfT = (perfTab && cols.group && (prePerf>0 || preRows===0)) ? perfTab : null;
+    if(sendTab && !sendT) add(L.ERROR, scope, `發送統計完全比對不到（0／${preRows}）。為避免把設定檔原有的數字蓋成 0，這次不寫入發送相關欄位。請確認來源檔和設定檔是不是同一個月份`);
+    if(perfTab && cols.group && !perfT) add(L.ERROR, scope, `成效統計完全比對不到（0／${preRows}）。為避免把設定檔原有的數字蓋成 0，這次不寫入成效相關欄位。請確認來源檔和設定檔是不是同一個月份`);
+
+    const st = { sheet:scope, type, headerRow, lastData, dataRows:0, sendMatched:0, perfMatched:0, written:0, overwritten:0, unchanged:0, protected:0, kept:0, fallback:0, skippedTotals:[], mapping, sendAvailable:!!sendT, perfAvailable:!!perfT };
+    if(preRows>0 && !sendT && !perfT){
+      add(L.ERROR, scope, '兩份來源都比對不到，此分頁完全沒有修改');
+      st.dataRows = preRows; st._written = [];
+      return st;
+    }
+    const written = [];
+    const seen = new Map();
+    const rowWarn = { groupBlank:[], groupBad:[], gsBad:[], sentGtGs:[], negSent:[], badNum:[], sentUndecided:[] };
+
+    const readNum = (r, fk) => {
+      const col = cols[fk]; if(!col) return null;
+      const inf = sheet.info(r,col);
+      if(!inf.exists || inf.text===null || String(inf.text).trim()==='') return null;
+      if(inf.isError){ rowWarn.badNum.push(`${col}${r}（${inf.text}）`); return null; }
+      const n = toNumber(inf.text);
+      if(!n.ok){ rowWarn.badNum.push(`${col}${r}「${inf.text}」`); return null; }
+      return n.value;
+    };
+
+    const put = (fk, r, value, formula) => {
+      const col = cols[fk]; if(!col) return;
+      let v = (value===null || value===undefined) ? 0 : value;
+      if(typeof v!=='number' || !isFinite(v)){ add(L.WARN, scope, `${FIELD_LABEL[fk]}的結果不是有效數字，改填 0`, col+r); v=0; }
+      const inf = sheet.info(r,col);
+      if(inf.f && formula && normFormula(inf.f.text)===normFormula(formula)){ st.unchanged++; return; }
+      if(inf.f){
+        if(inf.f.master){
+          add(L.ERROR, scope, `${FIELD_LABEL[fk]}這格是「共用公式」的起始格，覆蓋會讓整組公式損壞，已略過未寫入`, col+r);
+          st.protected++; result.protectedCells.push({ sheet:scope, ref:col+r, field:FIELD_LABEL[fk], formula:'='+inf.f.text, reason:'共用公式起始格' });
+          return;
+        }
+        if(!formula && opt.protectFormulas){
+          st.protected++; result.protectedCells.push({ sheet:scope, ref:col+r, field:FIELD_LABEL[fk], formula:'='+(inf.f.text||'（共用公式）'), reason:'保留既有公式' });
+          return;
+        }
+        const same = formula && normFormula(inf.f.text)===normFormula(formula);
+        if(!same){ st.overwritten++; result.changes.push({ sheet:scope, ref:col+r, field:FIELD_LABEL[fk], old:'='+(inf.f.text||'（共用公式）'), now: formula ? '='+formula : v }); }
+      } else if(inf.exists && inf.text!==null && String(inf.text).trim()!==''){
+        const o = toNumber(inf.text);
+        const same = !formula && o.ok && o.value!==null && Math.abs(o.value - v) < 1e-9;
+        if(!same){
+          if(!opt.overwrite){ st.kept++; return; }
+          st.overwritten++; result.changes.push({ sheet:scope, ref:col+r, field:FIELD_LABEL[fk], old:inf.text, now: formula ? '='+formula : v });
+        }
+      }
+      sheet.write(r, col, v, formula);
+      written.push({ ref:col+r, value:v, formula:formula||null });
+      st.written++;
+    };
+
+    for(let r=headerRow+1; r<=lastData; r++){
+      if(sheet.isBlank(r,keyCol)){ if(sheet.rowHasContent(r,keyCol)) st.skippedTotals.push(r); continue; }
+      const kInf = sheet.info(r,keyCol);
+      if(kInf.isError){ add(L.WARN, scope, `活動ID 是錯誤值 ${kInf.text}，此列略過`, keyCol+r); continue; }
+      const key = normKey(kInf.text);
+      if(!isIdKey(key)){ add(L.WARN, scope, `活動ID「${kInf.text}」不是數字，此列略過（若是備註列可忽略）`, keyCol+r); continue; }
+      if(seen.has(key)) add(L.WARN, scope, `活動ID ${key} 和第 ${seen.get(key)} 列重複，兩列會填入相同的發送數，加總時請留意重複計算`, keyCol+r);
+      else seen.set(key, r);
+      st.dataRows++;
+
+      let gKey = null, gRaw = null;
+      if(cols.group){
+        const g = sheet.info(r, cols.group);
+        gRaw = g.text;
+        if(g.isError) rowWarn.groupBad.push(`${cols.group}${r}（${g.text}）`);
+        else {
+          const gk = normKey(g.text);
+          if(gk===null) rowWarn.groupBlank.push(r);
+          else if(!isIdKey(gk)) rowWarn.groupBad.push(`${cols.group}${r}「${g.text}」`);
+          else gKey = gk;
+        }
+      }
+      const sendRec = sendT ? sendT.map.get(key) : undefined;
+      if(sendRec){ sendT.used.add(key); st.sendMatched++; }
+      const perfRec = (perfT && gKey) ? perfT.map.get(gKey) : undefined;
+      if(perfRec){ perfT.used.add(gKey); st.perfMatched++; }
+      const pv = f => perfRec ? perfRec.values[f] : null;
+      const sv = f => sendRec ? sendRec.values[f] : null;
+      let sendNote = !sendTab ? '來源缺頁籤（未回填）' : !sendT ? '整頁比對不到（未回填）' : (sendRec ? '比對到' : '比對不到→掛0');
+
+      if(type==='SMS'){
+        if(cols.sent && sendT){
+          const raw = sv('成功發送次數');
+          let aj;
+          if(raw!==null && raw!==undefined) aj = raw;
+          else if(!st.perfAvailable){ aj = null; }
+          else if(pv('總金額')!==null && pv('總金額')!==undefined){
+            const gs = readNum(r,'groupSize');
+            if(gs===null){ rowWarn.gsBad.push(`${cols.groupSize||'分群人數'}${r}`); aj = 0; }
+            else { aj = gs; st.fallback++; sendNote = '比對不到→改填分群人數'; }
+          } else aj = 0;
+          if(aj!==null){
+            const gs = readNum(r,'groupSize');
+            if(gs!==null && aj>gs) rowWarn.sentGtGs.push(`${cols.sent}${r}（${aj}＞${gs}）`);
+            put('sent', r, aj);
+          } else if(!sendRec){
+            rowWarn.sentUndecided.push(`${cols.sent}${r}`);
+          }
+        }
+      }
+      if(type==='EDM' && sendT){
+        put('sent', r, sv('成功發送次數'));
+        put('open', r, sv('信件開啟次數'));
+        put('click', r, sv('URL 點擊次數'));
+      }
+      if(type==='APP'){
+        if(cols.sent && cols.groupSize){
+          const gs = readNum(r,'groupSize');
+          const cf = cols.conflict ? readNum(r,'conflict') : null;
+          const formula = cols.conflict ? `${cols.groupSize}${r}-${cols.conflict}${r}` : `${cols.groupSize}${r}`;
+          const cached = (gs||0) - (cf||0);
+          if(gs===null) rowWarn.gsBad.push(`${cols.groupSize}${r}`);
+          if(cached<0) rowWarn.negSent.push(`${cols.sent}${r}（${cached}）`);
+          put('sent', r, cached, formula);
+        }
+        if(sendT) put('click', r, sv('(活動)Campaign URL 已讀數'));
+      }
+      if(st.perfAvailable){
+        put('amt', r, pv('總金額'));
+        put('ord', r, pv('訂單數'));
+        put('buy', r, pv('購買會員數'));
+      }
+
+      const perfNote = !perfTab || !cols.group ? '來源或欄位缺少（未回填）' : !perfT ? '整頁比對不到（未回填）' : (perfRec ? '比對到' : (gKey ? '比對不到→掛0' : '分群ID空白或無效→掛0'));
+      if(sendNote!=='比對到' || perfNote!=='比對到'){
+        result.unmatched.push({ sheet:scope, row:r, id:key, group: gKey || (gRaw===null ? '' : String(gRaw)), send:sendNote, perf:perfNote });
+      }
+    }
+
+    if(type==='APP' && cols.sent && !cols.groupSize) add(L.WARN, scope, '找不到「分群人數」，APP 的實際發送數無法計算，這次不回填');
+    if(type==='APP' && cols.sent && cols.groupSize && !cols.conflict) add(L.WARN, scope, '找不到「排除衝突」，實際發送數公式改為直接等於分群人數');
+    if(st.skippedTotals.length) add(L.INFO, scope, `略過 ${st.skippedTotals.length} 列總計／小計列（活動ID空白但有其他內容）：第 ${fmtRows(st.skippedTotals)} 列`);
+    if(rowWarn.groupBlank.length) add(L.WARN, scope, `分群ID空白，成效欄位掛 0：第 ${fmtRows(rowWarn.groupBlank)} 列`);
+    if(rowWarn.groupBad.length) add(L.WARN, scope, `分群ID不是有效數字，成效欄位掛 0：${listSample(rowWarn.groupBad)}`);
+    if(rowWarn.gsBad.length) add(L.WARN, scope, `分群人數空白或不是數字：${listSample(rowWarn.gsBad)}`);
+    if(rowWarn.sentGtGs.length) add(L.WARN, scope, `實際發送數大於分群人數，請確認：${listSample(rowWarn.sentGtGs)}`);
+    if(rowWarn.negSent.length) add(L.WARN, scope, `排除衝突大於分群人數，實際發送數變成負數：${listSample(rowWarn.negSent)}`);
+    if(rowWarn.badNum.length) add(L.WARN, scope, `讀取到非數字的內容，視為空白：${listSample(rowWarn.badNum)}`);
+    if(rowWarn.sentUndecided.length) add(L.WARN, scope, `發送數比對不到，且成效統計無法使用，無法判斷是否改填分群人數，這些格未寫入：${listSample(rowWarn.sentUndecided)}`);
+
+    const rateCheck = (matched, label, available) => {
+      if(!available || st.dataRows===0) return;
+      const rate = matched / st.dataRows;
+      if(rate<0.5) add(L.WARN, scope, `${label}只比對到 ${matched}／${st.dataRows} 列（${Math.round(rate*100)}%），偏低，請確認來源檔月份與內容`);
+    };
+    rateCheck(st.sendMatched, '發送統計', st.sendAvailable);
+    rateCheck(st.perfMatched, '成效統計', st.perfAvailable);
+    if(st.dataRows===0) add(L.WARN, scope, '沒有找到任何可回填的活動列');
+    if(st.protected) add(L.WARN, scope, `${st.protected} 格原本是公式，已保留沒有覆蓋（清單見報告「受保護儲存格」）`);
+    if(st.overwritten) add(L.INFO, scope, `更新了 ${st.overwritten} 格原本已有的內容（原值與新值見報告「數值異動」）`);
+    if(st.kept) add(L.INFO, scope, `${st.kept} 格原本已有數值，依設定保留未覆蓋`);
+    if(st.unchanged) add(L.INFO, scope, `${st.unchanged} 格原本的公式已經和規則一致，保持不動`);
+    st._written = written;
+    return st;
+  }
+
+  /* ---------- 主流程 ---------- */
+  async function run({ src1, src2, target, targetName, options, onProgress }){
+    const opt = Object.assign({ overwrite:true, protectFormulas:true, blankRunThreshold:3 }, options||{});
+    const issues = [];
+    const add = (level, scope, msg, ref) => issues.push({ level, scope:scope||'', ref:ref||'', msg });
+    const tick = async m => { if(onProgress) onProgress(m); await new Promise(res=>setTimeout(res,0)); };
+    const result = { issues, sheets:[], unmatched:[], unusedSource:[], changes:[], protectedCells:[], output:null, outputName:null, verified:false, verifiedCells:0 };
+
+    await tick('讀取來源檔…');
+    let wb1, wb2;
+    try{ wb1 = XLSX.read(src1, { type:'array' }); } catch(e){ add(L.FATAL,'點擊發送統計','檔案無法解析：'+e.message); return result; }
+    try{ wb2 = XLSX.read(src2, { type:'array' }); } catch(e){ add(L.FATAL,'成效統計','檔案無法解析：'+e.message); return result; }
+    const tables = { send:{}, perf:{} };
+    for(const t of ['EDM','SMS','APP']){
+      tables.send[t] = readSourceTable(wb1, SOURCE_SPEC.send[t], '點擊發送統計', add);
+      tables.perf[t] = readSourceTable(wb2, SOURCE_SPEC.perf[t], '成效統計', add);
+    }
+    sourceSanityChecks(tables, add);
+
+    await tick('讀取目標設定檔…');
+    if(sniff(target)!=='zip'){ add(L.FATAL,'目標設定檔','不是有效的 .xlsx 檔案'); return result; }
+    let zip;
+    try{ zip = await JSZip.loadAsync(target); } catch(e){ add(L.FATAL,'目標設定檔','檔案無法開啟：'+e.message); return result; }
+    if(!zip.file('xl/workbook.xml')){ add(L.FATAL,'目標設定檔','找不到活頁簿結構（xl/workbook.xml），檔案可能損壞'); return result; }
+    const parser = new DOMParser(), ser = new XMLSerializer();
+    let sst;
+    try{ sst = await loadSharedStrings(zip, parser); } catch(e){ add(L.FATAL,'目標設定檔', e.message); return result; }
+    const wbXml = parser.parseFromString(await zip.file('xl/workbook.xml').async('string'), 'application/xml');
+    const relFile = zip.file('xl/_rels/workbook.xml.rels');
+    if(xmlError(wbXml) || !relFile){ add(L.FATAL,'目標設定檔','活頁簿結構解析失敗，檔案可能損壞'); return result; }
+    const relsXml = parser.parseFromString(await relFile.async('string'), 'application/xml');
+    const relMap = {};
+    for(const r of Array.from(relsXml.getElementsByTagName('Relationship'))) relMap[r.getAttribute('Id')] = r.getAttribute('Target');
+    const sheetEls = Array.from(wbXml.getElementsByTagName('sheet'));
+    const originalNames = sheetEls.map(e => e.getAttribute('name'));
+    const targets = [];
+    for(const el of sheetEls){
+      const name = el.getAttribute('name'), type = sheetTypeOf(name);
+      if(!type) continue;
+      const rid = el.getAttribute('r:id') || el.getAttributeNS(REL_NS,'id');
+      const tg = relMap[rid];
+      if(!tg){ add(L.ERROR, name, '找不到此分頁的檔案位置，已略過'); continue; }
+      const path = tg.startsWith('/') ? tg.slice(1) : 'xl/' + tg.replace(/^\.\//,'');
+      if(!zip.file(path)){ add(L.ERROR, name, '分頁內容遺失，已略過'); continue; }
+      if(el.getAttribute('state')==='hidden' || el.getAttribute('state')==='veryHidden') add(L.INFO, name, '這是隱藏分頁，仍會一併回填');
+      targets.push({ name, type, path });
+    }
+    if(!targets.length){ add(L.FATAL,'目標設定檔','找不到名稱以 SMS／EDM／APP 結尾的分頁'); return result; }
+
+    const touchedTypes = new Set();
+    for(const t of targets){
+      await tick(`處理 ${t.name}…`);
+      try{
+        const doc = parser.parseFromString(await zip.file(t.path).async('string'), 'application/xml');
+        if(xmlError(doc)){ add(L.ERROR, t.name, '分頁內容解析失敗，此分頁沒有修改'); continue; }
+        const sheet = new Sheet(doc, sst);
+        const st = processSheet(sheet, t, tables, opt, add, result);
+        if(!st) continue;
+        touchedTypes.add(t.type);
+        if(st.written>0) zip.file(t.path, ser.serializeToString(doc));
+        result.sheets.push(st);
+      }catch(e){
+        add(L.ERROR, t.name, '處理時發生未預期的錯誤，此分頁沒有修改：' + e.message);
+      }
+    }
+
+    for(const t of touchedTypes){
+      for(const kind of ['send','perf']){
+        const tb = tables[kind][t];
+        if(!tb) continue;
+        const unused = [...tb.map.keys()].filter(k => !tb.used.has(k));
+        for(const k of unused) result.unusedSource.push({ source:tb.scope, keyLabel:tb.keyLabel, id:k });
+        if(unused.length) add(L.WARN, tb.scope, `有 ${unused.length} 筆${tb.keyLabel}在設定檔中找不到對應的活動：${listSample(unused,8)}。可能是設定檔漏列了活動，或來源檔包含其他月份的資料`);
+      }
+    }
+
+    const totalWritten = result.sheets.reduce((s,x)=>s+x.written,0);
+    if(!totalWritten){ add(L.FATAL,'目標設定檔','沒有任何儲存格被寫入，未產生結果檔'); return result; }
+
+    await tick('整理輸出檔…');
+    // 移除 calcChain，避免 Excel 開檔時跳出「修復」提示；並要求開檔時重新計算
+    const ccPath = Object.keys(zip.files).find(p => /^xl\/calcChain\.xml$/i.test(p));
+    if(ccPath){
+      zip.remove(ccPath);
+      const ctFile = zip.file('[Content_Types].xml');
+      if(ctFile){
+        const ct = parser.parseFromString(await ctFile.async('string'), 'application/xml');
+        for(const o of Array.from(ct.getElementsByTagName('Override'))) if(/calcChain\.xml$/i.test(o.getAttribute('PartName')||'')) o.parentNode.removeChild(o);
+        zip.file('[Content_Types].xml', ser.serializeToString(ct));
+      }
+      for(const r of Array.from(relsXml.getElementsByTagName('Relationship'))) if(/calcChain\.xml$/i.test(r.getAttribute('Target')||'')) r.parentNode.removeChild(r);
+      zip.file('xl/_rels/workbook.xml.rels', ser.serializeToString(relsXml));
+    }
+    const calcPr = wbXml.getElementsByTagName('calcPr')[0];
+    if(calcPr){ calcPr.setAttribute('fullCalcOnLoad','1'); zip.file('xl/workbook.xml', ser.serializeToString(wbXml)); }
+
+    let out;
+    try{ out = await zip.generateAsync({ type:'uint8array', compression:'DEFLATE', compressionOptions:{ level:6 } }); }
+    catch(e){ add(L.FATAL,'輸出檔','產生檔案失敗：' + e.message); return result; }
+
+    // 重新開啟輸出檔，逐格核對寫入的內容
+    await tick('重新開啟輸出檔逐格核對…');
+    try{
+      const names = result.sheets.filter(s=>s.written>0).map(s=>s.sheet);
+      const chk = XLSX.read(out, { type:'array', cellFormula:true, sheets:names });
+      const all = XLSX.read(out, { type:'array', bookSheets:true });
+      if(all.SheetNames.length!==originalNames.length || all.SheetNames.some((n,i)=>n!==originalNames[i])){
+        add(L.ERROR,'輸出檔','分頁清單和原檔不一致，請勿使用此結果');
+      }
+      let bad=0, total=0;
+      for(const s of result.sheets){
+        const ws = chk.Sheets[s.sheet];
+        for(const w of s._written){
+          total++;
+          const c = ws && ws[w.ref];
+          const okV = c && typeof c.v==='number' && Math.abs(c.v - w.value) < 1e-9;
+          const okF = !w.formula || (c && c.f && normFormula(c.f)===normFormula(w.formula));
+          if(!okV || !okF){ bad++; if(bad<=10) add(L.ERROR, s.sheet, '核對失敗：寫入後重新讀回的內容不一致', w.ref); }
+        }
+      }
+      if(bad>10) add(L.ERROR,'輸出檔',`另有 ${bad-10} 格核對失敗`);
+      result.verified = bad===0; result.verifiedCells = total;
+    }catch(e){
+      add(L.ERROR,'輸出檔','輸出檔無法重新開啟核對：' + e.message);
+    }
+
+    result.output = out;
+    const base = String(targetName||'設定檔').replace(/\.xlsx$/i,'').replace(/_已回填$/,'');
+    result.outputName = `${base}_已回填.xlsx`;
+    await tick('完成');
+    return result;
+  }
+
+  /* ---------- 檢查報告 ---------- */
+  function buildReport(result){
+    const wb = XLSX.utils.book_new();
+    const addSheet = (name, rows, widths) => {
+      const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ 說明:'（無）' }]);
+      if(widths) ws['!cols'] = widths.map(w=>({ wch:w }));
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    addSheet('摘要', result.sheets.map(s=>({
+      分頁:s.sheet, 活動列數:s.dataRows, 掃描至列:s.lastData,
+      發送比對到:s.sendAvailable ? s.sendMatched : '來源缺',
+      成效比對到:s.perfAvailable ? s.perfMatched : '來源缺',
+      SMS改填分群人數:s.type==='SMS' ? s.fallback : '',
+      寫入格數:s.written, 更新既有:s.overwritten, 保留公式:s.protected,
+      略過總計列:s.skippedTotals.join('、'),
+      欄位對應:s.mapping.map(m=>`${m.field}=${m.col||'（'+(m.note||'無')+'）'}`).join('；')
+    })), [12,10,10,11,11,15,10,10,10,20,90]);
+    addSheet('問題清單', result.issues.map(i=>({ 等級:LEVEL_LABEL[i.level], 範圍:i.scope, 儲存格:i.ref, 說明:i.msg })), [8,28,10,110]);
+    addSheet('比對不到明細', result.unmatched.map(u=>({ 分頁:u.sheet, 列:u.row, 活動ID:u.id, 分群ID:u.group, 發送統計:u.send, 成效統計:u.perf })), [12,6,10,10,22,22]);
+    addSheet('來源未使用ID', result.unusedSource.map(u=>({ 來源頁籤:u.source, 欄位:u.keyLabel, ID:u.id })), [34,20,12]);
+    addSheet('數值異動', result.changes.map(c=>({ 分頁:c.sheet, 儲存格:c.ref, 欄位:c.field, 原值:c.old, 新值:c.now })), [12,10,12,16,16]);
+    addSheet('受保護儲存格', result.protectedCells.map(p=>({ 分頁:p.sheet, 儲存格:p.ref, 欄位:p.field, 原公式:p.formula, 原因:p.reason })), [12,10,12,30,16]);
+    return new Uint8Array(XLSX.write(wb, { type:'array', bookType:'xlsx' }));
+  }
+
+  return { classify, run, buildReport, LEVEL_LABEL };
+})();
+</script>
+
+<script>
+/* ================= 畫面 ================= */
+(function(){
+  const ROLES = {
+    src1:{ slot:'slot-src1', label:'點擊發送統計', hint:'含 EDM發送／SMS發送／APP' },
+    src2:{ slot:'slot-src2', label:'封閉式行銷成效統計', hint:'含 成效統計edm／sms／app' },
+    target:{ slot:'slot-target', label:'目標設定檔', hint:'任何月份，分頁名稱以 SMS／EDM／APP 結尾' },
+  };
+  const files = { src1:null, src2:null, target:null };
+  let running = false, filter = 'all';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function notice(msg, kind){
+    const n = $('notice');
+    n.className = 'notice show ' + (kind||'ok');
+    n.innerHTML = msg;
+  }
+  function renderSlots(){
+    for(const [role,cfg] of Object.entries(ROLES)){
+      const el = $(cfg.slot), f = files[role];
+      el.classList.toggle('filled', !!f);
+      el.innerHTML = `<div class="role"><b>${cfg.label}</b>（${cfg.hint}）</div>` + (f
+        ? `<div class="fname">${esc(f.file.name)}</div><div class="meta">${esc(f.detail)}</div><button class="x" aria-label="移除${cfg.label}" data-role="${role}">×</button>`
+        : `<div class="empty">尚未上傳</div>`);
+    }
+    document.querySelectorAll('.slot button.x').forEach(b => b.addEventListener('click', () => { files[b.dataset.role]=null; clearResult(); renderSlots(); updateRun(); }));
+  }
+  function updateRun(){
+    const ready = files.src1 && files.src2 && files.target;
+    const btn = $('runBtn');
+    btn.disabled = !ready || running;
+    btn.textContent = running ? '處理中…' : (ready ? '開始檢查並回填' : `請先上傳三個檔案（還缺：${['src1','src2','target'].filter(r=>!files[r]).map(r=>ROLES[r].label).join('、')}）`);
+  }
+  function clearResult(){ $('result').classList.remove('show'); $('status').textContent=''; }
+
+  async function addFiles(list){
+    const msgs = []; let hasErr = false;
+    for(const file of list){
+      if(!/\.xlsx$/i.test(file.name)){
+        hasErr = true;
+        msgs.push(`<b>${esc(file.name)}</b>：${/\.xls$/i.test(file.name) ? '這是舊版 .xls，請用 Excel 另存為 .xlsx 再上傳' : '只接受 .xlsx 檔案'}`);
+        continue;
+      }
+      let buf;
+      try{ buf = await file.arrayBuffer(); } catch(e){ hasErr = true; msgs.push(`<b>${esc(file.name)}</b>：無法讀取檔案`); continue; }
+      const c = FillerCore.classify(buf);
+      if(!c.role){ hasErr = true; msgs.push(`<b>${esc(file.name)}</b>：${esc(c.error)}`); continue; }
+      const replaced = files[c.role] && files[c.role].file.name!==file.name ? files[c.role].file.name : null;
+      const detail = c.role==='target'
+        ? `偵測到 ${c.targetSheets.length} 個回填分頁：${c.targetSheets.join('、')}`
+        : `頁籤：${c.sheets.join('、')}`;
+      files[c.role] = { file, buf, detail };
+      msgs.push(`<b>${esc(file.name)}</b> 判斷為「${ROLES[c.role].label}」${replaced ? `（取代原本的 ${esc(replaced)}）` : ''}`);
+    }
+    if(msgs.length) notice(msgs.join('<br>'), hasErr ? 'err' : 'ok');
+    clearResult(); renderSlots(); updateRun();
+  }
+
+  const drop = $('drop'), input = $('fileInput');
+  input.addEventListener('change', () => { if(input.files.length) addFiles(Array.from(input.files)); input.value=''; });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if(e.dataTransfer.files.length) addFiles(Array.from(e.dataTransfer.files)); });
+  $('optOverwrite').addEventListener('change', clearResult);
+  $('optProtect').addEventListener('change', clearResult);
+
+  $('runBtn').addEventListener('click', async () => {
+    if(running) return;
+    running = true; updateRun(); clearResult();
+    try{
+      const res = await FillerCore.run({
+        src1: files.src1.buf.slice(0), src2: files.src2.buf.slice(0), target: files.target.buf.slice(0),
+        targetName: files.target.file.name,
+        options:{ overwrite:$('optOverwrite').checked, protectFormulas:$('optProtect').checked },
+        onProgress: m => { $('status').textContent = m; }
+      });
+      renderResult(res);
+      $('status').textContent = '';
+    }catch(e){
+      $('status').textContent = '發生未預期的錯誤：' + e.message;
+      console.error(e);
+    }
+    running = false; updateRun();
+  });
+
+  function renderResult(res){
+    const cnt = { fatal:0, error:0, warn:0, info:0 };
+    res.issues.forEach(i => cnt[i.level]++);
+    const v = $('verdict');
+    let cls, title, desc;
+    if(cnt.fatal){ cls='bad'; title='無法完成回填'; desc='請依下方問題清單修正後再執行一次，這次沒有產生結果檔。'; }
+    else if(cnt.error){ cls='bad'; title=`已回填，但有 ${cnt.error} 項錯誤需要處理`; desc='結果檔可以下載，但請先看過紅色的錯誤項目再使用。'; }
+    else if(cnt.warn){ cls='mid'; title=`已回填，有 ${cnt.warn} 項需要留意`; desc='數字已寫入，建議瀏覽一下黃色的警告項目。'; }
+    else { cls='good'; title='回填完成，沒有發現問題'; desc='所有檢查都通過。'; }
+    const verifyLine = res.output ? (res.verified ? `已重新開啟輸出檔逐格核對，${res.verifiedCells.toLocaleString()} 格寫入內容全部一致。` : '輸出檔核對未通過，請勿直接使用。') : '';
+    v.className = 'verdict ' + cls;
+    v.innerHTML = `<h2>${title}</h2><p>${desc} ${verifyLine}</p>
+      <div class="tally">
+        ${cnt.fatal ? `<span class="t e"><b>${cnt.fatal}</b>無法執行</span>` : ''}
+        <span class="t e"><b>${cnt.error}</b>錯誤</span>
+        <span class="t w"><b>${cnt.warn}</b>警告</span>
+        <span class="t i"><b>${cnt.info}</b>提示</span>
+      </div>
+      <div class="downloads">
+        <button class="btn" id="dlOut" ${res.output ? '' : 'disabled'}>下載回填結果${cnt.error ? '（含錯誤）' : ''}</button>
+        <button class="btn ghost" id="dlReport">下載檢查報告</button>
+      </div>
+      <p class="sub" id="dlMsg" role="status" aria-live="polite"></p>`;
+    $('dlOut').addEventListener('click', () => res.output && save(res.outputName, res.output));
+    $('dlReport').addEventListener('click', () => {
+      const base = res.outputName ? res.outputName.replace(/_已回填\.xlsx$/,'') : '回填';
+      save(`${base}_檢查報告.xlsx`, FillerCore.buildReport(res));
+    });
+
+    const pct = (m, n) => n ? Math.round(m/n*100) : 0;
+    const rateCell = (m, n, avail) => {
+      if(!avail) return '<td>來源缺</td>';
+      const p = pct(m,n);
+      return `<td class="${n && p===0 ? 'low' : (n && p<50 ? 'mid' : '')}">${m}／${n}（${p}%）</td>`;
+    };
+    $('sheetTable').innerHTML = `<thead><tr><th>分頁</th><th>活動列</th><th>發送比對</th><th>成效比對</th><th>寫入格數</th><th>更新既有</th><th>保留公式</th><th>略過總計列</th></tr></thead><tbody>` +
+      (res.sheets.length ? res.sheets.map(s => `<tr><td>${esc(s.sheet)}</td><td>${s.dataRows}</td>${rateCell(s.sendMatched,s.dataRows,s.sendAvailable)}${rateCell(s.perfMatched,s.dataRows,s.perfAvailable)}<td>${s.written}</td><td>${s.overwritten}</td><td>${s.protected}</td><td>${s.skippedTotals.length}</td></tr>`).join('')
+        : `<tr><td colspan="8">沒有處理任何分頁</td></tr>`) + '</tbody>';
+    $('maps').innerHTML = res.sheets.map(s => `<details class="map"><summary>${esc(s.sheet)} 的欄位對應（標題在第 ${s.headerRow} 列，掃描到第 ${s.lastData} 列）</summary><div class="maplist">${
+      s.mapping.map(m => `<div><span>${esc(m.field)}</span>${m.col ? `<span class="ref">${m.col}</span>` : `<span class="miss">${esc(m.note||'無')}</span>`}</div>`).join('')}</div></details>`).join('');
+
+    const chips = [['all','全部',res.issues.length],['error','錯誤',cnt.fatal+cnt.error],['warn','警告',cnt.warn],['info','提示',cnt.info]];
+    filter = (cnt.fatal+cnt.error) ? 'error' : (cnt.warn ? 'warn' : 'all');
+    $('chips').innerHTML = chips.map(([k,l,n]) => `<button class="chip" data-f="${k}" aria-pressed="${k===filter}">${l} ${n}</button>`).join('');
+    document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+      filter = b.dataset.f;
+      document.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.f===filter)));
+      renderIssues(res);
+    }));
+    renderIssues(res);
+    $('result').classList.add('show');
+    $('result').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block:'start' });
+  }
+
+  function renderIssues(res){
+    const order = { fatal:0, error:1, warn:2, info:3 };
+    const list = res.issues
+      .filter(i => filter==='all' || i.level===filter || (filter==='error' && i.level==='fatal'))
+      .sort((a,b) => order[a.level]-order[b.level]);
+    const MAX = 300;
+    $('issues').innerHTML = list.length
+      ? list.slice(0,MAX).map(i => `<li><span class="lv ${i.level}">${FillerCore.LEVEL_LABEL[i.level]}</span><div><div class="where">${esc(i.scope)}${i.ref ? ` <span class="ref">${esc(i.ref)}</span>` : ''}</div>${esc(i.msg)}</div></li>`).join('')
+      : `<li><span class="empty" style="grid-column:1/-1">這個分類沒有項目</span></li>`;
+    $('issuesNote').textContent = list.length > MAX ? `只顯示前 ${MAX} 項，完整清單請下載檢查報告。` : '';
+  }
+
+  async function save(filename, data){
+    const msg = $('dlMsg');
+    msg.textContent = '';
+    let dl = null;
+    try{ if(window.claude && typeof window.claude.use === 'function') dl = await window.claude.use('downloads'); }catch(e){ dl = null; }
+    if(dl){
+      try{ await dl.save({ filename, data: new Blob([data]) }); msg.textContent = `已下載 ${filename}`; }
+      catch(e){
+        const code = e && e.code;
+        msg.textContent = code==='declined' ? '已取消下載' : code==='rate_limited' ? '下載視窗已經開著，請稍候再試' : '這裡無法下載檔案：' + ((e && e.message) || code || '未知原因');
+      }
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([data], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    msg.textContent = `已下載 ${filename}`;
+  }
+
+  renderSlots(); updateRun();
+  if(typeof XLSX==='undefined' || typeof JSZip==='undefined'){
+    notice('Excel 處理元件載入失敗，請確認網路連線後重新整理頁面', 'err');
+    $('runBtn').disabled = true;
+  }
+})();
+</script>
+</body>
+</html>
