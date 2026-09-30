@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EDM 製作工具｜整合版</title>
+<style>
+  :root{
+    --bg:#eceef1; --panel:#ffffff; --ink:#1d2530; --muted:#6b7482; --line:#dde1e7;
+    --tool:#2f5d8a; --tool-soft:#e7eef6; --danger:#b3261e; --danger-soft:#fbeaea; --ok:#2e7d4f; --ok-soft:#e6f3ec;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13px;}
+  button,input,select,textarea{font-family:inherit;font-size:12px;color:var(--ink);}
+  button{cursor:pointer;}
+  :focus-visible{outline:2px solid var(--tool);outline-offset:1px;}
+
+  .app{display:grid;grid-template-columns:470px 1fr;height:100vh;}
+  .editor{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  .editor-scroll{overflow-y:auto;padding:16px 16px 8px;flex:1;}
+  .preview{display:flex;flex-direction:column;min-height:0;min-width:0;}
+  @media (max-width:1000px){
+    .app{grid-template-columns:1fr;height:auto;}
+    .editor{border-right:none;border-bottom:1px solid var(--line);}
+    .editor-scroll{max-height:none;}
+    .preview iframe{height:80vh !important;}
+  }
+
+  h1{font-size:16px;margin:0 0 2px;}
+  .lead{color:var(--muted);font-size:12px;line-height:1.6;margin:0 0 14px;}
+
+  .panel{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;background:#fbfbfc;}
+  .panel > .ph{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;cursor:pointer;user-select:none;font-weight:700;font-size:13px;}
+  .panel > .ph .caret{color:var(--muted);font-weight:400;transition:transform .15s;}
+  .panel.open > .ph .caret{transform:rotate(90deg);}
+  .panel > .pb{display:none;padding:0 12px 12px;}
+  .panel.open > .pb{display:block;}
+
+  label.l{display:block;font-size:11px;color:var(--muted);margin:8px 0 3px;}
+  input[type=text],input[type=number],select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;}
+  textarea{resize:vertical;min-height:32px;line-height:1.5;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px;}
+  .chk{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:8px;cursor:pointer;}
+  .hint{font-size:11px;color:var(--muted);line-height:1.6;margin:6px 0 0;}
+
+  .btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 10px;}
+  .btn:hover{background:#f3f5f8;}
+  .btn.primary{background:var(--tool);border-color:var(--tool);color:#fff;font-weight:700;}
+  .btn.primary:hover{background:#264d73;}
+  .btn.ghost{border-style:dashed;color:var(--tool);background:var(--tool-soft);border-color:#b9cbe0;width:100%;margin-top:6px;font-weight:700;}
+  .btn.icon{padding:3px 7px;font-size:12px;line-height:1.2;}
+  .btn.danger{color:var(--danger);}
+  .btn.danger:hover{background:var(--danger-soft);}
+
+  .mytpl{border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:6px 0 8px;margin:10px 0 4px;}
+  .mytpl .add-row .btn{flex:1;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .color-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 10px;margin-top:6px;}
+  .color-item{display:flex;align-items:center;gap:6px;font-size:11px;color:#444;}
+  .color-item input{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:4px;background:#fff;cursor:pointer;}
+
+  /* 區塊卡 */
+  .blk{border:1px solid var(--line);border-radius:8px;background:#fff;margin-bottom:8px;}
+  .blk.hidden-blk{opacity:.55;}
+  .blk-h{display:flex;align-items:center;gap:6px;padding:7px 8px;}
+  .blk-title{flex:1;min-width:0;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .blk-title .type{font-size:11px;background:var(--tool-soft);color:var(--tool);padding:2px 6px;border-radius:4px;white-space:nowrap;}
+  .blk-title .sum{font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .blk-b{display:none;padding:0 10px 10px;border-top:1px solid var(--line);}
+  .blk.open .blk-b{display:block;}
+  .gap-ctrl{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);}
+  .gap-ctrl input[type=range]{flex:1;}
+  .gap-ctrl b{color:var(--ink);width:36px;text-align:right;}
+
+  .item{border:1px solid var(--line);border-radius:6px;padding:8px;margin-top:8px;background:#fafbfc;}
+  .item-h{display:flex;align-items:center;gap:6px;}
+  .item-h .thumb{width:40px;height:40px;border-radius:4px;border:1px solid var(--line);object-fit:contain;background:#fff;flex-shrink:0;}
+  .item-h .nm{flex:1;min-width:0;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+  .item-b{display:none;}
+  .item.open .item-b{display:block;}
+  .add-row{display:flex;gap:6px;margin-top:4px;}
+  .add-row select{flex:1;}
+
+  .bottom-bar{border-top:1px solid var(--line);padding:10px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#fff;}
+  .bottom-bar .btn{padding:9px;}
+
+  /* 預覽 */
+  .ptool{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);background:#f6f7f9;flex-wrap:wrap;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .seg button{border:none;background:#fff;padding:6px 12px;}
+  .seg button.on{background:var(--tool);color:#fff;}
+  .status{margin-left:auto;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;cursor:pointer;}
+  .status.ok{background:var(--ok-soft);color:var(--ok);}
+  .status.bad{background:var(--danger-soft);color:var(--danger);}
+  .status.warn{background:#fff4e0;color:#8a5a00;}
+  .issues{display:none;background:#fff;border-bottom:1px solid var(--line);padding:8px 16px;max-height:170px;overflow:auto;font-size:12px;line-height:1.7;}
+  .issues.show{display:block;}
+  .issues .e{color:var(--danger);} .issues .w{color:#8a5a00;}
+  .stage{flex:1;overflow:auto;display:flex;justify-content:center;padding:18px;background:repeating-linear-gradient(45deg,#e9ebee 0 10px,#e4e7ea 10px 20px);}
+  .stage iframe{border:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);height:100%;min-height:600px;transition:width .2s;}
+
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:999px;font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;}
+  .toast.show{opacity:1;}
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="editor">
+    <div class="editor-scroll" id="editorScroll">
+      <h1>EDM 製作工具｜整合版</h1>
+      <p class="lead">六種範本共用同一套區塊系統：套範本 → 改內容 → 看右側預覽 → 通過發信檢查後複製 HTML。右側預覽就是實際匯出的 HTML，所見即所得。</p>
+
+      <div class="panel open" id="pTpl">
+        <div class="ph">① 範本與主題 <span class="caret">▸</span></div>
+        <div class="pb">
+          <label class="l">從範本開始（會取代目前內容）</label>
+          <div class="add-row">
+            <select id="tplSelect"></select>
+            <button class="btn primary" id="tplApply">套用</button>
+          </div>
+          <div class="mytpl">
+            <div class="add-row">
+              <button class="btn" id="tplSave">★ 把目前內容存成我的範本</button>
+              <button class="btn danger" id="tplDel" disabled>刪除選取的我的範本</button>
+            </div>
+            <div class="add-row">
+              <button class="btn" id="tplUpBtn">⬆ 上傳範本（.html／.json）</button>
+              <button class="btn" id="tplLibDl">⬇ 下載範本庫</button>
+            </div>
+            <button class="btn primary" id="tplToolDl" style="width:100%;margin-top:6px;">⬇ 下載內建我的範本的新版工具</button>
+            <input type="file" id="tplUpFile" accept=".json,.html,.htm" multiple hidden>
+            <p class="hint" id="myTplCount"></p>
+            <p class="hint">存好或上傳後，範本會出現在上方選單的「★ 我的範本」。按「下載內建我的範本的新版工具」後，用新檔取代舊檔，下次打開就會自動帶著這些範本。上傳 .html 時，工具會自動拆成可編輯的區塊，請套用後檢查一次。</p>
+          </div>
+          <label class="l">配色主題（只換顏色與標題樣式，不動內容）</label>
+          <div class="add-row">
+            <select id="themeSelect"></select>
+            <button class="btn" id="themeApply">套用配色</button>
+          </div>
+          <div class="color-grid" id="colorGrid"></div>
+          <div class="row2">
+            <div><label class="l">區塊標題樣式</label>
+              <select id="titleStyle"><option value="line">左對齊＋底線</option><option value="center">置中＋短線</option><option value="serif">襯線字＋細線</option></select></div>
+            <div><label class="l">「看更多」樣式</label>
+              <select id="moreStyle"><option value="pill">圓角小按鈕</option><option value="text">文字連結 ➤</option></select></div>
+            <div><label class="l">信件寬度</label>
+              <select id="width"><option value="600">600px</option><option value="640">640px</option><option value="680">680px</option></select></div>
+            <div><label class="l">信件圓角 px</label><input type="number" id="radius" min="0" max="24"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="pMeta">
+        <div class="ph">② 信件設定 <span class="caret">▸</span></div>
+        <div class="pb">
+          <label class="l">HTML 標題（title）</label><input type="text" id="mTitle">
+          <label class="l">預覽文字（收件匣摘要，會隱藏在信件中）</label><textarea id="mPre"></textarea>
+          <label class="chk"><input type="checkbox" id="mUtmOn"> 匯出時自動加上 UTM 參數</label>
+          <div id="utmBox">
+            <label class="l">UTM 參數</label><input type="text" id="mUtm" placeholder="utm_source=eslite&utm_medium=epaper&utm_campaign=xxx">
+            <label class="chk"><input type="checkbox" id="mUtmSeq"> 自動編號 utm_content=1、2、3…</label>
+          </div>
+          <p class="hint">若發信系統（SAP）會自動加 UTM，這裡保持關閉即可，避免重複。</p>
+        </div>
+      </div>
+
+      <div class="panel open" id="pBlocks">
+        <div class="ph">③ 區塊（由上到下排列） <span class="caret">▸</span></div>
+        <div class="pb">
+          <div id="blockList"></div>
+          <div class="add-row">
+            <select id="addType"></select>
+            <button class="btn primary" id="addBlock">＋ 新增區塊</button>
+          </div>
+          <p class="hint">每個區塊都可以：顯示／隱藏、調整「上方間距」、上下移動、複製、刪除。清單型區塊支援「批次貼上」從 Excel 複製的欄位。</p>
+        </div>
+      </div>
+
+      <div class="panel" id="pImport">
+        <div class="ph">④ 從既有 EDM 匯入商品 <span class="caret">▸</span></div>
+        <div class="pb">
+          <p class="hint" style="margin-top:0;">貼上任何一份 EDM 或活動頁的 HTML 原始碼，工具會抓出「有圖片的連結」，連同圖片、標題、價格一起變成新區塊，再手動微調即可。</p>
+          <textarea id="impSrc" rows="4" placeholder="貼上 HTML 原始碼…"></textarea>
+          <div class="row2">
+            <div><label class="l">匯入成哪種區塊</label><select id="impType"></select></div>
+            <div><label class="chk" style="margin-top:26px;"><input type="checkbox" id="impStripUtm" checked> 移除連結上的舊 UTM</label></div>
+          </div>
+          <button class="btn ghost" id="impBtn">匯入為新區塊</button>
+          <p class="hint" id="impMsg"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn primary" id="copyBtn">複製 HTML</button>
+      <button class="btn primary" id="dlBtn">下載 .html</button>
+      <button class="btn" id="saveBtn">儲存專案（.json）</button>
+      <button class="btn" id="loadBtn">載入專案</button>
+      <input type="file" id="loadFile" accept=".json,application/json" hidden>
+    </div>
+  </aside>
+
+  <main class="preview">
+    <div class="ptool">
+      <div class="seg" id="viewSeg">
+        <button data-w="desktop" class="on">桌機</button>
+        <button data-w="mobile">手機 390px</button>
+      </div>
+      <span class="status ok" id="status">檢查中…</span>
+    </div>
+    <div class="issues" id="issues"></div>
+    <div class="stage"><iframe id="frame" title="EDM 預覽" style="width:100%;max-width:760px;"></iframe></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="application/json" id="userTpls">[]</script>
+<script>
+/* 原始工具檔（用來產生「內建我的範本」的新版工具） */
+const TOOL_SRC = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+/* =========================================================
+   基本工具
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clone = o => JSON.parse(JSON.stringify(o));
+const themeOf = k => Object.assign(clone(THEMES[k]), {key:k});
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!==undefined) e.textContent=text; return e; }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1800); }
+/* 文字：跳脫後，<span>字</span> 轉主色、換行轉 <br> */
+function rich(s, color){ return esc(s).replace(/&lt;span&gt;([\s\S]*?)&lt;\/span&gt;/g, `<span style="color:${color};">$1</span>`).replace(/\n/g,'<br>'); }
+
+const SANS = "'Noto Sans TC','PingFang TC','Microsoft JhengHei',Arial,Helvetica,sans-serif";
+const SERIF = "'Noto Serif TC',Georgia,'PMingLiU',serif";
+
+/* =========================================================
+   主題
+   ========================================================= */
+const THEMES = {
+  autumn:{name:'秋日棕橘（月月樂讀／秋日回饋祭／中秋888）', outer:'#f3ece0', card:'#fffdf9', accent:'#b3742c', accent2:'#8f5a1f', title:'#2b2620', text:'#2b2620', sub:'#8a7f6f', border:'#e7dcc6', soft:'#faf5e9', price:'#b3742c', link:'#1f4d3a', titleStyle:'line', moreStyle:'pill', radius:14},
+  black:{name:'黑卡紅（黑卡會員日）', outer:'#d4434d', card:'#fffaf6', accent:'#d4434d', accent2:'#611415', title:'#611415', text:'#611415', sub:'#8c8272', border:'#f1d3cf', soft:'#fdf1ef', price:'#c8363f', link:'#d4434d', titleStyle:'line', moreStyle:'text', radius:14},
+  gift:{name:'禮享粉（禮享指南）', outer:'#eef0e9', card:'#ffffff', accent:'#a7212f', accent2:'#ee5d90', title:'#5c3f2f', text:'#333333', sub:'#666666', border:'#82bec0', soft:'#fbeef0', price:'#a7212f', link:'#c85a86', titleStyle:'center', moreStyle:'pill', radius:0},
+  radar:{name:'職場雷達（內容型）', outer:'#ffffff', card:'#ffffff', accent:'#2b1f5c', accent2:'#1a1710', title:'#1a1710', text:'#3d3830', sub:'#847e76', border:'#e8e4dc', soft:'#f9f7f4', price:'#2b1f5c', link:'#1a1710', titleStyle:'serif', moreStyle:'text', radius:0}
+};
+const COLOR_KEYS = {outer:'外框背景', card:'信件底色', accent:'主色', accent2:'輔色', title:'標題字', text:'內文字', sub:'次要字', border:'邊框', soft:'淡色底', price:'價格', link:'連結'};
+
+/* =========================================================
+   區塊定義
+   ========================================================= */
+const BLOCKS = {
+  header:{label:'Header', fields:[
+    ['align','排列','select:split=左 Logo／右「請按此連結」|center=Logo 置中'],
+    ['logo','Logo 圖片網址','text'],['logoLink','Logo 連結','text'],
+    ['openText','提示文字','text'],['openLinkText','連結文字（留空＝不顯示）','text'],['openLink','「請按此連結」網址','text']]},
+  kv:{label:'KV 主視覺', fields:[
+    ['imgDesk','桌機版圖片網址','textarea'],['imgMob','手機版圖片網址（留空＝同桌機）','textarea'],
+    ['link','點擊連結','text'],['alt','替代文字','text'],['radius','圓角 px','number'],['fullBleed','滿版（左右不留白）','check']]},
+  titleHero:{label:'大標題', fields:[['kicker','小標','text'],['title','大標題','text'],['date','日期／副標','text']]},
+  text:{label:'文字段落', fields:[
+    ['text','內容（可換行；<span>字</span> 會變主色）','textarea'],
+    ['align','對齊','select:center=置中|left=靠左'],['color','顏色','select:text=內文字|accent=主色|accent2=輔色|sub=次要字'],
+    ['size','字級 px','number'],['bold','粗體','check'],['boxed','放進淡色底框','check']]},
+  cta:{label:'CTA 優惠', fields:[
+    ['style','樣式','select:gradient=漸層卡片|soft=淡色框|button=只有按鈕'],
+    ['title','主標題','text'],['sub','副標題','text'],['btnText','按鈕文字','text'],['btnLink','按鈕連結','text'],
+    ['btnTone','按鈕顏色','select:accent=主色|accent2=輔色'],['note','小字備註（可留空）','text']]},
+  pills:{label:'標籤導覽', list:true, itemFields:['title','link']},
+  products:{label:'商品 2欄橫式', list:true, section:true, itemFields:['img','tag','title','sub','price','link']},
+  cards:{label:'商品 2欄大圖', list:true, section:true, itemFields:['img','tag','title','price','link']},
+  articles:{label:'文章 左文右圖', list:true, section:true, itemFields:['img','tag','title','body','link']},
+  banner3:{label:'活動方圖 3欄', list:true, section:true, itemFields:['img','title','link']},
+  guide3:{label:'活動圖卡 3欄純圖', list:true, section:true, itemFields:['img','title','link']},
+  hot4:{label:'熱搜活動 4欄', list:true, section:true, itemFields:['img','title','link']},
+  dual:{label:'雙圖橫幅', list:true, section:true, itemFields:['img','title','link']},
+  closing:{label:'結尾 CTA', fields:[
+    ['title','標題（可留空）','text'],['text','說明（可換行；<span>字</span>=主色）','textarea'],
+    ['btnText','按鈕文字','text'],['btnLink','按鈕連結','text'],['btnTone','按鈕顏色','select:accent=主色|accent2=輔色'],['note','小字備註（可留空）','text']]},
+  footer:{label:'Footer', fields:[
+    ['unsubLink','訂閱／取消電子報連結','text'],['disclaimer','顯示「商品金額僅供參考」聲明','check'],['lines','其他文字（每行一段）','textarea']]}
+};
+const ITEM_LABEL = {img:'圖片網址', tag:'標籤／小標', title:'標題（可換行）', sub:'副標／賣點', price:'價格（例：79折 $356）', body:'摘要', link:'連結'};
+const ITEM_KIND = {img:'textarea', tag:'text', title:'textarea', sub:'text', price:'text', body:'textarea', link:'text'};
+const TYPE_HELP = {
+  products:'左小圖＋右文字，手機變 1 欄', cards:'上大圖＋下文字，手機變 1 欄', articles:'文字在左、縮圖在右，手機上下排',
+  banner3:'方形活動圖＋標題，手機仍 3 欄', guide3:'純圖片 3 欄，手機仍 3 欄', hot4:'桌機一排 4 個，手機 2×2', dual:'兩張橫幅並排，手機上下排', pills:'圓角標籤連結，自動換行'
+};
+
+function newBlock(type){
+  const b = {id:uid(), type, show:true, gap:22};
+  const D = {
+    header:{gap:16, align:'split', logo:'https://events.eslite.com/asset/images/logo_b.png', logoLink:'https://www.eslite.com/', openText:'如果無法開啟此訊息，', openLinkText:'請按此連結', openLink:''},
+    kv:{gap:0, imgDesk:'', imgMob:'', link:'', alt:'', radius:10, fullBleed:false},
+    titleHero:{kicker:'', title:'大標題', date:''},
+    text:{text:'文字內容', align:'center', color:'text', size:15, bold:true, boxed:false},
+    cta:{gap:18, style:'gradient', title:'主標題', sub:'副標題', btnText:'立即前往', btnLink:'', btnTone:'accent', note:''},
+    closing:{title:'', text:'', btnText:'更多好物立即逛', btnLink:'', btnTone:'accent', note:''},
+    footer:{gap:20, unsubLink:'https://www.eslite.com/member/newsletter', disclaimer:true, lines:'建議使用瀏覽器版本：Google Chrome版本60以上 / Firefox版本48以上 / Safari 版本11以上\n本信件為系統自動發送，請勿直接回覆'}
+  };
+  Object.assign(b, D[type] || {});
+  if(BLOCKS[type].section){ b.secTitle='區塊標題'; b.moreText=''; b.moreLink=''; }
+  if(BLOCKS[type].list) b.items = [];
+  if(type==='pills') b.gap = 14;
+  return b;
+}
+function newItem(type){ const o={}; BLOCKS[type].itemFields.forEach(k=>o[k]=''); o.id=uid(); return o; }
+function mk(type, props, items){ const b=Object.assign(newBlock(type), props||{}); if(items) b.items=items.map(x=>Object.assign(newItem(type), x)); return b; }
+
+/* =========================================================
+   範本（來自已確認發信的版本）
+   ========================================================= */
+const S2 = 'https://s2.eslite.com/unsafe/';
+const TEMPLATES = {
+  autumn:{name:'秋日回饋祭／中秋888（已確認發信版）', build:()=>({
+    meta:{title:'誠品線上｜中秋加碼購物金', pre:'【🍂您的專屬$100購物金已送達】中秋加碼！優惠疊加結帳最高折$350👉9/30前立即逛', width:640, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('autumn'),
+    blocks:[
+      mk('header',{openLink:'https://events.eslite.com/campaign/autumn/index.html'}),
+      mk('kv',{imgDesk:'https://events.eslite.com/edm/ad/202609kv_desktop.jpg', imgMob:'https://events.eslite.com/edm/ad/202609kv_mobile.jpg', link:'https://events.eslite.com/campaign/autumn/index.html', alt:'中秋加碼｜會員獨享$100購物金'}),
+      mk('cta',{title:'中秋限時加碼⏰$100購物金', sub:'只有你才有！09/25-09/30單筆滿$888可使用', btnText:'立即用券', btnLink:'https://www.eslite.com/member/coupons'}),
+      mk('products',{secTitle:'當個講究的<span>生活家</span>', moreText:'點我看更多', moreLink:'https://events.eslite.com/campaign/autumn/index.html#blk1'},[
+        {img:S2+'fit-in/x900/s.eslite.com/b2b/newItem/2023/09/13/878_101726420_999_mainCoverImage1.jpg', title:'CLARINS克蘭詩 身體調和護理油/ 100ml', sub:'植萃滋養深層彈潤', price:'56折 $1,450', link:'https://www.eslite.com/product/1005327662682241519008'},
+        {img:S2+'s.eslite.com/b2b/newItem/2026/03/06/8404_144144413_397_mainCoverImage1.jpg', title:"Paula's Choice 寶拉珍選 2%水楊酸精華液118ml 兩入組", sub:'淨化毛孔調理油脂', price:'66折 $1,539', link:'https://www.eslite.com/product/10052264922683106484004'},
+        {img:S2+'s.eslite.com/b2b/newItem/2026/09/14/2466_103406857_705_mainCoverImage1.jpg', title:'情緒過勞: 如何自我修復, 在職場帶人又帶心 (誠品獨家軟精版)', sub:'會員獨享贈300點', price:'79折 $356', link:'https://www.eslite.com/product/10012030542683208571008'},
+        {img:S2+'s.eslite.com/b2b/newItem/2026/09/14/2466_103241598_865_mainCoverImage1.jpg', title:'昨年 (誠品獨家理想女人版)', sub:'安海瑟薇監製改編・年度話題作', price:'79折 $410', link:'https://www.eslite.com/product/10012020052683210494005'}]),
+      mk('products',{secTitle:'玩樂好物 <span>x</span> 聰明上班族', moreText:'點我看更多', moreLink:'https://events.eslite.com/campaign/autumn/index.html#blk3'},[
+        {img:S2+'fit-in/x900/s.eslite.com/upload/product/o/2682091176000/20211030031455595155.jpg', title:'SONGEN 松井 涮烤圍爐鍋/ KR-135HS', sub:'一鍋兩味歡聚必備', price:'75折 $1,580', link:'https://www.eslite.com/product/1005342942682091176000'},
+        {img:S2+'s.eslite.com/b2b/newItem/2023/10/18/2532_151557458_160_mainCoverImage1.jpg', title:'FUJIFILM富士instax mini12馬上看相機/ 丁香紫', sub:'紀錄美好瞬間', price:'9折 $2,590', link:'https://www.eslite.com/product/10052130262682377744008'},
+        {img:S2+'s.eslite.com/b2b/newItem/2026/08/13/7951_165700999_751_mainCoverImage1.jpg', title:'小小吃: 臺灣家之味 (附首刷限量作者手繪圖案藏書票)', sub:'誠品獨家・限量贈品', price:'79折 $339', link:'https://www.eslite.com/product/10012010632683203060002'},
+        {img:S2+'fit-in/x900/s.eslite.com/b2b/newItem/2026/07/30/20468_164218143_800_mainCoverImage1.jpg', title:'印花樂伸縮證件套/ 山林朋友/ 橘藍', sub:'通勤必備的好夥伴', price:'特價 $288', link:'https://www.eslite.com/product/10042147262683201481007'}]),
+      mk('banner3',{secTitle:'精選活動推薦'},[
+        {img:'https://events.eslite.com/campaign/autumn/images/BN/13.jpg', title:'HOLA開館慶', link:'https://events.eslite.com/2026/260901-HOLA/index.html'},
+        {img:'https://events.eslite.com/campaign/autumn/images/BN/15.jpg', title:'美妝話題空空賞', link:'https://events.eslite.com/2026/260911-beauty/index.html'},
+        {img:'https://events.eslite.com/campaign/autumn/images/BN/17.jpg', title:'禮遇中秋', link:'https://events.eslite.com/campaign/pomelo/index.html'}]),
+      mk('closing',{btnText:'更多好物立即逛', btnLink:'https://events.eslite.com/campaign/autumn/index.html'}),
+      mk('footer')
+    ]})},
+
+  reading:{name:'月月樂讀（購書金＋選書）', build:()=>({
+    meta:{title:'誠品線上｜月月樂讀', pre:'每月贈$50購書金．每月限量12款書籤．誠品線上月月樂讀開跑！', width:640, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('autumn'),
+    blocks:[
+      mk('header',{openLink:'https://events.eslite.com/campaign/reading/index.html'}),
+      mk('kv',{imgDesk:'https://events.eslite.com/campaign/reading/images/media.jpg', link:'https://events.eslite.com/campaign/reading/index.html', alt:'月月樂讀'}),
+      mk('cta',{title:'💰 每月$50購書金早已入帳！', sub:'效期：2026/09/01 至 2026/09/24 23:59:59', btnText:'立即查看我的購書金', btnLink:'https://www.eslite.com/member/coupons'}),
+      mk('pills',{},[
+        {title:'中文館', link:'https://www.eslite.com/category/1/3'},{title:'電子書', link:'https://www.eslite.com/category/1/42187'},
+        {title:'雜誌館', link:'https://www.eslite.com/category/1/42581'},{title:'兒童館', link:'https://www.eslite.com/category/1/42637'},
+        {title:'外文館', link:'https://www.eslite.com/category/1/42401'},{title:'日文館', link:'https://www.eslite.com/category/1/42507'}]),
+      mk('products',{secTitle:'中文書｜<span>絕對收藏</span>', moreText:'MORE', moreLink:'https://www.eslite.com/category/1/3'},[
+        {img:S2+'s.eslite.com/b2b/newItem/2026/09/14/2466_103406857_705_mainCoverImage1.jpg', tag:'會員獨享贈300點', title:'情緒過勞 (誠品獨家軟精版)', sub:'每位領導者都應該讀這本書', price:'79折 $355', link:'https://www.eslite.com/product/10012030542683208571008'},
+        {img:S2+'s.eslite.com/b2b/newItem/2026/09/14/2466_103241598_865_mainCoverImage1.jpg', tag:'安．海瑟薇監製、主演', title:'昨年 (誠品獨家理想女人版)', sub:'年度話題作', price:'79折 $410', link:'https://www.eslite.com/product/10012020052683210494005'}]),
+      mk('closing',{title:'更多推薦閱讀', text:'每月主題選書持續更新中', btnText:'前往月月樂讀', btnLink:'https://events.eslite.com/campaign/reading/index.html'}),
+      mk('footer')
+    ]})},
+
+  black:{name:'黑卡會員日', build:()=>({
+    meta:{title:'誠品線上｜每月黑卡會員日', pre:'每月30號黑卡會員日．首筆滿千誠品點6倍送．黑卡都在買TOP10', width:640, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('black'),
+    blocks:[
+      mk('header',{openLink:'https://www.eslite.com/event-category/campaign/mbrblack30'}),
+      mk('kv',{imgDesk:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202605/ac7b2f96-cd5c-4e3f-a297-93b9b5bcb2fc.jpg', imgMob:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202605/10a2c442-33be-4f7e-b35b-aec06b35136f.jpg', link:'https://www.eslite.com/event-category/campaign/mbrblack30', alt:'每月黑卡會員日'}),
+      mk('guide3',{secTitle:'精明好購指南'},[
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/e1da751c-8fb5-4d5d-a2d8-50ac73dcdbb4.png', title:'秋日回饋祭 全站最高折$600', link:'https://events.eslite.com/campaign/autumn/index.html'},
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/d64a8f0f-59af-45a2-b71e-6019a2fc963c.png', title:'外文館慶 百萬圖書5折起', link:'https://events.eslite.com/campaign/Foreign/index.html'},
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202608/acb7d873-6a9f-47b8-9a46-7def4bf0a4e5.png', title:'誠品聯名卡 最高享7%回饋', link:'https://events.eslite.com/campaign/ekbank/index.html'}]),
+      mk('products',{secTitle:'黑卡會員都在買', moreText:'看更多 MORE', moreLink:'https://www.eslite.com/event-category/campaign/mbrblack30#a12749'},[
+        {img:S2+'fit-in/x375/s.eslite.com/b2b/newItem/2026/07/08/8924_155931936_547_mainCoverImage1.jpg', tag:'誠品獨家藏書票', title:'花錢的藝術\n(誠品獨家版)', price:'79折 $379', link:'https://www.eslite.com/exhibitions/CU202607-00040'},
+        {img:S2+'fit-in/x375/s.eslite.com/b2b/newItem/2026/09/04/2455_152122934_407_mainCoverImage1.jpg', tag:'風韻嗓音的夢幻逸品', title:'HeartBreakFast\n(空運精裝版黑膠)', price:'特價 $2,678', link:'https://www.eslite.com/product/10032241292683214552008'},
+        {img:S2+'fit-in/x375/s.eslite.com/b2b/newItem/2026/06/12/8924_141421106_267_mainCoverImage1.jpg', tag:'全球狂銷千萬本', title:'隨他們去\n(誠品獨家版)', price:'79折 $355', link:'https://www.eslite.com/exhibitions/CU202608-00019'},
+        {img:S2+'fit-in/x375/s.eslite.com/b2b/newItem/2026/09/14/2466_103241598_865_mainCoverImage1.jpg', tag:'席捲全球年度話題作', title:'昨年\n(誠品獨家理想女人版)', price:'79折 $410', link:'https://www.eslite.com/exhibitions/CU202608-00123'}]),
+      mk('hot4',{secTitle:'精選熱搜活動'},[
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/c9c9ebc5-002c-4320-a7c0-7166140b6b17.jpg', title:'iPhone 18', link:'https://events.eslite.com/campaign/NEWiPhone/index.html'},
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/c8c6f75e-dd49-4b3d-8210-6d67019bf8d1.jpg', title:'人氣包袋TOP100', link:'https://events.eslite.com/2026/260902-bag100/index.html'},
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/931e98a5-07a6-4b2b-840a-838b79f93e06.jpg', title:'美妝百貨週年慶', link:'https://events.eslite.com/2026/260921-beauty/index.html'},
+        {img:'https://static.eslite.com/unsafe/gs.eslite.com/index_campaign/202609/15518b6b-6340-410a-b37b-a6767e6d6a02.jpg', title:'誠品知味月', link:'https://events.eslite.com/campaign/flavor/'}]),
+      mk('closing',{title:'每月30號 黑卡會員日', text:'當日首筆消費滿千，<span>誠品點數6倍送</span>', btnText:'黑卡好康立即逛', btnLink:'https://www.eslite.com/event-category/campaign/mbrblack30', btnTone:'accent2', note:'本活動採系統自動贈點，無須登記，隔月20日18:00前匯入'}),
+      mk('footer',{disclaimer:false})
+    ]})},
+
+  gift:{name:'禮享指南（生日禮／送禮）', build:()=>({
+    meta:{title:'禮享指南 Gift Guide｜誠品線上', pre:'誠品線上祝您生日快樂．金卡會員生日禮$100優惠券已匯入', width:640, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('gift'),
+    blocks:[
+      mk('header',{align:'center'}),
+      mk('kv',{imgDesk:'https://events.eslite.com/campaign/giftguide/images/kv.jpg', link:'https://events.eslite.com/campaign/giftguide/index.html', alt:'禮享指南 Gift Guide 送禮找誠品', fullBleed:true, radius:0}),
+      mk('text',{text:'誠品線上祝您生日快樂，記得好好寵愛自己，為自己喝采！', color:'accent2', size:16}),
+      mk('text',{gap:8, text:'金卡會員生日禮 $100 優惠券已匯入，準備開始選購吧！', color:'accent', size:15}),
+      mk('cta',{gap:14, style:'button', title:'', sub:'', btnText:'前往優惠好康領券區 →', btnLink:'https://events.eslite.com/coupon/260825-coupon/'}),
+      mk('pills',{},[
+        {title:'星座幸運色', link:'https://events.eslite.com/campaign/giftguide/index.html#a'},{title:'個性分類', link:'https://events.eslite.com/campaign/giftguide/index.html#b'},
+        {title:'送禮排行榜', link:'https://events.eslite.com/campaign/giftguide/index.html#c'},{title:'依對象挑禮', link:'https://events.eslite.com/campaign/giftguide/index.html#d'}]),
+      mk('cards',{secTitle:'送禮新靈感'},[
+        {img:S2+'fit-in/x640/filters:format(webp)/s.eslite.com/b2b/newItem/2026/04/19/20474_113140758_346_0.jpg', tag:'輕量尼龍材質', title:'Masmarulez 尼龍半月包', price:'87折・特價 $1,320', link:'https://www.eslite.com/product/10052316292683133225007'},
+        {img:S2+'fit-in/x900/s.eslite.com/b2b/newItem/2025/06/18/2443_170927225_712_mainCoverImage1.jpg', tag:'源自京都內斂幽香', title:'hibi 薰香火柴 30入', price:'9折・特價 $801', link:'https://www.eslite.com/exhibitions/CU202506-00085#sidebar-4-0'},
+        {img:S2+'fit-in/x900/s.eslite.com/b2b/newItem/2026/03/19/20069_124318354_659_mainCoverImage1.jpg', tag:'贈史努比盲盒', title:'【Relove】史努比聯名 蛋白酵素衣物手洗精3入禮盒', price:'71折・特價 $1,749', link:'https://www.eslite.com/exhibitions/CU202501-00060#sidebar-12-0'},
+        {img:S2+'fit-in/x900/s.eslite.com/b2b/newItem/2026/03/25/20101_101505253_694_mainCoverImage1.jpg', tag:'延長髮色減緩退色', title:'【蕾娜塔 Renata】髮色續航2入組', price:'82折・特價 $976', link:'https://www.eslite.com/exhibitions/CU202512-00202#sidebar-7-0'}]),
+      mk('cta',{style:'button', title:'', sub:'', btnTone:'accent2', btnText:'前往禮享指南　選購更多好禮 →', btnLink:'https://events.eslite.com/campaign/giftguide/index.html'}),
+      mk('footer',{disclaimer:false})
+    ]})},
+
+  radar:{name:'職場雷達（文章內容型）', build:()=>({
+    meta:{title:'誠品線上-全方位職場人的管理實務與專業成長趨勢', pre:'領航企業未來，從掌握「職場雷達」開始！精選遠見文化深度內容', width:680, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('radar'),
+    blocks:[
+      mk('header',{openText:'*如果無法開啟此訊息，', openLink:'https://events.eslite.com/campaign/reading-insights/index.html'}),
+      mk('titleHero',{gap:26, kicker:'趨勢新聞推薦好書', title:'職場雷達', date:'2026-09-09'}),
+      mk('text',{text:'📚 誠品線上 × 遠見雜誌 攜手企劃，每天為你精選「高階決策・管理實務・職場成長」三大主題文章，並附上誠品推薦選書，陪你讀懂趨勢、找到下一本該讀的書。', align:'left', color:'text', size:14, bold:false, boxed:true}),
+      mk('cta',{style:'soft', title:'誠品線上「單品特惠」＆「各館精選」', sub:'', btnText:'超值優惠券，前往領取!', btnLink:'https://events.eslite.com/coupon/260825-coupon/index.html'}),
+      mk('articles',{secTitle:'今日精選', moreText:'看更多', moreLink:'https://events.eslite.com/campaign/reading-insights/index.html'},[
+        {img:'https://imgs.gvm.com.tw/upload/gallery/20260721/236791.jpg', tag:'高階決策', title:'壓力來襲，你是哪種領導者？六大抗壓模式全解析', body:'壓力，是領導者難以避開的課題。從冷靜觀望到立即出手，掌握六種領導模式，在關鍵時刻做出更好的決策。', link:'https://events.eslite.com/campaign/reading-insights/article/?id=132690'},
+        {img:'https://imgs.gvm.com.tw/upload/gallery/20260826/239675.jpg', tag:'管理實務', title:'台積電、輝達都在搶！矽光子為何成AI新戰場？', body:'當AI算力持續暴增，晶片之間如何高速傳輸資料正成為新瓶頸，矽光子因此站上浪頭。', link:'https://events.eslite.com/campaign/reading-insights/article/?id=132600'},
+        {img:'https://imgs.gvm.com.tw/upload/gallery/20260831/240092.jpg', tag:'職場成長', title:'北捷信義線東延段夯房市？福德直達101，廣慈房價挑戰百萬', body:'捷運題材如何牽動信義區房市新一輪行情？', link:'https://events.eslite.com/campaign/reading-insights/article/?id=132734'}]),
+      mk('footer',{disclaimer:false, lines:'本網站已依台灣網站內容分級規定處理｜建議使用瀏覽器版本：Google Chrome版本60以上 / Firefox版本48以上 / Safari 版本11以上\n本信件為系統自動發送，請勿直接回覆'})
+    ]})},
+
+  blank:{name:'空白（只有 Header／Footer）', build:()=>({
+    meta:{title:'誠品線上｜EDM', pre:'', width:640, utmOn:false, utm:'utm_source=eslite&utm_medium=epaper&utm_campaign=', utmSeq:true},
+    theme:themeOf('autumn'),
+    blocks:[mk('header'), mk('kv'), mk('footer')]
+  })}
+};
+
+/* =========================================================
+   狀態
+   ========================================================= */
+let state = TEMPLATES.autumn.build();
+const openBlocks = new Set();
+const openItems = new Set();
+
+/* =========================================================
+   匯出引擎（純 table、無 role／script，已對齊確認可發信的寫法）
+   ========================================================= */
+const BADGES = [['#eaf3ee','#0d3d2e'],['#f5ede4','#5c2800'],['#f5eaec','#5c1f2b'],['#e8f2f4','#0d4d5c']];
+
+function buildHTML(st){
+  const t = st.theme, W = Number(st.meta.width)||640, IN = W-40;
+  let seq = 0;
+  const L = raw => {
+    let u = String(raw||'').trim();
+    if(!u) return '#';
+    if(st.meta.utmOn && st.meta.utm && /^https?:\/\//i.test(u)){
+      seq++;
+      const hashAt = u.indexOf('#');
+      const base = hashAt>-1 ? u.slice(0,hashAt) : u, hash = hashAt>-1 ? u.slice(hashAt) : '';
+      let q = st.meta.utm.replace(/^[?&]+/,'');
+      if(st.meta.utmSeq) q += '&utm_content=' + seq;
+      u = base + (base.includes('?') ? '&' : '?') + q + hash;
+    }
+    return esc(u);
+  };
+  const tone = k => t[k] || t.accent;
+  const TBL = 'width="100%" cellpadding="0" cellspacing="0" border="0"';
+
+  const sec = b => {
+    if(!b.secTitle && !b.moreText) return '';
+    const more = !b.moreText ? '' : (t.moreStyle==='text'
+      ? `<a href="${L(b.moreLink)}" target="_blank" style="font-size:12px;font-weight:700;color:${t.accent};text-decoration:none;">${esc(b.moreText)} &#10148;</a>`
+      : `<a href="${L(b.moreLink)}" target="_blank" style="display:inline-block;background:${t.soft};color:${t.accent2};font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;text-decoration:none;">${esc(b.moreText)} &rarr;</a>`);
+    if(t.titleStyle==='center'){
+      return `<table ${TBL} style="margin:0 0 14px 0;"><tr><td align="center" style="text-align:center;"><span class="sec-title" style="font-size:22px;letter-spacing:2px;font-weight:900;color:${t.title};">${rich(b.secTitle,t.accent)}</span>${more?'&nbsp;&nbsp;'+more:''}<div style="height:3px;width:46px;background:${t.accent2};margin:8px auto 0 auto;font-size:0;line-height:0;">&nbsp;</div></td></tr></table>`;
+    }
+    const serif = t.titleStyle==='serif';
+    const fs = serif ? `font-family:${SERIF};font-size:23px;font-weight:600;` : 'font-size:19px;font-weight:700;';
+    const bd = serif ? `1px solid ${t.title}` : `2px solid ${t.accent}`;
+    return `<table ${TBL} style="margin:0 0 12px 0;border-bottom:${bd};"><tr><td style="padding-bottom:6px;"><span class="sec-title" style="${fs}color:${t.title};">${rich(b.secTitle,t.accent)}</span></td>${more?`<td align="right" valign="bottom" style="padding-bottom:6px;white-space:nowrap;">${more}</td>`:''}</tr></table>`;
+  };
+
+  /* 2欄：手機堆疊（秋日回饋祭確認寫法） */
+  const grid2 = (items, cell, pad='0 6px 12px 6px') => {
+    let out='';
+    for(let i=0;i<items.length;i+=2){
+      const p = items.slice(i,i+2);
+      out += `<table ${TBL} style="width:100%;table-layout:fixed;"><tr>` +
+        p.map(x=>`<td class="col2" width="50%" valign="top" style="width:50%;padding:${pad};">${cell(x)}</td>`).join('') +
+        (p.length<2 ? `<td class="col2 col-empty" width="50%" style="width:50%;">&nbsp;</td>` : '') + `</tr></table>`;
+    }
+    return out;
+  };
+  /* 3欄：手機維持 3 欄 */
+  const grid3 = (items, cell) => {
+    let out='';
+    for(let i=0;i<items.length;i+=3){
+      const p = items.slice(i,i+3);
+      out += `<table ${TBL} style="width:100%;table-layout:fixed;"><tr>` +
+        p.map(x=>`<td class="col3" width="33.33%" valign="top" align="center" style="width:33.33%;padding:0 4px 10px 4px;">${cell(x)}</td>`).join('') +
+        Array(3-p.length).fill(`<td class="col3" width="33.33%" style="width:33.33%;">&nbsp;</td>`).join('') + `</tr></table>`;
+    }
+    return out;
+  };
+  /* 4欄：桌機一排 4、手機自動 2×2（純 table，不用 div／條件註解） */
+  const grid4 = (items, cell) => {
+    let out='';
+    for(let i=0;i<items.length;i+=4){
+      const g = items.slice(i,i+4);
+      out += `<table ${TBL} style="width:100%;table-layout:fixed;"><tr>` +
+        g.map(x=>`<td class="col4" width="25%" valign="top" align="center" style="width:25%;padding:0 3px 12px 3px;">${cell(x)}</td>`).join('') +
+        Array(4-g.length).fill(`<td class="col4" width="25%" style="width:25%;">&nbsp;</td>`).join('') + `</tr></table>`;
+    }
+    return out;
+  };
+  const A = (h, inner, color) => `<a href="${h}" target="_blank" style="color:${color};text-decoration:none;">${inner}</a>`;
+  const btn = (text, link, bg, color='#ffffff', size=15, padd='13px 30px') =>
+    `<a href="${L(link)}" target="_blank" style="display:inline-block;background:${bg};color:${color};text-decoration:none;font-size:${size}px;font-weight:700;padding:${padd};border-radius:999px;line-height:1.5;">${rich(text,color)}</a>`;
+  const row = (b, inner, o={}) => {
+    const px = o.px ?? 20, pb = o.pb ?? 0;
+    return `<tr><td class="${o.cls ?? 'px'}" style="padding:${Number(b.gap)||0}px ${px}px ${pb}px ${px}px;${o.style||''}">${inner}</td></tr>`;
+  };
+
+  const R = {
+    header:b=>{
+      const logo = `<a href="${L(b.logoLink)}" target="_blank"><img src="${esc(b.logo)}" width="140" alt="誠品線上" style="display:block;width:140px;height:auto;border:0;${b.align==='center'?'margin:0 auto;':''}"></a>`;
+      if(b.align==='center') return row(b, `<table ${TBL}><tr><td class="hdr-logo" align="center" style="text-align:center;">${logo}</td></tr></table>`, {pb:14, style:`border-bottom:1px solid ${t.border};`});
+      const link = b.openLinkText ? `<td class="hdr-link" align="right" valign="middle" style="font-size:11px;line-height:1.5;color:${t.sub};">${esc(b.openText)}<a href="${L(b.openLink)}" target="_blank" style="color:${t.link};font-weight:700;text-decoration:underline;">${esc(b.openLinkText)}</a></td>` : '';
+      return row(b, `<table ${TBL}><tr><td class="hdr-logo" valign="middle">${logo}</td>${link}</tr></table>`, {pb:10});
+    },
+    kv:b=>{
+      if(!b.imgDesk) return '';
+      const r = b.fullBleed ? 0 : (Number(b.radius)||0);
+      const w = b.fullBleed ? W : IN;
+      const alt = esc(b.alt);
+      const desk = `<img src="${esc(b.imgDesk)}" width="${w}" alt="${alt}"${b.imgMob?' class="desktop-only"':''} style="display:block;width:100%;max-width:${w}px;height:auto;border:0;border-radius:${r}px;">`;
+      const mob = b.imgMob ? `<!--[if !mso]><!--><img src="${esc(b.imgMob)}" width="${w}" alt="${alt}" class="mobile-only" style="display:none;max-height:0;overflow:hidden;width:100%;max-width:${w}px;height:auto;border:0;border-radius:${r}px;mso-hide:all;"><!--<![endif]-->` : '';
+      return row(b, `<a href="${L(b.link)}" target="_blank" style="display:block;">${desk}${mob}</a>`, b.fullBleed?{px:0, cls:''}:{});
+    },
+    titleHero:b=> row(b, `<table ${TBL} style="border-bottom:1px solid ${t.border};"><tr><td align="left" valign="bottom" style="padding-bottom:18px;">${b.kicker?`<span style="display:block;font-size:13px;letter-spacing:2px;color:${t.sub};margin-bottom:8px;">${esc(b.kicker)}</span>`:''}<span class="hero-title" style="font-family:${SERIF};font-size:34px;font-weight:600;color:${t.title};">${rich(b.title,t.accent)}</span></td><td align="right" valign="bottom" style="padding-bottom:18px;font-family:${SERIF};font-size:18px;color:${t.title};white-space:nowrap;">${esc(b.date)}</td></tr></table>`),
+    text:b=>{
+      const c = t[b.color] || t.text;
+      const p = `<p style="margin:0;font-size:${Number(b.size)||14}px;line-height:1.8;color:${c};${b.bold?'font-weight:700;':''}text-align:${b.align};">${rich(b.text,t.accent)}</p>`;
+      if(b.boxed) return row(b, `<table ${TBL} style="background:${t.soft};border-radius:6px;"><tr><td style="padding:16px 20px;">${p}</td></tr></table>`);
+      return row(b, p);
+    },
+    cta:b=>{
+      const bg = tone(b.btnTone);
+      const note = b.note ? `<p style="margin:12px 0 0 0;font-size:12px;line-height:1.6;color:${b.style==='gradient'?'#fdeeda':t.sub};">${esc(b.note)}</p>` : '';
+      if(b.style==='button') return row(b, `<table ${TBL}><tr><td align="center" style="text-align:center;">${btn(b.btnText,b.btnLink,bg)}${note}</td></tr></table>`);
+      if(b.style==='soft') return row(b, `<table ${TBL} style="background:${t.soft};border-radius:8px;"><tr><td align="center" style="padding:22px 16px;text-align:center;">${b.title?`<p style="margin:0 0 4px 0;font-size:17px;line-height:1.4;font-weight:700;color:${t.title};">${rich(b.title,t.accent)}</p>`:''}${b.sub?`<p style="margin:0 0 14px 0;font-size:13px;line-height:1.6;color:${t.sub};">${rich(b.sub,t.accent)}</p>`:'<div style="height:10px;line-height:10px;font-size:0;">&nbsp;</div>'}${btn(b.btnText,b.btnLink,bg,'#ffffff',15)}${note}</td></tr></table>`);
+      return row(b, `<table ${TBL} style="background:${t.accent};background:linear-gradient(135deg,${t.accent},${t.accent2});border-radius:14px;"><tr><td align="center" style="padding:22px 16px;text-align:center;">${b.title?`<p style="margin:0 0 4px 0;font-size:19px;line-height:1.35;font-weight:800;color:#ffffff;">${esc(b.title)}</p>`:''}${b.sub?`<p style="margin:0 0 14px 0;font-size:13px;line-height:1.6;color:#fdeeda;">${esc(b.sub)}</p>`:''}<a href="${L(b.btnLink)}" target="_blank" style="display:inline-block;background:#ffffff;color:${t.accent};text-decoration:none;font-size:16px;font-weight:800;padding:13px 34px;border-radius:999px;">${esc(b.btnText)}</a>${note}</td></tr></table>`);
+    },
+    pills:b=>{
+      if(!b.items.length) return '';
+      return row(b, `<table ${TBL}><tr><td align="center" style="text-align:center;">${b.items.map(p=>`<a href="${L(p.link)}" target="_blank" style="display:inline-block;background:${t.soft};color:${t.accent2};font-size:12px;font-weight:700;padding:7px 14px;border-radius:20px;margin:3px;text-decoration:none;">${esc(p.title)}</a>`).join('')}</td></tr></table>`);
+    },
+    /* 注意：SAP 會刪掉「包住 table 的 <a>」，所以連結一律只包圖片或文字 */
+    products:b=> row(b, sec(b) + grid2(b.items, p=>{ const h=L(p.link);
+      return `<table ${TBL} style="width:100%;table-layout:fixed;background:#ffffff;border:1px solid ${t.border};border-radius:10px;"><tr>` +
+      `<td width="72" valign="top" style="width:72px;padding:12px 0 12px 12px;"><a href="${h}" target="_blank"><img src="${esc(p.img)}" width="72" height="72" alt="${esc(p.title)}" style="display:block;width:72px;height:72px;object-fit:contain;border-radius:8px;border:1px solid ${t.border};background:#ffffff;"></a></td>` +
+      `<td class="pc-txt" valign="top" height="108" style="padding:12px 12px 12px 10px;word-break:break-word;overflow-wrap:anywhere;">` +
+      (p.tag?`<p style="margin:0 0 3px 0;font-size:11px;line-height:1.4;font-weight:700;">${A(h,esc(p.tag),t.accent)}</p>`:'') +
+      `<p style="margin:0 0 4px 0;font-size:13px;line-height:1.45;font-weight:700;">${A(h,rich(p.title,t.accent),t.title)}</p>` +
+      (p.sub?`<p style="margin:0 0 5px 0;font-size:11px;line-height:1.5;">${A(h,esc(p.sub),t.sub)}</p>`:'') +
+      (p.price?`<p style="margin:0;font-size:12px;line-height:1.4;font-weight:700;">${A(h,esc(p.price),t.price)}</p>`:'') +
+      `</td></tr></table>`; })),
+    cards:b=> row(b, sec(b) + grid2(b.items, p=>{ const h=L(p.link);
+      return `<table ${TBL} style="width:100%;table-layout:fixed;background:#ffffff;border:1px solid ${t.border};border-radius:6px;"><tr><td align="center" style="background:#f7f5f0;border-radius:6px 6px 0 0;text-align:center;"><a href="${h}" target="_blank"><img src="${esc(p.img)}" width="${Math.floor(IN/2)-12}" height="140" alt="${esc(p.title)}" style="display:block;width:100%;height:140px;object-fit:contain;margin:0 auto;border:0;"></a></td></tr><tr><td style="padding:8px 10px 10px 10px;">` +
+      (p.tag?`<p style="margin:0 0 2px 0;font-size:12px;line-height:1.5;">${A(h,esc(p.tag),t.accent)}</p>`:'') +
+      `<p style="margin:0 0 6px 0;font-size:14px;line-height:1.5;font-weight:700;">${A(h,rich(p.title,t.accent),t.text)}</p>` +
+      (p.price?`<p style="margin:0;font-size:15px;font-weight:700;">${A(h,esc(p.price),t.price)}</p>`:'') +
+      `</td></tr></table>`; }, '0 5px 12px 5px')),
+    articles:b=> row(b, sec(b) + b.items.map((p,i)=>{
+      const bc = BADGES[i%BADGES.length], h=L(p.link);
+      return `<table ${TBL} style="width:100%;border-bottom:1px solid ${t.border};"><tr>` +
+        `<td class="art-txt" valign="top" style="padding:18px 16px 18px 0;">` +
+        (p.tag?`<p style="margin:0 0 8px 0;"><span style="display:inline-block;font-size:11px;letter-spacing:1px;padding:3px 9px;background:${bc[0]};color:${bc[1]};">${esc(p.tag)}</span></p>`:'') +
+        `<p style="margin:0 0 6px 0;font-family:${t.titleStyle==='serif'?SERIF:SANS};font-size:17px;font-weight:700;line-height:1.5;">${A(h,rich(p.title,t.accent),t.title)}</p>` +
+        (p.body?`<p style="margin:0;font-size:13px;line-height:1.7;">${A(h,rich(p.body,t.accent),t.sub)}</p>`:'') + `</td>` +
+        (p.img?`<td class="art-img" width="140" valign="top" style="width:140px;padding:18px 0;"><a href="${h}" target="_blank"><img src="${esc(p.img)}" width="140" alt="${esc(p.title)}" style="display:block;width:140px;height:auto;border:0;border-radius:2px;"></a></td>`:'') +
+        `</tr></table>`;
+    }).join('')),
+    banner3:b=> row(b, sec(b) + grid3(b.items, p=>{ const h=L(p.link);
+      return `<table ${TBL} style="width:100%;table-layout:fixed;background:#ffffff;border:1px solid ${t.border};border-radius:8px;"><tr><td align="center" style="line-height:0;font-size:0;background:${t.soft};text-align:center;"><a href="${h}" target="_blank"><img src="${esc(p.img)}" width="188" alt="${esc(p.title)}" style="display:block;width:100%;max-width:188px;height:auto;margin:0 auto;border:0;"></a></td></tr>` +
+      (p.title?`<tr><td style="padding:6px 4px;text-align:center;"><p style="margin:0;font-size:11px;line-height:1.35;font-weight:700;">${A(h,esc(p.title),t.title)}</p></td></tr>`:'') + `</table>`; })),
+    guide3:b=> row(b, sec(b) + grid3(b.items, p=>
+      `<a href="${L(p.link)}" target="_blank"><img src="${esc(p.img)}" width="176" alt="${esc(p.title)}" style="display:block;width:100%;max-width:176px;height:auto;border:0;border-radius:8px;margin:0 auto;"></a>`)),
+    hot4:b=> row(b, sec(b) + grid4(b.items, p=>{ const h=L(p.link);
+      return `<a href="${h}" target="_blank"><img src="${esc(p.img)}" width="122" alt="${esc(p.title)}" style="display:block;width:100%;max-width:122px;height:auto;border:1px solid ${t.border};border-radius:8px;margin:0 auto;"></a>` +
+      (p.title?`<p style="margin:6px 0 0 0;font-size:12px;line-height:1.35;font-weight:700;text-align:center;">${A(h,esc(p.title),t.title)}</p>`:''); })),
+    dual:b=> row(b, sec(b) + grid2(b.items, p=>
+      `<a href="${L(p.link)}" target="_blank"><img src="${esc(p.img)}" width="${Math.floor(IN/2)-12}" alt="${esc(p.title)}" style="display:block;width:100%;height:auto;border:0;border-radius:8px;"></a>`)),
+    closing:b=>{
+      const bg = tone(b.btnTone);
+      return row(b, `<table ${TBL}><tr><td align="center" style="background:${t.soft};border:1px dashed ${t.accent};border-radius:12px;padding:22px 16px;text-align:center;">` +
+        (b.title?`<p style="margin:0 0 6px 0;font-size:16px;line-height:1.5;font-weight:700;color:${t.title};">${rich(b.title,t.accent)}</p>`:'') +
+        (b.text?`<p style="margin:0 0 16px 0;font-size:13px;line-height:1.7;color:${t.text};">${rich(b.text,t.accent)}</p>`:'') +
+        btn(b.btnText, b.btnLink, bg, '#ffffff', 14, '13px 28px') +
+        (b.note?`<p style="margin:12px 0 0 0;font-size:12px;line-height:1.6;color:${t.sub};">${esc(b.note)}</p>`:'') +
+        `</td></tr></table>`);
+    },
+    footer:b=>{
+      const lines = String(b.lines||'').split('\n').map(s=>s.trim()).filter(Boolean);
+      const P = h => `<p style="margin:0;font-size:11px;line-height:1.8;color:${t.sub};">${h}</p>`;
+      return row(b, `<table ${TBL}><tr><td align="center" style="border-top:1px solid ${t.border};padding-top:14px;text-align:center;">` +
+        P(`誠品線上 - 誠品生活股份有限公司｜<a href="${L(b.unsubLink)}" target="_blank" style="color:${t.sub};text-decoration:underline;">訂閱/取消電子報</a>`) +
+        (b.disclaimer?P('本電子報所列之商品金額僅供參考，請以實際商品販售金額為主'):'') +
+        lines.map(l=>P(esc(l))).join('') + `</td></tr></table>`, {pb:24});
+    }
+  };
+
+  const body = st.blocks.filter(b=>b.show && R[b.type]).map(b=>R[b.type](b)).join('\n');
+  const radius = Number(t.radius)||0;
+
+  return `<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no,address=no,email=no,date=no">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${esc(st.meta.title)}</title>
+<style>
+ body,table,td{font-family:${SANS};}
+ body{margin:0;padding:0;width:100% !important;background:${t.outer};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
+ table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}
+ img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
+ a{color:${t.link};}
+ .mobile-only{display:none;}
+ @media screen and (max-width:600px){
+  .outer-pad{padding:8px 6px !important;}
+  .container{width:100% !important;max-width:100% !important;border-radius:${radius?10:0}px !important;}
+  .px{padding-left:12px !important;padding-right:12px !important;}
+  .col2{display:block !important;width:100% !important;padding:0 0 10px 0 !important;}
+  .col-empty{display:none !important;}
+  .pc-txt{height:auto !important;}
+  .col3{padding:0 3px 8px 3px !important;}
+  .col3 p{font-size:10px !important;}
+  .col4{display:inline-block !important;width:50% !important;box-sizing:border-box;vertical-align:top;}
+  .art-txt{display:block !important;width:100% !important;padding:16px 0 10px 0 !important;}
+  .art-img{display:block !important;width:100% !important;padding:0 0 16px 0 !important;}
+  .art-img img{width:100% !important;height:auto !important;}
+  .sec-title{font-size:17px !important;}
+  .hero-title{font-size:26px !important;}
+  .hdr-logo img{width:110px !important;}
+  .hdr-link{font-size:10px !important;}
+  .desktop-only{display:none !important;max-height:0 !important;overflow:hidden !important;}
+  .mobile-only{display:block !important;max-height:none !important;}
+ }
+</style>
+</head>
+<body style="margin:0;padding:0;width:100%;background:${t.outer};">
+${st.meta.pre?`<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(st.meta.pre)}${'&nbsp;&zwnj;'.repeat(12)}</div>`:''}
+<center style="width:100%;background:${t.outer};">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${t.outer};">
+<tr><td class="outer-pad" align="center" style="padding:16px 10px;">
+<!--[if mso]><table width="${W}" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+<table class="container" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${W}px;background:${t.card};border-radius:${radius}px;overflow:hidden;">
+${body}
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</center>
+</body>
+</html>`;
+}
+
+/* =========================================================
+   發信前檢查
+   ========================================================= */
+function runChecks(html){
+  const out = [];
+  const re = /script|role/gi; let m, n=0;
+  while((m = re.exec(html)) && n<10){
+    n++;
+    const ctx = html.slice(Math.max(0,m.index-25), m.index+25).replace(/\s+/g,' ');
+    out.push(['e', `含有「${m[0]}」字樣，新發信系統會判定為惡意內容：…${ctx}…`]);
+  }
+  const wrapRe = /<a\b[^>]*>((?:(?!<\/a>)[\s\S])*?)<\/a>/gi; let w;
+  while((w = wrapRe.exec(html))){ if(/<table/i.test(w[1])){ out.push(['e','有連結包住整個表格，SAP 發信系統會把這個連結刪掉（商品卡會點不到）']); break; } }
+  state.blocks.filter(b=>b.show).forEach(b=>{
+    const name = BLOCKS[b.type].label + (b.secTitle?`「${b.secTitle.replace(/<\/?span>/g,'')}」`:'');
+    if(b.type==='kv' && !b.imgDesk) out.push(['w', `${name}：還沒有圖片，匯出時會被略過`]);
+    if(BLOCKS[b.type].list){
+      if(!b.items.length) out.push(['w', `${name}：沒有任何項目`]);
+      b.items.forEach((p,i)=>{
+        const tag = `${name} 第${i+1}項`;
+        if('img' in p && !p.img) out.push(['w', `${tag}：缺圖片`]);
+        if(p.img && !/^https:\/\//i.test(p.img)) out.push(['w', `${tag}：圖片不是 https 公開網址（${p.img.slice(0,40)}）`]);
+        if(!p.link) out.push(['w', `${tag}：缺連結`]);
+      });
+    }
+    ['btnLink','link','moreLink'].forEach(k=>{ if(k in b && b[k]==='' && (k!=='moreLink' || b.moreText) && !(k==='link' && b.type!=='kv')) out.push(['w', `${name}：${k==='moreLink'?'「看更多」':k==='btnLink'?'按鈕':'圖片'}缺連結`]); });
+  });
+  return out;
+}
+
+/* =========================================================
+   預覽
+   ========================================================= */
+let view = 'desktop';
+function renderPreview(){
+  const html = buildHTML(state);
+  $('#frame').srcdoc = html;
+  const issues = runChecks(html);
+  const errs = issues.filter(x=>x[0]==='e').length, warns = issues.length-errs;
+  const s = $('#status');
+  s.className = 'status ' + (errs ? 'bad' : warns ? 'warn' : 'ok');
+  s.textContent = errs ? `✕ ${errs} 個發信問題` : warns ? `！${warns} 項提醒（可發信）` : '✓ 通過發信檢查';
+  const box = $('#issues'); box.innerHTML='';
+  issues.forEach(([lv,msg])=>{ const d=el('div', lv, (lv==='e'?'✕ ':'！ ')+msg); box.appendChild(d); });
+  if(!issues.length) box.appendChild(el('div', null, '沒有 script／role 字樣、沒有會被 SAP 刪掉的連結，圖片與連結都已填寫。'));
+  return {html, errs};
+}
+let _pt; function schedule(){ clearTimeout(_pt); _pt = setTimeout(renderPreview, 150); }
+$('#status').onclick = ()=> $('#issues').classList.toggle('show');
+document.querySelectorAll('#viewSeg button').forEach(bt=>bt.onclick=()=>{
+  document.querySelectorAll('#viewSeg button').forEach(x=>x.classList.remove('on')); bt.classList.add('on');
+  view = bt.dataset.w;
+  $('#frame').style.width = view==='mobile' ? '390px' : '100%';
+});
+
+/* =========================================================
+   編輯器
+   ========================================================= */
+function field(obj, key, label, kind, after){
+  const wrap = el('div');
+  if(kind==='check'){
+    const lb = el('label','chk'); const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!obj[key];
+    cb.onchange=()=>{ obj[key]=cb.checked; schedule(); after&&after(); };
+    lb.append(cb, document.createTextNode(label)); wrap.append(lb); return wrap;
+  }
+  wrap.append(el('label','l',label));
+  let inp;
+  if(kind.startsWith('select:')){
+    inp=document.createElement('select');
+    kind.slice(7).split('|').forEach(o=>{ const [v,tx]=o.split('='); const op=document.createElement('option'); op.value=v; op.textContent=tx; inp.append(op); });
+    inp.value = obj[key]; inp.onchange=()=>{ obj[key]=inp.value; schedule(); after&&after(); };
+  } else if(kind==='textarea'){
+    inp=document.createElement('textarea'); inp.rows = key==='text'||key==='body'||key==='lines' ? 3 : 1; inp.value=obj[key]??'';
+    inp.oninput=()=>{ obj[key]=inp.value; schedule(); after&&after(); };
+  } else {
+    inp=document.createElement('input'); inp.type = kind==='number'?'number':'text'; inp.value=obj[key]??'';
+    inp.oninput=()=>{ obj[key]= kind==='number' ? Number(inp.value) : inp.value; schedule(); after&&after(); };
+  }
+  wrap.append(inp); return wrap;
+}
+function summary(b){
+  const s = b.secTitle || (b.type==='cta'&&b.style==='button'?b.btnText:'') || b.title || b.text || b.btnText || b.alt || (b.items&&b.items[0]&&b.items[0].title) || '';
+  return String(s).replace(/<\/?span>/g,'').replace(/\n/g,' ').slice(0,28) + (b.items?`（${b.items.length}）`:'');
+}
+function iconBtn(txt, title, fn, cls=''){ const b=el('button','btn icon '+cls, txt); b.title=title; b.setAttribute('aria-label',title); b.onclick=e=>{e.stopPropagation(); fn();}; return b; }
+
+function renderBlocks(){
+  const list = $('#blockList'); list.innerHTML='';
+  state.blocks.forEach((b,bi)=>{
+    const def = BLOCKS[b.type];
+    const card = el('div','blk'+(openBlocks.has(b.id)?' open':'')+(b.show?'':' hidden-blk'));
+    const h = el('div','blk-h');
+
+    const vis = document.createElement('input'); vis.type='checkbox'; vis.checked=b.show; vis.title='顯示／隱藏'; vis.setAttribute('aria-label','顯示此區塊');
+    vis.onchange=()=>{ b.show=vis.checked; card.classList.toggle('hidden-blk',!b.show); schedule(); };
+    const tt = el('div','blk-title'); tt.append(el('span','type',def.label)); const sm=el('span','sum',summary(b)); tt.append(sm);
+    tt.onclick=()=>{ openBlocks.has(b.id)?openBlocks.delete(b.id):openBlocks.add(b.id); card.classList.toggle('open'); };
+    h.append(vis, tt,
+      iconBtn('↑','上移',()=>{ if(bi>0){ [state.blocks[bi-1],state.blocks[bi]]=[state.blocks[bi],state.blocks[bi-1]]; renderBlocks(); schedule(); } }),
+      iconBtn('↓','下移',()=>{ if(bi<state.blocks.length-1){ [state.blocks[bi+1],state.blocks[bi]]=[state.blocks[bi],state.blocks[bi+1]]; renderBlocks(); schedule(); } }),
+      iconBtn('⧉','複製區塊',()=>{ const c=clone(b); c.id=uid(); (c.items||[]).forEach(x=>x.id=uid()); state.blocks.splice(bi+1,0,c); openBlocks.add(c.id); renderBlocks(); schedule(); }),
+      iconBtn('✕','刪除區塊',()=>{ if(confirm(`刪除「${def.label}」區塊？`)){ state.blocks.splice(bi,1); renderBlocks(); schedule(); } },'danger'));
+    card.append(h);
+
+    const body = el('div','blk-b');
+    const refreshSum = ()=>{ sm.textContent = summary(b); };
+    // 間距
+    const g = el('div','gap-ctrl'); g.append(el('span',null,'上方間距'));
+    const rg=document.createElement('input'); rg.type='range'; rg.min=0; rg.max=60; rg.step=2; rg.value=b.gap; rg.setAttribute('aria-label','上方間距');
+    const gv=el('b',null,b.gap+'px'); rg.oninput=()=>{ b.gap=Number(rg.value); gv.textContent=b.gap+'px'; schedule(); };
+    g.append(rg,gv); body.append(g);
+    if(TYPE_HELP[b.type]) body.append(el('p','hint',TYPE_HELP[b.type]));
+
+    if(def.section){
+      body.append(field(b,'secTitle','區塊標題（<span>字</span>＝主色；留空＝不顯示標題）','text',refreshSum));
+      const r2=el('div','row2'); r2.append(field(b,'moreText','「看更多」文字（留空＝不顯示）','text'), field(b,'moreLink','「看更多」連結','text')); body.append(r2);
+    }
+    (def.fields||[]).forEach(([k,lab,kind])=> body.append(field(b,k,lab,kind,refreshSum)));
+
+    if(def.list){
+      b.items.forEach((p,pi)=>{
+        const it = el('div','item'+(openItems.has(p.id)?' open':''));
+        const ih = el('div','item-h');
+        if('img' in p){ const im=document.createElement('img'); im.className='thumb'; im.alt=''; if(p.img) im.src=p.img; ih.append(im); }
+        const nm = el('div','nm', `${pi+1}. ${String(p.title||'（未命名）').replace(/\n/g,' ')}`);
+        nm.onclick=()=>{ openItems.has(p.id)?openItems.delete(p.id):openItems.add(p.id); it.classList.toggle('open'); };
+        ih.append(nm,
+          iconBtn('↑','上移',()=>{ if(pi>0){ [b.items[pi-1],b.items[pi]]=[b.items[pi],b.items[pi-1]]; renderBlocks(); schedule(); } }),
+          iconBtn('↓','下移',()=>{ if(pi<b.items.length-1){ [b.items[pi+1],b.items[pi]]=[b.items[pi],b.items[pi+1]]; renderBlocks(); schedule(); } }),
+          iconBtn('✕','刪除此項',()=>{ b.items.splice(pi,1); renderBlocks(); schedule(); },'danger'));
+        it.append(ih);
+        const ib = el('div','item-b');
+        def.itemFields.forEach(k=> ib.append(field(p,k,ITEM_LABEL[k],ITEM_KIND[k],()=>{
+          nm.textContent = `${pi+1}. ${String(p.title||'（未命名）').replace(/\n/g,' ')}`;
+          if(k==='img'){ const im=ih.querySelector('img'); if(im) im.src=p.img; }
+          refreshSum();
+        })));
+        it.append(ib); body.append(it);
+      });
+      const add = el('button','btn ghost','＋ 新增一項');
+      add.onclick=()=>{ const n=newItem(b.type); b.items.push(n); openItems.add(n.id); renderBlocks(); schedule(); };
+      body.append(add);
+
+      // 批次貼上
+      const det = el('details'); det.style.marginTop='8px';
+      const su = el('summary',null,'批次貼上（從 Excel 複製）'); su.style.cssText='cursor:pointer;font-size:12px;color:#2f5d8a;';
+      const cols = def.itemFields.map(k=>ITEM_LABEL[k].replace(/（.*）/,'')).join('｜');
+      const ta = document.createElement('textarea'); ta.rows=3; ta.placeholder=`每列一項，欄位順序：${cols}`;
+      const bx = el('button','btn','加入這些項目'); bx.style.marginTop='6px';
+      bx.onclick=()=>{
+        const rows = ta.value.split(/\r?\n/).map(r=>r.trim()?r.split('\t'):null).filter(Boolean);
+        rows.forEach(r=>{ const n=newItem(b.type); def.itemFields.forEach((k,ci)=>{ n[k]=(r[ci]||'').trim(); }); b.items.push(n); });
+        toast(`已加入 ${rows.length} 項`); renderBlocks(); schedule();
+      };
+      det.append(su, el('p','hint',`欄位順序：${cols}（Excel 直接複製的 Tab 分隔格式）`), ta, bx);
+      body.append(det);
+    }
+    card.append(body);
+    list.append(card);
+  });
+}
+
+/* ---------- 主題面板 ---------- */
+function renderTheme(){
+  const g = $('#colorGrid'); g.innerHTML='';
+  Object.entries(COLOR_KEYS).forEach(([k,lab])=>{
+    const w = el('label','color-item'); const c=document.createElement('input'); c.type='color'; c.value=state.theme[k];
+    c.oninput=()=>{ state.theme[k]=c.value; schedule(); };
+    w.append(c, document.createTextNode(lab)); g.append(w);
+  });
+  $('#titleStyle').value = state.theme.titleStyle;
+  $('#moreStyle').value = state.theme.moreStyle;
+  $('#width').value = String(state.meta.width);
+  $('#radius').value = state.theme.radius;
+  if(state.theme.key) $('#themeSelect').value = state.theme.key;
+}
+$('#titleStyle').onchange=e=>{ state.theme.titleStyle=e.target.value; schedule(); };
+$('#moreStyle').onchange=e=>{ state.theme.moreStyle=e.target.value; schedule(); };
+$('#width').onchange=e=>{ state.meta.width=Number(e.target.value); schedule(); };
+$('#radius').oninput=e=>{ state.theme.radius=Number(e.target.value); schedule(); };
+
+/* ---------- 信件設定 ---------- */
+function renderMeta(){
+  $('#mTitle').value=state.meta.title; $('#mPre').value=state.meta.pre;
+  $('#mUtmOn').checked=!!state.meta.utmOn; $('#mUtm').value=state.meta.utm||''; $('#mUtmSeq').checked=!!state.meta.utmSeq;
+  $('#utmBox').style.display = state.meta.utmOn?'block':'none';
+}
+$('#mTitle').oninput=e=>{ state.meta.title=e.target.value; schedule(); };
+$('#mPre').oninput=e=>{ state.meta.pre=e.target.value; schedule(); };
+$('#mUtmOn').onchange=e=>{ state.meta.utmOn=e.target.checked; $('#utmBox').style.display=e.target.checked?'block':'none'; schedule(); };
+$('#mUtm').oninput=e=>{ state.meta.utm=e.target.value; schedule(); };
+$('#mUtmSeq').onchange=e=>{ state.meta.utmSeq=e.target.checked; schedule(); };
+
+/* ---------- 下拉選單 ---------- */
+Object.entries(THEMES).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.name; $('#themeSelect').append(o); });
+Object.entries(BLOCKS).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.label; $('#addType').append(o); });
+['products','cards','banner3','guide3','hot4','dual','articles'].forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=BLOCKS[k].label; $('#impType').append(o); });
+
+$('#tplApply').onclick=()=>{
+  if(!confirm('套用範本會取代目前所有內容，確定嗎？（可先「儲存專案」備份）')) return;
+  state = getTemplate($('#tplSelect').value); openBlocks.clear(); openItems.clear(); refreshAll(); toast('已套用範本');
+};
+$('#themeApply').onclick=()=>{ const th=themeOf($('#themeSelect').value); delete th.name; state.theme=th; renderTheme(); schedule(); toast('已套用配色'); };
+$('#addBlock').onclick=()=>{
+  const b = newBlock($('#addType').value);
+  const fi = state.blocks.findIndex(x=>x.type==='footer');
+  state.blocks.splice(fi>-1?fi:state.blocks.length, 0, b); openBlocks.add(b.id); renderBlocks(); schedule();
+  toast('已新增在 Footer 之前');
+};
+document.querySelectorAll('.panel > .ph').forEach(ph=> ph.onclick=()=> ph.parentElement.classList.toggle('open'));
+
+/* ---------- 從 HTML 匯入 ---------- */
+/* ---------- 從 HTML 讀出單一卡片（圖片＋附近文字） ---------- */
+const PRICE_RE = /(\d+(?:\.\d+)?\s*折[^$\n]{0,6}\$\s?[\d,]+|特價\s*\$\s?[\d,]+|NT\$\s?[\d,]+|\$\s?[\d,]{2,})/;
+const fsize = e => { let x=e; while(x && x.getAttribute){ const m=(x.getAttribute('style')||'').match(/font-size:\s*(\d+)/); if(m) return Number(m[1]); x=x.parentElement; } return 13; };
+const cleanHref = (h, strip) => !strip ? h : h.replace(/([?&])utm_[^=&#]+=[^&#]*/g,'$1').replace(/[?&]+(#|$)/,'$1').replace(/\?&+/,'?').replace(/&&+/g,'&');
+function readCard(img, strip){
+  let box = img.closest('td'), txtBox = null, lvl = 0;
+  for(let i=0; i<4 && box; i++){
+    const n = box.textContent.replace(/\s+/g,'').length;
+    if(n>0){ if(n<260){ txtBox = box; lvl = i; } break; }
+    box = box.parentElement ? box.parentElement.closest('td,table') : null;
+  }
+  const a = img.closest('a') || (txtBox && lvl<2 && txtBox.querySelector('a[href]'));
+  const leaves = (txtBox && lvl<2) ? [...txtBox.querySelectorAll('*')]
+    .filter(e=> e.textContent.trim() && ![...e.children].some(c=>c.tagName!=='BR' && c.textContent.trim()))
+    .map(e=>({t:e.innerHTML.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/[ \t]+/g,' ').replace(/\s*\n\s*/g,'\n').trim(), f:fsize(e)}))
+    .filter(x=>x.t && !/無法開啟/.test(x.t)) : [];
+  const uniq = []; leaves.forEach(x=>{ if(!uniq.some(u=>u.t===x.t)) uniq.push(x); });
+  const pm = uniq.map(x=>x.t).join('\n').match(PRICE_RE);
+  const words = uniq.filter(x=>!PRICE_RE.test(x.t));
+  const ti = words.length ? words.reduce((bi,x,i,arr)=> x.f>arr[bi].f ? i : bi, 0) : -1;
+  const alt = (img.getAttribute('alt')||'').trim();
+  return {
+    img: img.getAttribute('src')||'', link: cleanHref(a ? a.getAttribute('href')||'' : '', strip),
+    title: ti>-1 ? words[ti].t : alt, tag: ti>0 ? words[ti-1].t : '',
+    sub: ti>-1 && words[ti+1] ? words[ti+1].t : '', body: ti>-1 ? words.slice(ti+1).map(x=>x.t).join(' ') : '',
+    price: pm ? pm[1].replace(/\s+/g,' ') : '', alt, hasText: words.length>0
+  };
+}
+function toItem(raw, type){ const n=newItem(type); Object.keys(n).forEach(k=>{ if(k!=='id' && k in raw) n[k]=raw[k]; }); return n; }
+const isContentImg = img => { const s=img.getAttribute('src')||''; return /^https?:/i.test(s) && !/logo/i.test(s) && !img.closest('.mobile-only,[class*="mobile-only"]'); };
+
+$('#impBtn').onclick=()=>{
+  const src = $('#impSrc').value.trim(); const msg=$('#impMsg');
+  if(!src){ msg.textContent='請先貼上 HTML 原始碼。'; return; }
+  const doc = new DOMParser().parseFromString(src,'text/html');
+  const strip = $('#impStripUtm').checked, type=$('#impType').value;
+  const seen = new Set(), items=[];
+  doc.querySelectorAll('img').forEach(img=>{
+    if(!isContentImg(img)) return; const s=img.getAttribute('src'); if(seen.has(s)) return; seen.add(s);
+    const r = readCard(img, strip); if(!r.title && !r.link) return; items.push(toItem(r, type));
+  });
+  if(!items.length){ msg.textContent='沒有找到圖片，請確認貼的是 HTML 原始碼。'; return; }
+  const b = newBlock(type); b.secTitle='匯入的項目（請確認）'; b.items=items;
+  const fi = state.blocks.findIndex(x=>x.type==='footer'); state.blocks.splice(fi>-1?fi:state.blocks.length,0,b); openBlocks.add(b.id);
+  renderBlocks(); schedule(); msg.textContent=`已匯入 ${items.length} 項，放在 Footer 之前。`; toast(`匯入 ${items.length} 項`);
+};
+
+/* =========================================================
+   我的範本：把確認沒問題的版本存進工具
+   ========================================================= */
+const TPL_OPEN = '<scr'+'ipt type="application/json" id="userTpls">', TPL_CLOSE = '</scr'+'ipt>';
+let USER_TPLS = [];
+try{ USER_TPLS = JSON.parse(document.getElementById('userTpls').textContent || '[]'); }catch(e){ USER_TPLS = []; }
+let tplDirty = false;
+
+function fillTplSelect(keep){
+  const sel = $('#tplSelect'); const cur = keep || sel.value; sel.innerHTML='';
+  if(USER_TPLS.length){
+    const g = document.createElement('optgroup'); g.label='★ 我的範本';
+    USER_TPLS.forEach((t,i)=>{ const o=document.createElement('option'); o.value='u:'+i; o.textContent='★ '+t.name+(t.date?`（${t.date}）`:''); g.append(o); });
+    sel.append(g);
+  }
+  const g2 = document.createElement('optgroup'); g2.label='內建範本';
+  Object.entries(TEMPLATES).forEach(([k,v])=>{ const o=document.createElement('option'); o.value=k; o.textContent=v.name; g2.append(o); });
+  sel.append(g2);
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  $('#tplDel').disabled = !sel.value.startsWith('u:');
+  $('#myTplCount').textContent = USER_TPLS.length ? `目前有 ${USER_TPLS.length} 個我的範本` + (tplDirty?'（尚未存進工具檔）':'') : '還沒有我的範本';
+}
+function freshIds(st){ st.blocks.forEach(b=>{ b.id=uid(); (b.items||[]).forEach(x=>x.id=uid()); }); return st; }
+function getTemplate(key){ return key.startsWith('u:') ? freshIds(clone(USER_TPLS[Number(key.slice(2))].state)) : TEMPLATES[key].build(); }
+function addUserTpl(name, st){
+  const d=new Date(); const date=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  const i = USER_TPLS.findIndex(t=>t.name===name);
+  const rec = {name, date, state:clone(st)};
+  if(i>-1){ if(!confirm(`已經有「${name}」，要覆蓋嗎？`)) return false; USER_TPLS[i]=rec; } else USER_TPLS.push(rec);
+  tplDirty = true; fillTplSelect('u:'+(i>-1?i:USER_TPLS.length-1)); return true;
+}
+
+$('#tplSelect').onchange=()=>{ $('#tplDel').disabled = !$('#tplSelect').value.startsWith('u:'); };
+$('#tplSave').onclick=()=>{
+  const {errs} = renderPreview();
+  if(errs && !confirm('目前內容的發信檢查還有問題，確定要存成範本嗎？')) return;
+  const name = prompt('範本名稱（例：黑卡會員日 10月版）', state.meta.title.replace(/^誠品線上｜/,''));
+  if(!name) return;
+  if(addUserTpl(name.trim(), state)) toast(`已存成我的範本「${name}」`);
+};
+$('#tplDel').onclick=()=>{
+  const v=$('#tplSelect').value; if(!v.startsWith('u:')) return;
+  const i=Number(v.slice(2)); if(!confirm(`刪除我的範本「${USER_TPLS[i].name}」？`)) return;
+  USER_TPLS.splice(i,1); tplDirty=true; fillTplSelect('autumn'); toast('已刪除');
+};
+$('#tplUpBtn').onclick=()=> $('#tplUpFile').click();
+$('#tplUpFile').onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=''; let added=0;
+  for(const f of files){
+    const txt = await f.text(); const base = f.name.replace(/\.(json|html?)$/i,'');
+    try{
+      if(/\.json$/i.test(f.name)){
+        const j = JSON.parse(txt);
+        if(Array.isArray(j)){ j.forEach(t=>{ if(t.state&&t.state.blocks){ if(addUserTpl(t.name, t.state)) added++; } }); }   // 範本庫
+        else if(j.blocks&&j.theme&&j.meta){ if(addUserTpl(base, j)) added++; }                                            // 專案檔
+        else throw 0;
+      } else {
+        const st = htmlToState(txt);
+        if(addUserTpl(base, st)) added++;
+      }
+    }catch(err){ alert(`「${f.name}」無法讀取：請上傳本工具的專案檔／範本庫（.json），或 EDM 的 .html`); }
+  }
+  if(added){ toast(`已加入 ${added} 個範本`); }
+};
+$('#tplToolDl').onclick=()=>{
+  const json = JSON.stringify(USER_TPLS).replace(/</g,'\\u003c');
+  const a = TOOL_SRC.indexOf(TPL_OPEN), z = TOOL_SRC.indexOf(TPL_CLOSE, a);
+  if(a<0||z<0){ alert('找不到範本存放區，請使用最新版工具'); return; }
+  const out = TOOL_SRC.slice(0, a+TPL_OPEN.length) + json + TOOL_SRC.slice(z);
+  download('edm製作工具_整合版.html', out, 'text/html;charset=utf-8');
+  tplDirty=false; fillTplSelect(); toast('已下載含「我的範本」的新版工具，請用它取代舊檔');
+};
+$('#tplLibDl').onclick=()=>{ if(!USER_TPLS.length){ toast('還沒有我的範本'); return; } download(`EDM範本庫_${stamp()}.json`, JSON.stringify(USER_TPLS,null,1), 'application/json'); };
+window.addEventListener('beforeunload', e=>{ if(tplDirty){ e.preventDefault(); e.returnValue=''; } });
+
+/* ---------- 把一封完成的 EDM HTML 轉成可編輯的區塊 ---------- */
+function htmlToState(src){
+  const doc = new DOMParser().parseFromString(src,'text/html');
+  doc.querySelectorAll('script,[data-sap-hpa-ceimo-block-type="SUBJECT"],.sapConditionHelper').forEach(e=>e.remove());
+  const st = TEMPLATES.blank.build(); st.blocks=[];
+  const hex = s => { const m=String(s||'').match(/#([0-9a-f]{6}|[0-9a-f]{3})\b/i); if(!m) return null; let h=m[1]; if(h.length===3) h=h.split('').map(c=>c+c).join(''); return '#'+h.toLowerCase(); };
+  const sty = e => (e && e.getAttribute && e.getAttribute('style')) || '';
+  const bgOf = e => { const m=sty(e).match(/background(?:-color)?:\s*(#[0-9a-f]{3,6})/i); return m?hex(m[1]):null; };
+  const css = [...doc.querySelectorAll('style')].map(x=>x.textContent).join('\n');
+  const cssBg = sel => { const m = css.match(new RegExp(sel+'\\s*\\{[^}]*background(?:-color)?:\\s*(#[0-9a-fA-F]{3,6})')); return m?hex(m[1]):null; };
+
+  // 信件設定
+  st.meta.title = (doc.title||'').trim() || st.meta.title;
+  const pre = [...doc.querySelectorAll('div')].find(d=>/display:\s*none/i.test(sty(d)) && d.textContent.trim().length>4 && !d.querySelector('img'));
+  st.meta.pre = pre ? pre.textContent.replace(/[\u200c\u00a0]/g,' ').replace(/\s+/g,' ').trim() : '';
+  const cont = doc.querySelector('table.container') || [...doc.querySelectorAll('table')].find(t=>/max-width:\s*\d{3}px/i.test(sty(t)) || /^\d{3}$/.test(t.getAttribute('width')||''));
+  if(cont){ const w=Number((sty(cont).match(/max-width:\s*(\d{3})px/i)||[])[1] || cont.getAttribute('width')); if(w) st.meta.width = w>=670?680:w>=620?640:600;
+    const bg=bgOf(cont) || cssBg('\\.container'); if(bg) st.theme.card=bg; const r=sty(cont).match(/border-radius:\s*(\d+)px/i); st.theme.radius = r?Number(r[1]):0; }
+  const outer = bgOf(doc.body) || cssBg('\\.wrapper') || cssBg('body') || bgOf(doc.querySelector('center')) || bgOf(doc.querySelector('table')); if(outer) st.theme.outer=outer;
+
+  // 區塊標題 = 有粗底線、沒有圖片、文字很短的表格
+  const tBorder = t => { if(/border-bottom:\s*[12]px solid/i.test(sty(t))) return sty(t); const td=[...t.querySelectorAll('td')].find(d=>/border-bottom:\s*[12]px solid/i.test(sty(d))); return td?sty(td):''; };
+  const shortTxt = e => { const n=e.textContent.trim().length; return n>0 && n<50; };
+  const isTitle = t => (t.tagName==='TABLE' && tBorder(t) && !t.querySelector('img,table') && shortTxt(t))
+                    || (/^H[1-3]$/.test(t.tagName) && shortTxt(t) && !t.closest('a'));
+  const firstTitle = [...doc.querySelectorAll('table,h1,h2,h3')].find(isTitle);
+  delete st.theme.key; st.theme.name='自訂';
+  if(firstTitle){
+    const bc = firstTitle.tagName==='TABLE' ? hex((tBorder(firstTitle).match(/border-bottom:[^;]*/i)||[''])[0]) : null; if(bc){ st.theme.accent=bc; st.theme.price=bc; }
+    if(/^H/.test(firstTitle.tagName)) st.theme.titleStyle='center';
+    const sp = firstTitle.tagName==='TABLE' ? firstTitle.querySelector('span') : firstTitle; const tc = hex((sty(sp).match(/color:\s*#[0-9a-f]{3,6}/i)||[''])[0]); if(tc){ st.theme.title=tc; st.theme.text=tc; }
+    const more = firstTitle.querySelector('a'); if(more) st.theme.moreStyle = /background/i.test(sty(more)) ? 'pill' : 'text';
+  }
+  const bord = [...doc.querySelectorAll('table')].map(t=>(sty(t).match(/border:\s*1px solid\s*(#[0-9a-f]{3,6})/i)||[])[1]).find(Boolean); if(bord) st.theme.border=hex(bord);
+
+  const done = new Set(); let cur = null, kvDone=false, headerDone=false;
+  const flush = keepTitle => {
+    if(!cur) return;
+    if(keepTitle && !cur.items.length) return;
+    if(cur.items.length){
+      const its = cur.items;
+      const type = its.some(x=>x.price) ? 'products' : its.some(x=>x.body && x.body.length>40) ? 'articles'
+                 : its.length%4===0 && its.every(x=>x.hasText) ? 'hot4' : !its.some(x=>x.hasText) && its.length%3===0 ? 'guide3'
+                 : its.length===2 ? 'dual' : 'banner3';
+      const b = newBlock(type); b.secTitle = cur.title; b.moreText = cur.moreText; b.moreLink = cur.moreLink;
+      b.items = its.map(r=>toItem(r,type)); st.blocks.push(b);
+    }
+    cur = null;
+  };
+  const inside = e => { for(const d of done){ if(d.contains(e)) return true; } return false; };
+
+  doc.body.querySelectorAll('*').forEach(e=>{
+    if(inside(e)) return;
+    const s = sty(e);
+    // Header
+    if(!headerDone && e.tagName==='IMG' && /logo/i.test(e.getAttribute('src')||'')){
+      headerDone = true;
+      const h = newBlock('header'); h.logo = e.getAttribute('src'); const la=e.closest('a'); if(la) h.logoLink=cleanHref(la.getAttribute('href')||'',true);
+      const row = e.closest('table'); const op = row && [...row.querySelectorAll('a')].find(a=>/按此|連結|瀏覽/.test(a.textContent));
+      if(op){ h.openLink = cleanHref(op.getAttribute('href')||'',true); h.openLinkText=op.textContent.trim(); const tx=op.parentElement.textContent.split(op.textContent)[0].trim(); h.openText=tx; }
+      else { h.align='center'; h.openLinkText=''; }
+      st.blocks.push(h); return;
+    }
+    // 區塊標題
+    if(isTitle(e)){
+      flush();
+      const sp = e.querySelector('span'); const a = e.querySelector('a');
+      cur = {title:(sp?sp.textContent:e.textContent).trim(), moreText: a ? a.textContent.replace(/[➤→>\u27a4]/g,'').trim() : '', moreLink: a ? cleanHref(a.getAttribute('href')||'',true) : '', items:[]};
+      done.add(e); return;
+    }
+    // CTA（漸層卡）與結尾（虛線框）
+    const grad = /linear-gradient/i.test(s) && e.tagName==='TABLE' && !!e.querySelector('a') && !e.closest('a') && !e.querySelector('img'), dash = /dashed/i.test(s) && (e.tagName==='TD'||e.tagName==='TABLE');
+    if(grad || dash){
+      flush();
+      const ps = [...e.querySelectorAll('p')].filter(p=>p.textContent.trim() && !p.querySelector('a'));
+      const btnA = [...e.querySelectorAll('a')].pop();
+      const b = newBlock(grad ? 'cta' : 'closing');
+      if(grad){ b.title = ps[0]?ps[0].textContent.trim():''; b.sub = ps[1]?ps[1].textContent.trim():''; b.note = ps[2]?ps[2].textContent.trim():''; }
+      else { b.title = ps[0]?ps[0].textContent.trim():''; b.text = ps[1]?ps[1].textContent.trim():''; b.note = ps[2]?ps[2].textContent.trim():''; if(ps.length===1 && ps[0].compareDocumentPosition(btnA)&4 && /\d+日|無須|匯入/.test(ps[0].textContent)){ b.note=b.title; b.title=''; } }
+      if(btnA){ b.btnText = btnA.textContent.trim(); b.btnLink = cleanHref(btnA.getAttribute('href')||'',true);
+        const bb = bgOf(btnA); if(!grad && bb){ st.theme.accent2 = bb; b.btnTone = bb===st.theme.accent ? 'accent' : 'accent2'; } }
+      if(grad){ const g = s.match(/linear-gradient\([^,]+,\s*(#[0-9a-f]{3,6})[^,]*,\s*(#[0-9a-f]{3,6})/i); if(g){ st.theme.accent=hex(g[1]); st.theme.accent2=hex(g[2]); } }
+      if(dash){ const sb = bgOf(e); if(sb) st.theme.soft = sb; }
+      st.blocks.push(b); done.add(e); return;
+    }
+    // 標籤導覽（3 個以上圓角連結、沒有圖片）
+    if(e.tagName==='TD' && !e.querySelector('img,table')){
+      const as=[...e.querySelectorAll('a')].filter(a=>/border-radius/i.test(sty(a)) && /background/i.test(sty(a)));
+      if(as.length>=3){ flush(true); const b=newBlock('pills'); b.items=as.map(a=>Object.assign(newItem('pills'),{title:a.textContent.trim(), link:cleanHref(a.getAttribute('href')||'',true)})); st.blocks.push(b); done.add(e); return; }
+    }
+    // 職場雷達式大標題（30px 以上的短字）
+    if(e.tagName==='SPAN' && fsize(e)>=30 && shortTxt(e) && !e.querySelector('img')){
+      flush(true); const b=newBlock('titleHero'); b.title=e.textContent.trim();
+      const pv=e.previousElementSibling; b.kicker = pv && fsize(pv)<=14 ? pv.textContent.trim() : '';
+      const row=e.closest('tr'); const tds=row?[...row.children]:[]; const last=tds[tds.length-1];
+      b.date = last && !last.contains(e) ? last.textContent.trim() : '';
+      if(/serif|Georgia/i.test(sty(e))) st.theme.titleStyle='serif';
+      st.blocks.push(b); done.add(row?row.closest('table'):e); return;
+    }
+    // 有底色的框：只有一個按鈕 → 淡色 CTA；沒有連結 → 文字框
+    const boxBg = bgOf(e);
+    if((e.tagName==='TD'||e.tagName==='TABLE') && boxBg && boxBg!==st.theme.card && boxBg!=='#ffffff' && !e.querySelector('img') && !isTitle(e)){
+      const tl = e.textContent.replace(/\s+/g,' ').trim(), as=[...e.querySelectorAll('a')];
+      if(as.length===1 && /background/i.test(sty(as[0])) && tl.length<200){
+        flush(true); const b=newBlock('cta'); b.style='soft'; const bt=as[0].textContent.trim();
+        b.title = tl.replace(bt,'').trim(); b.sub=''; b.btnText=bt; b.btnLink=cleanHref(as[0].getAttribute('href')||'',true);
+        st.theme.soft = boxBg; const ab=bgOf(as[0]); if(ab) st.theme.accent=ab;
+        st.blocks.push(b); done.add(e); return;
+      }
+      if(!as.length && tl.length>=10 && tl.length<=400 && e.tagName==='TD'){
+        flush(true); const b=newBlock('text'); b.text=tl; b.align='left'; b.bold=false; b.size=14; b.boxed=true; st.theme.soft=boxBg;
+        st.blocks.push(b); done.add(e); return;
+      }
+    }
+    // 圖片
+    if(e.tagName==='IMG' && isContentImg(e)){
+      const src = e.getAttribute('src');
+      const wide = Number(e.getAttribute('width'))>=300 || /100%/.test(e.getAttribute('width')||'') || /(^|;)\s*width:\s*100%/i.test(sty(e));
+      if(!kvDone && !cur && wide && !readCard(e,true).hasText){
+        kvDone = true;
+        const k = newBlock('kv'); k.imgDesk = src; k.alt = e.getAttribute('alt')||'';
+        const a = e.closest('a'); if(a){ k.link = cleanHref(a.getAttribute('href')||'',true);
+          const m = a.querySelector('img.mobile-only, img[class*="mobile-only"]'); if(m) k.imgMob = m.getAttribute('src'); }
+        const r = sty(e).match(/border-radius:\s*(\d+)px/i); k.radius = r?Number(r[1]):0;
+        const pad = e.closest('td'); k.fullBleed = !!pad && !/padding:\s*[^;]*20px/i.test(sty(pad));
+        st.blocks.push(k); done.add(a||e); return;
+      }
+      if(!cur) cur = {title:'', moreText:'', moreLink:'', items:[]};
+      if(cur.items.some(x=>x.img===src)) return;
+      cur.items.push(readCard(e, true));
+    }
+  });
+  flush();
+  const ft = newBlock('footer'); ft.disclaimer = /僅供參考/.test(doc.body.textContent);
+  const un = [...doc.querySelectorAll('a')].find(a=>/訂閱|取消/.test(a.textContent)); if(un) ft.unsubLink = cleanHref(un.getAttribute('href')||'',true);
+  st.blocks.push(ft);
+  // 自動判斷標題樣式
+  if(firstTitle && firstTitle.tagName==='TABLE' && /1px solid/i.test(tBorder(firstTitle))) st.theme.titleStyle='serif';
+  if(!cont || !(bgOf(cont) || cssBg('\\.container'))) st.theme.card = st.theme.outer;
+  if(!firstTitle || firstTitle.tagName!=='TABLE'){  // 沒有底線標題時，用第一顆實心按鈕的顏色當主色
+    const b1 = [...doc.querySelectorAll('a')].find(a=>/border-radius/i.test(sty(a)) && bgOf(a) && /color:\s*#fff/i.test(sty(a)));
+    if(b1){ st.theme.accent = bgOf(b1); st.theme.price = bgOf(b1); }
+  }
+  return st;
+}
+
+/* ---------- 匯出／專案 ---------- */
+function exportGuard(){
+  const {html, errs} = renderPreview();
+  if(errs && !confirm('發信檢查有問題（script／role 字樣，或會被 SAP 刪掉的連結），右上角可看明細。仍要繼續嗎？')) return null;
+  return html;
+}
+$('#copyBtn').onclick=async()=>{
+  const html = exportGuard(); if(!html) return;
+  try{ await navigator.clipboard.writeText(html); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=html; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('已複製 HTML');
+};
+function download(name, text, type){
+  const blob=new Blob([text],{type}); const u=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=u; a.download=name; document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+}
+const stamp = ()=>{ const d=new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`; };
+$('#dlBtn').onclick=()=>{ const html=exportGuard(); if(!html) return; download(`edm_${stamp()}.html`, html, 'text/html;charset=utf-8'); toast('已下載'); };
+$('#saveBtn').onclick=()=>{ download(`edm_專案_${stamp()}.json`, JSON.stringify(state,null,1), 'application/json'); toast('專案已儲存，下次可用「載入專案」接著改'); };
+$('#loadBtn').onclick=()=> $('#loadFile').click();
+$('#loadFile').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const s=JSON.parse(r.result); if(!s.blocks||!s.theme||!s.meta) throw 0; state=s; openBlocks.clear(); openItems.clear(); refreshAll(); toast('已載入專案'); }catch(err){ alert('這不是本工具的專案檔（.json）'); } };
+  r.readAsText(f); e.target.value='';
+};
+
+function refreshAll(){ renderTheme(); renderMeta(); renderBlocks(); renderPreview(); }
+fillTplSelect('autumn');
+refreshAll();
+</script>
+</body>
+</html>
