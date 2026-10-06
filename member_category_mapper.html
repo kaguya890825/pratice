@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>會員 × 分類 比對工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper: #F6F5F1;
+    --panel: #FFFFFF;
+    --ink: #16233B;
+    --ink-soft: #5B6472;
+    --line: #DEDCD4;
+    --teal: #23675F;
+    --teal-deep: #16453F;
+    --teal-tint: #E4EEEC;
+    --amber: #CE8B21;
+    --amber-tint: #FBF0DC;
+    --danger: #B23B3B;
+    --console-bg: #101B2C;
+    --console-text: #8FE3C7;
+    --console-dim: #5E7C8C;
+    --radius: 10px;
+    --mono: "SFMono-Regular","IBM Plex Mono",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans: "PingFang TC","Noto Sans TC","Microsoft JhengHei",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.55;
+    padding:40px 20px 80px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+
+  /* header */
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--teal);
+    text-transform:uppercase;
+    margin:0 0 10px;
+  }
+  h1{
+    font-size:28px;
+    margin:0 0 8px;
+    letter-spacing:-0.01em;
+  }
+  .lede{
+    color:var(--ink-soft);
+    font-size:15px;
+    max-width:640px;
+    margin:0 0 34px;
+  }
+
+  /* step cards */
+  .steps{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+    margin-bottom:22px;
+  }
+  @media (max-width:720px){ .steps{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:20px;
+    position:relative;
+  }
+  .step-num{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--teal);
+    letter-spacing:.08em;
+  }
+  .card h2{
+    font-size:16px;
+    margin:6px 0 4px;
+  }
+  .card .hint{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin:0 0 14px;
+  }
+
+  .dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:8px;
+    padding:22px 14px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    background:var(--paper);
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--teal);
+    background:var(--teal-tint);
+  }
+  .dropzone svg{width:22px;height:22px;stroke:var(--ink-soft);margin-bottom:8px;}
+  .dropzone p{margin:0;font-size:13px;color:var(--ink-soft);}
+  .dropzone .accept{font-family:var(--mono);font-size:11px;color:var(--ink-soft);opacity:.7;margin-top:4px;}
+  input[type=file]{display:none;}
+
+  .file-chip{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:var(--teal-tint);
+    border:1px solid var(--teal);
+    border-radius:8px;
+    padding:10px 12px;
+    font-size:13px;
+  }
+  .file-chip .name{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--teal-deep);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .file-chip button{
+    border:none;
+    background:none;
+    color:var(--ink-soft);
+    cursor:pointer;
+    font-size:15px;
+    line-height:1;
+    padding:2px 4px;
+  }
+  .file-chip button:hover{color:var(--danger);}
+
+  /* run button */
+  .run-row{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    margin:28px 0 30px;
+  }
+  button.primary{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:14.5px;
+    background:var(--teal);
+    color:#fff;
+    border:none;
+    padding:13px 28px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .15s ease, transform .1s ease;
+  }
+  button.primary:hover:not(:disabled){background:var(--teal-deep);}
+  button.primary:active:not(:disabled){transform:scale(.98);}
+  button.primary:disabled{
+    background:#C9C7BE;
+    cursor:not-allowed;
+  }
+  button.ghost{
+    font-family:var(--sans);
+    font-size:13.5px;
+    background:none;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:13px 20px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  button.ghost:hover{border-color:var(--ink-soft);color:var(--ink);}
+
+  /* console */
+  .console{
+    background:var(--console-bg);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--console-text);
+    max-height:220px;
+    overflow-y:auto;
+    margin-bottom:30px;
+    display:none;
+  }
+  .console.show{display:block;}
+  .console .line{white-space:pre-wrap;margin:0 0 3px;}
+  .console .line.dim{color:var(--console-dim);}
+  .console .line.err{color:#E38B8B;}
+  .console .line.ok{color:#8FE3C7;font-weight:600;}
+
+  /* results */
+  .results{display:none;}
+  .results.show{display:block;}
+
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:14px;
+    margin-bottom:22px;
+  }
+  @media (max-width:720px){ .stat-row{grid-template-columns:1fr 1fr;} }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .stat .label{font-size:11.5px;color:var(--ink-soft);letter-spacing:.02em;}
+  .stat .value{font-family:var(--mono);font-size:20px;color:var(--teal-deep);margin-top:4px;}
+
+  .coverage{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-bottom:16px;
+  }
+  .coverage b{color:var(--ink);font-weight:600;}
+
+  .table-wrap{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:auto;
+    max-height:480px;
+    margin-bottom:20px;
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    font-size:13px;
+    min-width:640px;
+  }
+  thead th{
+    position:sticky;top:0;
+    background:var(--teal-deep);
+    color:#fff;
+    text-align:left;
+    padding:10px 12px;
+    font-weight:600;
+    font-size:12px;
+    letter-spacing:.02em;
+    white-space:nowrap;
+  }
+  thead th.num{text-align:right;}
+  tbody td{
+    padding:8px 12px;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td.num{
+    text-align:right;
+    font-family:var(--mono);
+    font-variant-numeric:tabular-nums;
+  }
+  tbody tr:nth-child(even){background:#FAFAF7;}
+  tr.total-row td{
+    background:var(--amber-tint);
+    font-weight:700;
+    color:var(--teal-deep);
+    position:sticky;
+    bottom:0;
+    border-top:2px solid var(--amber);
+  }
+
+  .download-row{display:flex;justify-content:flex-end;gap:10px;}
+  button.download{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size:13.5px;
+    background:var(--amber);
+    color:#fff;
+    border:none;
+    padding:11px 22px;
+    border-radius:999px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  button.download:hover{background:#B87A18;}
+  button.download svg{width:14px;height:14px;stroke:#fff;}
+
+  .footnote{
+    margin-top:10px;
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">MEMBER × CATEGORY MATCH</p>
+  <h1>會員名單 × 商品分類 比對工具</h1>
+  <p class="lede">上傳「指定受眾名單」與「商品購買明細」，工具會依會員編號自動比對交集，並依明細中實際存在的分類欄位（類別1-2 / 類別2 / 類別3 / 26碼 / 商品名稱）自動彙整，購買人數與訂單筆數皆會去重，結果可直接下載為 Excel。</p>
+
+  <div class="steps">
+    <div class="card">
+      <div class="step-num">01</div>
+      <h2>指定受眾名單</h2>
+      <p class="hint">需含「會員編號」欄位</p>
+      <div id="dz-target" class="dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+        <p>點擊或拖曳 .xlsx / .xls 檔案</p>
+        <p class="accept">accepts xlsx, xls</p>
+      </div>
+      <input type="file" id="file-target" accept=".xlsx,.xls">
+      <div id="chip-target"></div>
+    </div>
+
+    <div class="card">
+      <div class="step-num">02</div>
+      <h2>商品購買明細</h2>
+      <p class="hint">需含「會員編號」及至少一項分類欄位</p>
+      <div id="dz-detail" class="dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+        <p>點擊或拖曳 .xlsx / .xls 檔案</p>
+        <p class="accept">accepts xlsx, xls</p>
+      </div>
+      <input type="file" id="file-detail" accept=".xlsx,.xls">
+      <div id="chip-detail"></div>
+    </div>
+  </div>
+
+  <div class="run-row">
+    <button class="primary" id="run-btn" disabled>執行比對</button>
+    <button class="ghost" id="reset-btn">重置</button>
+  </div>
+
+  <div class="console" id="console"></div>
+
+  <div class="results" id="results">
+    <div class="stat-row">
+      <div class="stat"><div class="label">目標清單人數</div><div class="value" id="stat-target">–</div></div>
+      <div class="stat"><div class="label">明細不重複人數</div><div class="value" id="stat-detail">–</div></div>
+      <div class="stat"><div class="label">實際匹配人數</div><div class="value" id="stat-matched">–</div></div>
+      <div class="stat"><div class="label" id="stat-orders-label">不重複訂單數</div><div class="value" id="stat-orders">–</div></div>
+      <div class="stat"><div class="label">彙整列數</div><div class="value" id="stat-rows">–</div></div>
+    </div>
+    <p class="coverage" id="coverage"></p>
+    <div class="table-wrap"><table id="result-table"></table></div>
+    <div class="download-row">
+      <button class="download" id="download-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 4v11M12 15l-4-4M12 15l4-4"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/></svg>
+        下載比對結果 (Excel)
+      </button>
+    </div>
+    <p class="footnote">訂單筆數：明細若有「母訂單號碼」（或訂單號碼／訂單編號）欄位，各分類與總計皆以不重複訂單號碼計算；同一張訂單買了多個分類時，在各分類各算 1 筆，但總計只算 1 筆，因此各列加總會大於總計。平均訂單價＝銷售金額(點加金)÷不重複訂單數，平均客單價＝銷售金額(點加金)÷購買人數。</p>
+    <p class="footnote">會員編號比對規則：去除前後空白，並移除如「123456.0」讀取後多出的小數點尾碼，以貼齊 Excel 中的原始編號格式。</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const state = { target:null, detail:null, lastSummary:null, lastCols:null };
+
+  const dzTarget = document.getElementById('dz-target');
+  const dzDetail = document.getElementById('dz-detail');
+  const fileTarget = document.getElementById('file-target');
+  const fileDetail = document.getElementById('file-detail');
+  const chipTarget = document.getElementById('chip-target');
+  const chipDetail = document.getElementById('chip-detail');
+  const runBtn = document.getElementById('run-btn');
+  const resetBtn = document.getElementById('reset-btn');
+  const consoleEl = document.getElementById('console');
+  const resultsEl = document.getElementById('results');
+  const downloadBtn = document.getElementById('download-btn');
+
+  function log(msg, cls){
+    consoleEl.classList.add('show');
+    const p = document.createElement('p');
+    p.className = 'line' + (cls ? ' '+cls : '');
+    p.textContent = msg;
+    consoleEl.appendChild(p);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function setupDrop(zone, input, onFile){
+    zone.addEventListener('click', ()=> input.click());
+    zone.addEventListener('dragover', e=>{ e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', ()=> zone.classList.remove('drag'));
+    zone.addEventListener('drop', e=>{
+      e.preventDefault();
+      zone.classList.remove('drag');
+      if(e.dataTransfer.files && e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+    });
+    input.addEventListener('change', e=>{
+      if(e.target.files && e.target.files[0]) onFile(e.target.files[0]);
+    });
+  }
+
+  function showChip(container, zone, file, key){
+    zone.style.display = 'none';
+    container.innerHTML = '';
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `<span class="name">${file.name}</span><button title="移除">✕</button>`;
+    chip.querySelector('button').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      state[key] = null;
+      container.innerHTML = '';
+      zone.style.display = '';
+      updateRunState();
+    });
+    container.appendChild(chip);
+  }
+
+  setupDrop(dzTarget, fileTarget, f=>{
+    state.target = f;
+    showChip(chipTarget, dzTarget, f, 'target');
+    updateRunState();
+  });
+  setupDrop(dzDetail, fileDetail, f=>{
+    state.detail = f;
+    showChip(chipDetail, dzDetail, f, 'detail');
+    updateRunState();
+  });
+
+  function updateRunState(){
+    runBtn.disabled = !(state.target && state.detail);
+  }
+
+  resetBtn.addEventListener('click', ()=>{
+    state.target = null; state.detail = null;
+    chipTarget.innerHTML=''; chipDetail.innerHTML='';
+    dzTarget.style.display=''; dzDetail.style.display='';
+    fileTarget.value=''; fileDetail.value='';
+    consoleEl.innerHTML=''; consoleEl.classList.remove('show');
+    resultsEl.classList.remove('show');
+    updateRunState();
+  });
+
+  // ---- 大檔安全讀取：改用 Web Worker 背景執行緒解析，避免主執行緒(畫面)被巨量資料卡死或造成分頁當機 ----
+  const LARGE_FILE_WARN_MB = 15;
+  const LARGE_FILE_DANGER_MB = 60;
+
+  function checkFileSize(file, label){
+    const mb = file.size/1024/1024;
+    if(mb >= LARGE_FILE_DANGER_MB){
+      log(`⚠️ ${label}約 ${mb.toFixed(1)}MB，資料量偏大，將以背景執行緒分批處理，請耐心等候（可能需 30 秒～數分鐘，畫面不會被卡住）`, 'dim');
+    } else if(mb >= LARGE_FILE_WARN_MB){
+      log(`${label}約 ${mb.toFixed(1)}MB，處理中...`, 'dim');
+    }
+  }
+
+  function fileToArrayBuffer(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = e=> resolve(e.target.result);
+      reader.onerror = ()=> reject(new Error('檔案讀取失敗：'+file.name));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // Worker 內容：讀檔、比對、彙整全部在背景執行緒完成，主執行緒只收回「彙整後的小結果」，
+  // 避免把百萬列資料轉成 JS 物件塞爆分頁記憶體。
+  const WORKER_SRC = `
+    importScripts('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+
+    function detectColumn(cols, patterns){
+      for(const p of patterns){
+        const idx = cols.findIndex(c => c.includes(p));
+        if(idx !== -1) return idx;
+      }
+      return -1;
+    }
+    function robustCleanId(v){
+      if(v===undefined || v===null || v==='') return '';
+      let s = String(v).trim();
+      if(s.includes('.')) s = s.split('.')[0];
+      return s.trim();
+    }
+
+    onmessage = function(e){
+      const { mode, buffer, patterns, targetIds } = e.data;
+      try{
+        const data = new Uint8Array(buffer);
+        const wb = XLSX.read(data, {type:'array', dense:true});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, defval:'', raw:false, blankrows:false});
+        if(!aoa.length) throw new Error('工作表沒有資料');
+        const header = aoa[0].map(h => String(h||'').trim());
+
+        if(mode === 'target'){
+          const idIdx = detectColumn(header, patterns.id);
+          if(idIdx === -1) throw new Error('__NO_ID__');
+          const idSet = new Set();
+          for(let i=1;i<aoa.length;i++){
+            const cid = robustCleanId(aoa[i][idIdx]);
+            if(cid) idSet.add(cid);
+          }
+          postMessage({ ok:true, mode, idColumnFound: header[idIdx], count: idSet.size, ids: Array.from(idSet) });
+          return;
+        }
+
+        // mode === 'detail'
+        const idIdx = detectColumn(header, patterns.id);
+        if(idIdx === -1) throw new Error('__NO_ID__');
+
+        const catDefs = patterns.categories
+          .map(def=>({ key:def.key, idx: detectColumn(header, def.patterns) }))
+          .filter(d=> d.idx !== -1);
+        if(!catDefs.length) throw new Error('__NO_CAT__');
+
+        const metricDefs = patterns.metrics.map(def=>({
+          key:def.key, idx: detectColumn(header, def.patterns), def: def.def
+        }));
+
+        // 訂單號碼欄位（有的話就以「不重複訂單號碼」計算訂單筆數，避免同一張訂單跨多列被重複加總）
+        const orderIdx = patterns.order ? detectColumn(header, patterns.order) : -1;
+        const matchedOrderSet = new Set();
+        let rawOrderSum = 0;
+        const orderMetric = metricDefs.find(m=> m.key === '訂單筆數');
+
+        const targetSet = new Set(targetIds);
+        const detailIdSetAll = new Set();
+        const matchedIdSet = new Set();
+        const groups = new Map();
+
+        for(let i=1;i<aoa.length;i++){
+          const row = aoa[i];
+          const cid = robustCleanId(row[idIdx]);
+          if(!cid) continue;
+          detailIdSetAll.add(cid);
+          if(!targetSet.has(cid)) continue;
+          matchedIdSet.add(cid);
+          const oid = orderIdx !== -1 ? robustCleanId(row[orderIdx]) : '';
+          if(oid) matchedOrderSet.add(oid);
+
+          const parts = catDefs.map(c=>{
+            const v = row[c.idx];
+            return (v===undefined || v===null || v==='') ? '未填寫' : String(v).trim();
+          });
+          const key = parts.join('\\u241F');
+          let g = groups.get(key);
+          if(!g){
+            const metrics = {};
+            metricDefs.forEach(m=> metrics[m.key]=0);
+            g = { parts, members:new Set(), orders:new Set(), metrics };
+            groups.set(key, g);
+          }
+          g.members.add(cid);
+          if(oid) g.orders.add(oid);
+          metricDefs.forEach(m=>{
+            let v;
+            if(m.idx !== -1){
+              v = parseFloat(row[m.idx]);
+              if(isNaN(v)) v = 0;
+            } else {
+              v = m.def;
+            }
+            g.metrics[m.key] += v;
+            if(m === orderMetric) rawOrderSum += v;
+          });
+        }
+
+        // 有訂單號碼欄位時，訂單筆數改為各組「不重複訂單號碼」數
+        const dedupOrders = orderIdx !== -1 && orderMetric;
+        if(dedupOrders){
+          groups.forEach(g=>{ g.metrics['訂單筆數'] = g.orders.size; });
+        }
+
+        const rows = Array.from(groups.values()).map(g=>({
+          parts: g.parts, members: g.members.size, metrics: g.metrics
+        }));
+
+        postMessage({
+          ok:true, mode,
+          idColumnFound: header[idIdx],
+          categoryKeys: catDefs.map(c=>c.key),
+          metricKeys: metricDefs.map(m=>m.key),
+          detailCount: detailIdSetAll.size,
+          matchedCount: matchedIdSet.size,
+          orderColumnFound: orderIdx !== -1 ? header[orderIdx] : null,
+          dedupOrders: !!dedupOrders,
+          matchedOrderCount: matchedOrderSet.size,
+          rawOrderSum,
+          rows
+        });
+      }catch(err){
+        postMessage({ ok:false, mode, error: (err && err.message) ? err.message : String(err) });
+      }
+    };
+  `;
+
+  let sharedWorker = null;
+  function getWorker(){
+    if(!sharedWorker){
+      const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+      sharedWorker = new Worker(URL.createObjectURL(blob));
+    }
+    return sharedWorker;
+  }
+
+  function runInWorker(mode, buffer, patterns, targetIds){
+    if(typeof Worker === 'undefined'){
+      return Promise.reject(new Error('此瀏覽器不支援 Web Worker（背景執行緒），請改用最新版 Chrome / Edge / Firefox'));
+    }
+    return new Promise((resolve, reject)=>{
+      const w = getWorker();
+      const timeoutMs = 6*60*1000; // 6 分鐘保護，避免無限等待
+      const timer = setTimeout(()=>{
+        w.removeEventListener('message', onMsg);
+        reject(new Error('處理逾時（超過 6 分鐘），檔案可能過大或格式異常，建議先用 Excel 篩選縮小資料範圍'));
+      }, timeoutMs);
+
+      function onMsg(e){
+        if(!e.data || e.data.mode !== mode) return; // 避免與其他任務的訊息錯位
+        clearTimeout(timer);
+        w.removeEventListener('message', onMsg);
+        if(e.data.ok){
+          resolve(e.data);
+        } else {
+          const map = {
+            '__NO_ID__': '找不到「會員編號」欄位',
+            '__NO_CAT__': '明細資料中找不到任何分類欄位（類別1-2／類別2／類別3／26碼／商品名稱）'
+          };
+          reject(new Error(map[e.data.error] || e.data.error));
+        }
+      }
+      w.addEventListener('message', onMsg);
+      w.onerror = function(err){
+        clearTimeout(timer);
+        w.removeEventListener('message', onMsg);
+        reject(new Error('背景執行緒處理失敗，瀏覽器可能記憶體不足：' + (err && err.message ? err.message : '未知錯誤')));
+      };
+
+      w.postMessage({ mode, buffer, patterns, targetIds }, [buffer]); // transferable，避免額外複製巨量 buffer
+    });
+  }
+
+  function fmt(n){
+    if(!isFinite(n)) return '0';
+    if(Number.isInteger(n)) return n.toLocaleString('zh-Hant-TW');
+    return n.toLocaleString('zh-Hant-TW', {maximumFractionDigits:2});
+  }
+
+  const CATEGORY_DEFS = [
+    {key:'類別1-2', patterns:['類別1-2']},
+    {key:'類別2', patterns:['類別2']},
+    {key:'類別3', patterns:['類別3']},
+    {key:'26碼', patterns:['26碼','條碼','料號']},
+    {key:'商品名稱', patterns:['商品名稱','品名']},
+  ];
+  const ORDER_ID_PATTERNS = ['母訂單號碼','母單號碼','訂單號碼','訂單編號','訂單號'];
+  const METRIC_DEFS = [
+    {key:'訂單筆數', patterns:['訂單筆數','次數'], def:1},
+    {key:'銷售金額(點加金)', patterns:['點加金','銷售金額'], def:0},
+    {key:'銷售金額(純金)', patterns:['純金'], def:0},
+    {key:'銷售品項數', patterns:['品項數','品項'], def:1},
+    {key:'銷售數量', patterns:['數量'], def:1},
+  ];
+
+  // 平均值依「去重後」的人數與訂單數重新計算，不沿用明細中逐列的平均欄位
+  const AVG_KEYS = ['平均訂單價','平均客單價'];
+  function addAverages(o){
+    const amt = o['銷售金額(點加金)'] || 0;
+    const orders = o['訂單筆數'] || 0;
+    const members = o['購買人數'] || 0;
+    o['平均訂單價'] = orders ? Math.round(amt/orders) : 0;
+    o['平均客單價'] = members ? Math.round(amt/members) : 0;
+  }
+
+  runBtn.addEventListener('click', async ()=>{
+    consoleEl.innerHTML = '';
+    resultsEl.classList.remove('show');
+    runBtn.disabled = true;
+    const t0 = performance.now();
+    log('--- 啟動比對流程（背景執行緒處理，畫面不會被卡住）---');
+    try{
+      checkFileSize(state.target, '指定受眾名單');
+      checkFileSize(state.detail, '商品購買明細');
+
+      log('正在讀取指定受眾名單...', 'dim');
+      const targetBuf = await fileToArrayBuffer(state.target);
+      const targetRes = await runInWorker('target', targetBuf, { id:['會員編號'] });
+      log(`會員編號欄位對應（受眾名單）：「${targetRes.idColumnFound}」`, 'dim');
+      log(`目標清單人數：${fmt(targetRes.count)}`);
+      if(!targetRes.count) throw new Error('指定受眾名單沒有有效的會員編號資料');
+
+      log('正在讀取商品購買明細...', 'dim');
+      const detailBuf = await fileToArrayBuffer(state.detail);
+      const detailRes = await runInWorker('detail', detailBuf, {
+        id:['會員編號'],
+        order: ORDER_ID_PATTERNS,
+        categories: CATEGORY_DEFS,
+        metrics: METRIC_DEFS
+      }, targetRes.ids);
+
+      log(`會員編號欄位對應（明細）：「${detailRes.idColumnFound}」`, 'dim');
+      log(`偵測到分類欄位：${detailRes.categoryKeys.join('、')}`, 'dim');
+      log(`明細記錄人數：${fmt(detailRes.detailCount)}`);
+      log(`實際匹配人數：${fmt(detailRes.matchedCount)}`);
+      if(detailRes.dedupOrders){
+        log(`訂單號碼欄位對應：「${detailRes.orderColumnFound}」→ 訂單筆數以不重複訂單號碼計算`, 'dim');
+        log(`匹配訂單：原始逐列加總 ${fmt(detailRes.rawOrderSum)} 筆 → 去重後 ${fmt(detailRes.matchedOrderCount)} 筆`);
+      } else {
+        log('未偵測到訂單號碼欄位（如「母訂單號碼」），訂單筆數維持逐列加總，可能含重複', 'err');
+      }
+
+      if(!detailRes.matchedCount) throw new Error('匹配人數為 0，請檢查兩份檔案的會員編號格式（如有無前導零）');
+
+      const summaryRows = detailRes.rows.map(g=>{
+        const obj = {};
+        detailRes.categoryKeys.forEach((k,i)=> obj[k]=g.parts[i]);
+        obj['購買人數'] = g.members;
+        detailRes.metricKeys.forEach(k=> obj[k]=g.metrics[k]);
+        addAverages(obj);
+        return obj;
+      });
+      summaryRows.sort((a,b)=>{
+        for(const k of detailRes.categoryKeys){
+          if(a[k] < b[k]) return -1;
+          if(a[k] > b[k]) return 1;
+        }
+        return 0;
+      });
+
+      const totalRow = {};
+      detailRes.categoryKeys.forEach((k,i)=> totalRow[k] = i===0 ? '總計' : '-');
+      totalRow['購買人數'] = detailRes.matchedCount;
+      detailRes.metricKeys.forEach(k=> totalRow[k] = summaryRows.reduce((s,r)=>s+r[k],0));
+      // 總計列的訂單筆數也要去重：同一張訂單可能同時出現在多個分類，不能直接把各列相加
+      if(detailRes.dedupOrders) totalRow['訂單筆數'] = detailRes.matchedOrderCount;
+      addAverages(totalRow);
+      const outMetricKeys = [...detailRes.metricKeys, ...AVG_KEYS];
+
+      const secs = ((performance.now()-t0)/1000).toFixed(1);
+      log(`彙整完成，共 ${summaryRows.length} 列（耗時 ${secs} 秒）`, 'ok');
+      log('✅ 比對完成', 'ok');
+
+      renderResults(detailRes.categoryKeys, outMetricKeys, summaryRows, totalRow,
+        {targetCount:targetRes.count, detailCount:detailRes.detailCount, matchedCount:detailRes.matchedCount,
+         orderCount: detailRes.dedupOrders ? detailRes.matchedOrderCount : totalRow['訂單筆數'],
+         dedupOrders: detailRes.dedupOrders});
+
+    }catch(err){
+      log('🚨 偵測到異常：'+err.message, 'err');
+    }finally{
+      runBtn.disabled = false;
+    }
+  });
+
+  function renderResults(categoryKeys, metricKeys, rows, totalRow, stats){
+    document.getElementById('stat-target').textContent = fmt(stats.targetCount);
+    document.getElementById('stat-detail').textContent = fmt(stats.detailCount);
+    document.getElementById('stat-matched').textContent = fmt(stats.matchedCount);
+    document.getElementById('stat-rows').textContent = fmt(rows.length);
+    document.getElementById('stat-orders').textContent = fmt(stats.orderCount);
+    document.getElementById('stat-orders-label').textContent = stats.dedupOrders ? '不重複訂單數' : '訂單筆數（未去重）';
+    document.getElementById('coverage').innerHTML = '本次涵蓋分類欄位：<b>' + categoryKeys.join('、') + '</b>';
+
+    const table = document.getElementById('result-table');
+    const headCols = [...categoryKeys, '購買人數', ...metricKeys];
+    let thead = '<thead><tr>' + headCols.map(h=>{
+      const numeric = h==='購買人數' || metricKeys.includes(h);
+      return `<th class="${numeric?'num':''}">${h}</th>`;
+    }).join('') + '</tr></thead>';
+
+    let tbody = '<tbody>';
+    rows.forEach(r=>{
+      tbody += '<tr>' + headCols.map(h=>{
+        const numeric = h==='購買人數' || metricKeys.includes(h);
+        const val = numeric ? fmt(r[h]) : r[h];
+        return `<td class="${numeric?'num':''}">${val}</td>`;
+      }).join('') + '</tr>';
+    });
+    tbody += `<tr class="total-row">` + headCols.map(h=>{
+      const numeric = h==='購買人數' || metricKeys.includes(h);
+      const val = numeric ? fmt(totalRow[h]) : totalRow[h];
+      return `<td class="${numeric?'num':''}">${val}</td>`;
+    }).join('') + '</tr>';
+    tbody += '</tbody>';
+
+    table.innerHTML = thead + tbody;
+    resultsEl.classList.add('show');
+
+    state.lastSummary = rows;
+    state.lastTotal = totalRow;
+    state.lastHeadCols = headCols;
+  }
+
+  downloadBtn.addEventListener('click', ()=>{
+    if(!state.lastSummary){ return; }
+    const dataOut = [...state.lastSummary, state.lastTotal].map(r=>{
+      const o = {};
+      state.lastHeadCols.forEach(h=> o[h]=r[h]);
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(dataOut, {header: state.lastHeadCols});
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '比對結果');
+    const ts = new Date();
+    const stamp = `${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}`;
+    XLSX.writeFile(wb, `會員分類比對結果_${stamp}.xlsx`);
+  });
+
+})();
+</script>
+</body>
+</html>
