@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>封閉式行銷甘特圖產生器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --paper:#F6F9F9; --surface:#FFFFFF; --ink:#1B2B30; --muted:#5B6E73;
+  --line:#D3DEE0; --teal:#0F6E77; --teal-ink:#FFFFFF; --tint:#E0F7FA;
+  --warn-bg:#FFF4E0; --warn-ink:#8A4B08; --bad:#C0362C; --ok:#1E7B4A; --focus:#1E88E5;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121A1C; --surface:#1A2427; --ink:#E4ECEE; --muted:#9AAEB3; --line:#2E3D41;
+    --teal:#46B3BD; --teal-ink:#0C1A1C; --tint:#1E3A3E; --warn-bg:#3A2A12; --warn-ink:#F3C27A;
+    --bad:#FF7B70; --ok:#6FD19B; --focus:#64B5F6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121A1C; --surface:#1A2427; --ink:#E4ECEE; --muted:#9AAEB3; --line:#2E3D41;
+  --teal:#46B3BD; --teal-ink:#0C1A1C; --tint:#1E3A3E; --warn-bg:#3A2A12; --warn-ink:#F3C27A;
+  --bad:#FF7B70; --ok:#6FD19B; --focus:#64B5F6; color-scheme:dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif;font-size:15px;line-height:1.6}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1560px;margin:0 auto;padding:28px 24px 48px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-bottom:18px;border-bottom:2px solid var(--ink)}
+h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.02em}
+.sub{margin:4px 0 0;color:var(--muted);max-width:64ch}
+.btn{border:1px solid var(--ink);background:var(--surface);padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--tint)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:var(--teal-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.small{padding:4px 10px;font-size:13px}
+.drop{margin-top:28px;border:2px dashed var(--line);border-radius:6px;background:var(--surface);padding:48px 24px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--teal);background:var(--tint)}
+.drop strong{display:block;font-size:18px;margin-bottom:6px}
+.drop p{margin:0 auto;color:var(--muted);max-width:60ch}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;padding:12px 14px;background:var(--tint);border-radius:4px;margin:20px 0 14px}
+.toolbar .file{font-weight:700}
+.toolbar .stat{color:var(--muted)} .toolbar .stat b{color:var(--ink)}
+.toolbar label.ym{display:inline-flex;gap:6px;align-items:center}
+.toolbar input[type=number],.toolbar select{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px 6px}
+.toolbar input[type=number]{width:5.5em}
+.toolbar .spacer{flex:1}
+.toast{color:var(--ok);font-weight:500;min-width:9em}
+.panel{border-left:4px solid var(--warn-ink);background:var(--warn-bg);color:var(--warn-ink);padding:12px 16px;margin-bottom:14px;border-radius:0 4px 4px 0}
+.panel h2{font-size:15px;margin:0 0 8px}
+.panel ul{margin:0;padding-left:20px}
+.unk{display:grid;grid-template-columns:minmax(110px,auto) 1fr;gap:8px 14px;align-items:center;margin-top:6px}
+.unk .name{font-weight:700}
+.unk .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--ink)}
+.unk .eg{color:var(--warn-ink);font-size:13px;width:100%}
+.unk select,.unk input[type=text]{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px 6px}
+.unk input[type=color]{width:34px;height:28px;border:1px solid var(--line);padding:1px;background:var(--surface)}
+
+/* 試算表預覽：維持白底，跟 Excel 看起來一樣 */
+.sheetwrap{overflow-x:auto;background:#FFFFFF;border:1px solid var(--line);padding:0}
+#sheet{border-collapse:collapse;table-layout:fixed;color:#000}
+#sheet td{border:1px solid #E2E2E2;height:22px;overflow:hidden;padding:0 2px}
+#sheet td.ttl{overflow:visible;white-space:nowrap!important;text-align:left!important}
+#sheet td.day{cursor:pointer;white-space:nowrap!important;text-overflow:ellipsis}
+#sheet td.day:hover{box-shadow:inset 0 0 0 2px #1B2B30}
+#sheet td.day:focus-visible{outline:2px solid #1E88E5;outline-offset:-2px}
+#sheet td.manual{box-shadow:inset 0 0 0 2px #1B2B30;background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(0,0,0,.08) 6px 8px)}
+#sheet td.unknown{background:repeating-linear-gradient(45deg,#FFF4E0 0 4px,#FFFFFF 4px 8px)!important;color:#8A4B08!important;font-weight:700}
+#sheet col.rh{width:34px}
+.colhead{display:grid;font-size:11px;color:var(--muted)}
+.hint{color:var(--muted);font-size:13px;margin-top:10px}
+details.rules{margin-top:22px;border-top:1px solid var(--line);padding-top:12px}
+details.rules summary{cursor:pointer;font-weight:500}
+details.rules li{color:var(--muted);max-width:80ch}
+dialog{border:1px solid var(--ink);border-radius:6px;padding:0;max-width:min(440px,92vw);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(10,20,22,.35)}
+.dlg{padding:18px 20px}
+.dlg h3{margin:0 0 4px;font-size:17px}
+.dlg .where{color:var(--muted);margin:0 0 12px;font-size:14px}
+.dlg .src{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:13px;white-space:pre-wrap;margin-bottom:12px;max-height:180px;overflow:auto}
+.dlg label.f{display:block;font-size:14px;margin-bottom:4px}
+.dlg select{width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.err{margin-top:20px;padding:12px 16px;border-left:4px solid var(--bad);background:var(--surface);color:var(--bad)}
+.hidden{display:none !important}
+@media (max-width:640px){.wrap{padding:18px 12px 36px}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>封閉式行銷甘特圖產生器</h1>
+      <p class="sub">上傳含「月曆」頁籤的 Excel，依月曆的月份自動產生整張甘特圖，複製後直接貼進 Excel 或 Google 試算表。</p>
+    </div>
+    <div>
+      <input type="file" id="file" accept=".xlsx" hidden>
+      <button class="btn" id="pick">選擇 Excel 檔</button>
+    </div>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇或拖曳 Excel 檔">
+    <strong>把有「月曆」頁籤的 .xlsx 拖到這裡</strong>
+    <p>不需要甘特圖頁籤，日期、星期、列標題和圖例都會自動產生。檔案只在你的瀏覽器裡處理，不會上傳。</p>
+  </div>
+  <div id="err" class="err hidden" role="alert"></div>
+
+  <section id="app" class="hidden">
+    <div class="toolbar">
+      <span class="file" id="fname"></span>
+      <label class="ym">年 <input type="number" id="yr" min="2020" max="2100"></label>
+      <label class="ym">月 <select id="mo"></select></label>
+      <span class="stat">已排入 <b id="sCnt">0</b> 則</span>
+      <span class="spacer"></span>
+      <span class="toast" id="toast" aria-live="polite"></span>
+      <button class="btn" id="copyGrid" title="貼在甘特圖的 G3 儲存格">只複製排程格</button>
+      <button class="btn primary" id="copyAll" title="貼在空白工作表的 A1 儲存格">複製整張甘特圖</button>
+    </div>
+
+    <div id="unkPanel" class="panel hidden">
+      <h2>這些品類不在圖例裡，請指定要歸到哪一類</h2>
+      <div id="unkList"></div>
+    </div>
+    <div id="warnPanel" class="panel hidden">
+      <h2>需要留意</h2>
+      <ul id="warnList"></ul>
+    </div>
+
+    <div class="sheetwrap"><table id="sheet"></table></div>
+    <p class="hint">「複製整張甘特圖」請貼在空白工作表的 A1；「只複製排程格」請貼在既有甘特圖的 G3。點任一排程格可查看月曆原文並修改。</p>
+
+    <details class="rules">
+      <summary>對應規則</summary>
+      <ul>
+        <li>月曆「eDM」：灰底（其他單位）放 EDM 全會員列，其餘放 EDM 封閉列；「CDP eDM」放封閉CDP列。</li>
+        <li>月曆「APP公眾」放 APP 公眾列；「APP封閉」的兩列依序放 APP 封閉的兩列。</li>
+        <li>月曆「SMS」的兩列依序放 SMS 的兩列。</li>
+        <li>格子內容取「｜」前的品類，去掉 (品類)、(中央)、(廠商負擔) 等前綴後對應圖例，例如服飾鞋包→服飾、會員→(會員)；灰底一律為 (其他單位)。</li>
+        <li>年份先從檔名判斷，再用月曆上 1 號落在星期幾核對；判斷有誤可在上方直接改年、月。</li>
+        <li>你指定的品類對應和新增的圖例會記在這個瀏覽器，下個月自動套用。</li>
+      </ul>
+      <button class="btn small" id="resetAlias">清除已記住的品類對應</button>
+    </details>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg">
+    <h3 id="dTitle"></h3>
+    <p class="where" id="dWhere"></p>
+    <div class="src" id="dSrc"></div>
+    <label class="f" for="dSel">甘特圖要顯示</label>
+    <select id="dSel"></select>
+    <div class="acts">
+      <button class="btn small" value="auto">還原自動結果</button>
+      <button class="btn small" value="cancel">取消</button>
+      <button class="btn small primary" value="ok">套用</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+'use strict';
+const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const PNS='http://schemas.openxmlformats.org/package/2006/relationships';
+const RID='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const $=s=>document.querySelector(s);
+
+/* ---------- 甘特圖版型（依「甘特圖」頁籤） ---------- */
+const TITLE={text:'新首頁作業流程',href:'https://docs.google.com/spreadsheets/d/1q2YRpIJimi2D7FGsZJyPR94zR2_m8v0yPw9_Rp-_anM/edit?gid=1815756914'};
+const RULES=[
+  {ch:'edm',    gray:true,  row:3,  grp:'EDM發送', typ:'全會員'},
+  {ch:'edm',    gray:false, row:4,  grp:'EDM發送', typ:'封閉'},
+  {ch:'cdpedm',             row:5,  grp:'EDM發送', typ:'封閉CDP'},
+  {ch:'app公眾',            row:6,  grp:'APP推播', typ:'公眾'},
+  {ch:'app封閉', line:0,    row:7,  grp:'APP推播', typ:'封閉（第 1 則）'},
+  {ch:'app封閉', line:1,    row:8,  grp:'APP推播', typ:'封閉（第 2 則）'},
+  {ch:'sms',     line:0,    row:9,  grp:'SMS發送', typ:'第 1 則'},
+  {ch:'sms',     line:1,    row:10, grp:'SMS發送', typ:'第 2 則'}
+];
+// C、D 欄標題：row, rowspan, text, 字色
+const C_LABELS=[{r:3,span:3,t:'EDM發送\n*灰底為其他單位'},{r:6,span:3,t:'APP推播 \n*灰底為其他單位'},{r:9,span:2,t:'SMS發送'}];
+const D_LABELS=[{r:3,span:1,t:'全會員*每月2檔'},{r:4,span:1,t:'封閉'},{r:5,span:1,t:'封閉CDP'},{r:6,span:1,t:'公眾 *每月4檔'},
+  {r:7,span:2,t:'封閉'},{r:9,span:2,t:'*待每月簡訊排程公告後補上',color:'#FF0000'}];
+const LEGEND=[['全站','#FFFF00'],['中文','#B6D7A8'],['3C','#BF8F00'],['文具','#FCD5B4'],['服飾','#3D85C6','#FFFFFF'],
+  ['美妝','#FF9900'],['食品','#FFF5F5'],['生活','#FF6699'],['童書','#FF99FF'],['休閒','#6AA84F'],['外文','#00FF00'],
+  ['親子','#EDE6FF'],['影音','#C9DAF8'],['IMC','#674EA7','#FFFFFF'],['(會員)','#EAD1DC'],['(其他單位)','#D9D9D9']]
+  .map(([label,fill,font])=>({label,fill,font:font||'#000000'}));
+const TINT='#E0F7FA',FONT="font-family:'Microsoft JhengHei','微軟正黑體',sans-serif;font-size:9pt;";
+const THIN='.5pt solid windowtext',MED='1.5pt solid windowtext';
+const BASE_ALIAS={'會員':'(會員)','會員處':'(其他單位)','服飾鞋包':'服飾','親子用品':'親子','3C家電':'3C',
+  '文具潮藝':'文具','美妝保養':'美妝','圖書':'中文','中文書':'中文','外文書':'外文'};
+const OTHER='(其他單位)';
+const LS_ALIAS='closedGantt.alias.v1',LS_CUSTOM='closedGantt.customLegend.v1';
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- xlsx 讀取 ---------- */
+const parseXml=s=>new DOMParser().parseFromString(s,'application/xml');
+const kids=(el,n)=>el?Array.from(el.childNodes).filter(x=>x.nodeType===1&&x.localName===n):[];
+const kid=(el,n)=>kids(el,n)[0]||null;
+const colIdx=L=>{let n=0;for(const c of L)n=n*26+c.charCodeAt(0)-64;return n};
+const colL=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
+const rowOf=ref=>+/\d+$/.exec(ref)[0];
+const norm=s=>String(s).replace(/\s+/g,'').toLowerCase();
+function siText(si){let s='';for(const ch of si.childNodes){if(ch.localName==='t')s+=ch.textContent;
+  else if(ch.localName==='r')for(const t of kids(ch,'t'))s+=t.textContent}return s}
+function isGray(rgb){if(!rgb)return false;const h=rgb.slice(-6);const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  return r===g&&g===b&&r>=0x99&&r<=0xE6}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function openBook(buf){
+  const zip=await JSZip.loadAsync(buf);const txt=async p=>{const f=zip.file(p);return f?await f.async('string'):null};
+  const wb=parseXml(await txt('xl/workbook.xml'));const rels=parseXml(await txt('xl/_rels/workbook.xml.rels'));
+  const relMap={};for(const r of rels.getElementsByTagNameNS(PNS,'Relationship'))relMap[r.getAttribute('Id')]=r.getAttribute('Target');
+  const sheets=[];for(const s of wb.getElementsByTagNameNS(NS,'sheet')){let t=relMap[s.getAttributeNS(RID,'id')];
+    t=t.startsWith('/')?t.slice(1):'xl/'+t.replace(/^\.\//,'');sheets.push({name:s.getAttribute('name'),path:t})}
+  const ssx=await txt('xl/sharedStrings.xml');const ss=ssx?Array.from(parseXml(ssx).getElementsByTagNameNS(NS,'si')).map(siText):[];
+  const st=parseXml(await txt('xl/styles.xml')).documentElement;
+  const fills=kids(kid(st,'fills'),'fill').map(f=>{const p=kid(f,'patternFill');if(!p||p.getAttribute('patternType')==='none')return null;
+    const fg=kid(p,'fgColor');return fg&&fg.getAttribute('rgb')||null});
+  const xfs=kids(kid(st,'cellXfs'),'xf');
+  const fillOf=s=>{const x=xfs[s]||xfs[0];return x?fills[+(x.getAttribute('fillId')||0)]||null:null};
+  const readSheet=async name=>{const sh=sheets.find(s=>s.name===name);const doc=parseXml(await txt(sh.path));
+    const cells=new Map();let maxRow=0;
+    for(const c of doc.getElementsByTagNameNS(NS,'c')){const ref=c.getAttribute('r');if(!ref)continue;
+      const t=c.getAttribute('t'),v=kid(c,'v');let val=null;
+      if(t==='s'&&v)val=ss[+v.textContent];else if(t==='inlineStr'){const is=kid(c,'is');val=is?siText(is):null}
+      else if(v)val=(t==='str'||t==='e'||t==='b')?v.textContent:Number(v.textContent);
+      if(val==='')val=null;cells.set(ref,{val,s:c.hasAttribute('s')?+c.getAttribute('s'):0});maxRow=Math.max(maxRow,rowOf(ref))}
+    return {name,cells,maxRow}};
+  return {sheets,fillOf,readSheet};
+}
+
+/* ---------- 解析月曆 ---------- */
+function parseCalendar(B,sh){
+  const get=(c,r)=>sh.cells.get(colL(c)+r);const W='一二三四五六日';let dayCols=null;
+  for(let r=1;r<=15&&!dayCols;r++){const f=[];for(let c=1;c<=80;c++){const x=get(c,r);const v=x&&typeof x.val==='string'?x.val.trim():'';
+      if(v.length===1&&W.includes(v))f.push({c,w:W.indexOf(v)})}
+    if(f.length>=5)dayCols=f.sort((a,b)=>a.w-b.w).map(o=>o.c)}
+  if(!dayCols)throw new Error('「'+sh.name+'」頁籤找不到星期列（一～日），請確認月曆版型沒有改動。');
+  const dateRows=[];for(let r=1;r<=sh.maxRow;r++){const a=get(1,r);if(a&&typeof a.val==='string'&&a.val.trim()==='日期')dateRows.push(r)}
+  if(!dateRows.length)throw new Error('「'+sh.name+'」頁籤的 A 欄找不到「日期」列，無法判斷週次。');
+  const h=dateRows.length>1?dateRows[1]-dateRows[0]:8;const entries=[];let month=null,firstWd=null;
+  for(let r=1;r<=6&&!month;r++){const a=get(1,r);const m=a&&typeof a.val==='string'&&/(\d{1,2})\/1\s*[-~～]/.exec(a.val);if(m)month=+m[1]}
+  dateRows.forEach((dr,i)=>{const end=i+1<dateRows.length?dateRows[i+1]:dr+h;const info=[];let ch=null,line=0;
+    for(let r=dr+1;r<end;r++){const a=get(1,r);const av=a&&a.val!=null?String(a.val).trim():'';
+      if(av&&av!=='日期'){ch=av;line=0}else line++;info.push({r,ch,line})}
+    dayCols.forEach((c,wi)=>{const dv=get(c,dr);if(!dv||typeof dv.val!=='number')return;const day=Math.round(dv.val);
+      if(day===1)firstWd=(wi+1)%7; // 0=日
+      for(const ri of info){if(!ri.ch)continue;const x=get(c,ri.r);if(!x||x.val==null)continue;const text=String(x.val).trim();if(!text)continue;
+        entries.push({day,ch:ri.ch,chn:norm(ri.ch),line:ri.line,text,rgb:B.fillOf(x.s),ref:colL(c)+ri.r})}})});
+  const maxDay=entries.reduce((m,e)=>Math.max(m,e.day),0);
+  return {entries,month,firstWd,maxDay};
+}
+function guessYear(fname,month,firstWd){
+  const now=new Date().getFullYear();const m=/(20\d{2})/.exec(fname);const cands=[];
+  if(m)cands.push(+m[1]);cands.push(now,now+1,now-1);
+  if(month&&firstWd!=null){for(const y of cands)if(new Date(y,month-1,1).getDay()===firstWd)return y}
+  return cands[0];
+}
+
+/* ---------- 狀態 ---------- */
+let CAL=null,FNAME='',YEAR=null,MONTH=null;
+let overrides=new Map(),alias=store.get(LS_ALIAS,{}),custom=store.get(LS_CUSTOM,[]);
+const allLegend=()=>{const l=LEGEND.slice();for(const c of custom)if(!l.find(x=>x.label===c.label))l.push({label:c.label,fill:c.fill,font:c.font||'#000000'});return l};
+const legendOf=lab=>allLegend().find(x=>x.label===lab);
+const daysIn=()=>new Date(YEAR,MONTH,0).getDate();
+
+function labelFor(text,rgb){
+  if(isGray(rgb))return {label:OTHER};
+  const p=text.split(/[｜|]/)[0].trim().replace(/^((\([^)]*\))|(（[^）]*）))+/,'').trim();
+  const leg=allLegend().map(x=>x.label);if(leg.includes(p))return {label:p};
+  const a=alias[p]||BASE_ALIAS[p];if(a&&leg.includes(a))return {label:a};
+  return {unknown:p};
+}
+function compute(){
+  const auto=new Map(),unk=new Map(),warns=[];const nd=daysIn();
+  for(const e of CAL.entries){
+    const g=isGray(e.rgb);let cands=RULES.filter(r=>r.ch===e.chn&&(r.gray===undefined||r.gray===g));
+    const first=e.text.split('\n')[0];
+    if(!cands.length){if(!warns.some(w=>w.k==='ch'+e.chn))warns.push({k:'ch'+e.chn,t:`月曆的通路「${e.ch}」沒有對應的甘特圖列，這些排程沒有排入（例如 ${e.day} 日「${first}」）。`});continue}
+    if(cands.some(r=>r.line!==undefined))cands=cands.filter(r=>r.line===e.line);
+    if(e.day>nd){warns.push({t:`${MONTH} 月只有 ${nd} 天，月曆 ${e.day} 日的「${first}」沒有排入。`});continue}
+    const rule=cands.find(r=>!auto.has(r.row+'|'+e.day));
+    if(!rule){warns.push({t:`${e.day} 日的「${e.ch}」超過甘特圖能放的則數，「${first}」沒有排入（月曆 ${e.ref}）。`});continue}
+    const lf=labelFor(e.text,e.rgb);auto.set(rule.row+'|'+e.day,{label:lf.label||null,unknown:lf.unknown||null,raw:e});
+    if(lf.unknown){const u=unk.get(lf.unknown)||{n:0,eg:first,day:e.day};u.n++;unk.set(lf.unknown,u)}
+  }
+  if(CAL.month&&CAL.month!==MONTH)warns.unshift({t:`月曆標示的是 ${CAL.month} 月，但目前產生的是 ${MONTH} 月，請確認上方的月份。`});
+  if(CAL.firstWd!=null&&new Date(YEAR,MONTH-1,1).getDay()!==CAL.firstWd)
+    warns.unshift({t:`月曆上 1 號是星期${'日一二三四五六'[CAL.firstWd]}，但 ${YEAR} 年 ${MONTH} 月 1 號是星期${'日一二三四五六'[new Date(YEAR,MONTH-1,1).getDay()]}，請確認上方的年份。`});
+  return {auto,unk,warns};
+}
+function cellsFinal(res){const out=new Map();
+  for(const rule of RULES)for(let d=1;d<=daysIn();d++){const k=rule.row+'|'+d;const a=res.auto.get(k)||null;const ov=overrides.get(k);
+    let fin=a&&a.label||null,st='';if(ov!==undefined){fin=ov||null;st='manual'}else if(a&&a.unknown){st='unknown'}
+    out.set(k,{rule,day:d,a,fin,st})}
+  return out}
+
+/* ---------- 產生甘特圖表格（預覽與複製共用） ---------- */
+function buildTable(FIN,opts){
+  const forCopy=opts.copy, gridOnly=opts.gridOnly;const nd=daysIn();const WD='日一二三四五六';
+  const css=(o)=>Object.entries(o).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>k+':'+v).join(';');
+  const base={'text-align':'center','vertical-align':'middle','white-space':'normal'};
+  const td=(content,style,attrs='')=>{const st={...base,...style};let bg='';
+    if(st.background){st['background-color']=st.background;bg=` bgcolor="${st.background}"`;delete st.background}
+    return `<td${attrs}${bg} style="${FONT}${css(st)}">${content}</td>`};
+  const txt=s=>esc(s).replace(/\n/g,forCopy?'<br style="mso-data-placement:same-cell">':'<br>');
+  const dayBorder=(d,r)=>{const wd=new Date(YEAR,MONTH-1,d).getDay();const s={};
+    if(d===1)s['border-left']=MED;if(wd===0||d===nd)s['border-right']=MED;
+    if(r===3)s['border-top']=MED;if(r===10)s['border-bottom']=MED;return s};
+  let h='';const cols=(gridOnly?0:6)+nd;
+  h+='<colgroup>';if(!gridOnly)h+='<col style="width:40px"><col style="width:40px"><col style="width:96px"><col style="width:104px"><col style="width:72px"><col style="width:66px">';
+  for(let d=1;d<=nd;d++)h+='<col style="width:66px">';h+='</colgroup>';
+  if(!gridOnly){
+    // 第 1 列：標題連結 + 日期
+    h+='<tr>'+td(`<a href="${TITLE.href}" style="color:#0563C1;text-decoration:underline">${TITLE.text}</a>`,{border:THIN,color:'#0563C1','white-space':'nowrap'},' class="ttl"');
+    for(let i=0;i<5;i++)h+=td('',{});
+    for(let d=1;d<=nd;d++)h+=td(forCopy?`${YEAR}/${MONTH}/${d}`:`${MONTH}/${d}`,{border:THIN,'mso-number-format':'"m\\/d"'});h+='</tr>';
+    // 第 2 列：AD尺寸 + 星期
+    h+='<tr>'+td('',{})+td('',{})+td('',{})+td('',{})+td(txt('AD尺寸\n(<200kb)'),{border:THIN})+td('',{});
+    for(let d=1;d<=nd;d++)h+=td(WD[new Date(YEAR,MONTH-1,d).getDay()],{border:THIN});h+='</tr>';
+  }
+  for(let r=3;r<=10;r++){
+    h+='<tr>';
+    if(!gridOnly){
+      if(r===3){h+=td('',{background:TINT,border:THIN},' rowspan="8"')+td('',{background:TINT,border:THIN},' rowspan="8"')}
+      const c=C_LABELS.find(x=>x.r===r);if(c)h+=td(txt(c.t),{background:TINT,border:THIN},` rowspan="${c.span}"`);
+      const dl=D_LABELS.find(x=>x.r===r);if(dl)h+=td(txt(dl.t),{background:TINT,border:THIN,color:dl.color},` rowspan="${dl.span}"`);
+      if(r===3)h+=td('',{background:TINT,border:THIN},' rowspan="8"');
+      h+=td('',{});
+    }
+    for(let d=1;d<=nd;d++){
+      const rule=RULES.find(x=>x.row===r);const f=FIN.get(r+'|'+d);const s=dayBorder(d,r);let content='';
+      if(f&&f.fin){const l=legendOf(f.fin);s.background=l?l.fill:'#FFFFFF';s.color=l?l.font:'#000000';content=txt(f.fin)}
+      else if(f&&f.st==='unknown'&&!forCopy){content=txt('?'+f.a.unknown)}
+      else s.background='#FFFFFF';
+      let attrs='';
+      if(!forCopy){const wd=new Date(YEAR,MONTH-1,d).getDay();
+        const tip=`${MONTH}/${d}（${WD[wd]}）${rule.grp} ${rule.typ}`+(f&&f.a?'\n月曆：'+f.a.raw.ch+'｜'+f.a.raw.text:'');
+        attrs=` class="day${f&&f.st?' '+f.st:''}" tabindex="0" role="button" data-k="${r}|${d}" title="${esc(tip)}"`}
+      h+=td(content,s,attrs)}
+    h+='</tr>';
+  }
+  if(!gridOnly){
+    for(let r=11;r<=13;r++){h+='<tr>';for(let i=0;i<cols;i++)h+=td('',{});h+='</tr>'}
+    const leg=allLegend();h+='<tr>';for(let i=0;i<4;i++)h+=td('',{});
+    for(const l of leg)h+=td(esc(l.label),{background:l.fill,color:l.font});
+    for(let i=4+leg.length;i<cols;i++)h+=td('',{});h+='</tr>';
+  }
+  return h;
+}
+function buildTSV(FIN,gridOnly){
+  const nd=daysIn(),WD='日一二三四五六',rows=[];const q=s=>/[\t\n"]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  if(!gridOnly){rows.push([TITLE.text,'','','','','',...Array.from({length:nd},(_,i)=>`${YEAR}/${MONTH}/${i+1}`)]);
+    rows.push(['','','','','AD尺寸\n(<200kb)','',...Array.from({length:nd},(_,i)=>WD[new Date(YEAR,MONTH-1,i+1).getDay()])])}
+  for(let r=3;r<=10;r++){const row=[];if(!gridOnly){const c=C_LABELS.find(x=>x.r===r),d=D_LABELS.find(x=>x.r===r);
+      row.push('','',c?c.t:'',d?d.t:'','','')}
+    for(let d=1;d<=nd;d++){const f=FIN.get(r+'|'+d);row.push(f&&f.fin||'')}rows.push(row)}
+  if(!gridOnly){rows.push([],[],[]);rows.push(['','','','',...allLegend().map(l=>l.label)])}
+  return rows.map(r=>r.map(x=>q(String(x))).join('\t')).join('\r\n');
+}
+
+/* ---------- 畫面 ---------- */
+let RES=null,FIN=null;
+function render(){
+  RES=compute();FIN=cellsFinal(RES);
+  let n=0;for(const f of FIN.values())if(f.fin)n++;$('#sCnt').textContent=n;
+  const ul=$('#unkList');ul.innerHTML='';
+  if(RES.unk.size){$('#unkPanel').classList.remove('hidden');
+    for(const [p,u] of RES.unk){const row=document.createElement('div');row.className='unk';
+      const opts=allLegend().map(l=>`<option value="${esc(l.label)}">${esc(l.label)}</option>`).join('');
+      row.innerHTML=`<div class="name">${esc(p)}</div><div class="ctl">
+        <select aria-label="${esc(p)} 要歸到"><option value="">選擇圖例…</option>${opts}<option value="__new">新增為新圖例</option></select>
+        <span class="newbox hidden"><input type="text" value="${esc(p)}" aria-label="新圖例名稱" size="8"> <input type="color" value="#FFE599" aria-label="新圖例顏色"></span>
+        <button class="btn small">套用</button>
+        <span class="eg">${u.n} 格，例如 ${u.day} 日「${esc(u.eg)}」</span></div>`;
+      const sel=row.querySelector('select'),nb=row.querySelector('.newbox');
+      sel.addEventListener('change',()=>nb.classList.toggle('hidden',sel.value!=='__new'));
+      row.querySelector('button').addEventListener('click',()=>{
+        if(sel.value==='__new'){const name=nb.querySelector('input[type=text]').value.trim();if(!name)return;
+          const fill=nb.querySelector('input[type=color]').value.toUpperCase();
+          if(!allLegend().find(l=>l.label===name)){custom.push({label:name,fill});store.set(LS_CUSTOM,custom)}alias[p]=name}
+        else if(sel.value)alias[p]=sel.value;else return;
+        store.set(LS_ALIAS,alias);render()});
+      ul.appendChild(row)}
+  }else $('#unkPanel').classList.add('hidden');
+  const wl=$('#warnList');wl.innerHTML='';
+  if(RES.warns.length){$('#warnPanel').classList.remove('hidden');for(const w of RES.warns){const li=document.createElement('li');li.textContent=w.t;wl.appendChild(li)}}
+  else $('#warnPanel').classList.add('hidden');
+  $('#sheet').innerHTML=buildTable(FIN,{copy:false,gridOnly:false});$('#sheet').style.width=(40+40+96+104+72+66+66*daysIn())+'px';
+  const blocked=RES.unk.size>0;
+  for(const id of ['#copyAll','#copyGrid']){$(id).disabled=blocked}
+  $('#toast').textContent=blocked?'請先指定上方未對應的品類':'';
+}
+
+/* ---------- 複製 ---------- */
+function copyRich(html,text){
+  let ok=false;const h=e=>{e.clipboardData.setData('text/html',html);e.clipboardData.setData('text/plain',text);e.preventDefault();ok=true};
+  document.addEventListener('copy',h);try{document.execCommand('copy')}catch(e){}document.removeEventListener('copy',h);
+  if(ok)return Promise.resolve(true);
+  if(navigator.clipboard&&window.ClipboardItem)
+    return navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]).then(()=>true,()=>false);
+  return Promise.resolve(false);
+}
+async function doCopy(gridOnly){
+  const table='<table style="border-collapse:collapse">'+buildTable(FIN,{copy:true,gridOnly})+'</table>';
+  const html='<html><head><meta charset="utf-8"></head><body>'+table+'</body></html>';
+  const ok=await copyRich(html,buildTSV(FIN,gridOnly));
+  $('#toast').textContent=ok?(gridOnly?'已複製排程格，請貼在 G3':'已複製整張甘特圖，請貼在 A1'):'瀏覽器不允許複製，請改用 Chrome 或 Edge';
+  clearTimeout(doCopy.t);doCopy.t=setTimeout(()=>{$('#toast').textContent=''},4000);
+}
+window.__gantt={doCopy,buildTable:g=>buildTable(FIN,{copy:true,gridOnly:g}),buildTSV:g=>buildTSV(FIN,g)};
+
+/* ---------- 單格編輯 ---------- */
+let editKey=null;
+function openEdit(k){editKey=k;const f=FIN.get(k);const WD='日一二三四五六';
+  $('#dTitle').textContent=`${MONTH}/${f.day}（${WD[new Date(YEAR,MONTH-1,f.day).getDay()]}）`;
+  $('#dWhere').textContent=`${f.rule.grp}　${f.rule.typ}`;
+  $('#dSrc').textContent=f.a?'月曆原文：\n'+f.a.raw.text+'\n（'+f.a.raw.ch+'，儲存格 '+f.a.raw.ref+'）':'月曆這天沒有排程。';
+  $('#dSel').innerHTML='<option value="">（空白）</option>'+allLegend().map(l=>`<option value="${esc(l.label)}">${esc(l.label)}</option>`).join('');
+  $('#dSel').value=f.fin||'';$('#dlg').showModal()}
+$('#sheet').addEventListener('click',e=>{const t=e.target.closest('td.day');if(t)openEdit(t.dataset.k)});
+$('#sheet').addEventListener('keydown',e=>{const t=e.target.closest('td.day');if(t&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openEdit(t.dataset.k)}});
+$('#dlg').addEventListener('close',()=>{const v=$('#dlg').returnValue;if(!editKey)return;
+  if(v==='ok')overrides.set(editKey,$('#dSel').value);else if(v==='auto')overrides.delete(editKey);editKey=null;render()});
+
+/* ---------- 上傳 ---------- */
+async function load(file){
+  $('#err').classList.add('hidden');
+  try{
+    if(typeof JSZip==='undefined')throw new Error('讀取元件沒有載入，請確認網路連線後重新整理頁面。');
+    const B=await openBook(await file.arrayBuffer());FNAME=file.name;
+    const names=B.sheets.map(s=>s.name);
+    const order=[...names.filter(n=>n==='月曆'),...names.filter(n=>n!=='月曆'&&n.includes('月曆')&&!n.includes('副本')),...names.filter(n=>!n.includes('月曆'))];
+    let cal=null,lastErr=null;
+    for(const n of order){try{cal=parseCalendar(B,await B.readSheet(n));cal.sheet=n;break}catch(e){lastErr=e}}
+    if(!cal)throw new Error(names.includes('月曆')?lastErr.message:'找不到「月曆」頁籤。');
+    CAL=cal;MONTH=cal.month||new Date().getMonth()+1;YEAR=guessYear(FNAME,cal.month,cal.firstWd);
+    $('#yr').value=YEAR;$('#mo').value=MONTH;overrides=new Map();
+    $('#fname').textContent=FNAME+(cal.sheet!=='月曆'?`（讀取「${cal.sheet}」）`:'');
+    $('#app').classList.remove('hidden');$('#drop').classList.add('hidden');render();
+  }catch(e){console.error(e);$('#err').textContent='無法讀取：'+e.message;$('#err').classList.remove('hidden')}
+}
+$('#mo').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+$('#yr').addEventListener('change',()=>{const y=+$('#yr').value;if(y>=2000&&y<=2100){YEAR=y;render()}});
+$('#mo').addEventListener('change',()=>{MONTH=+$('#mo').value;overrides=new Map();render()});
+const fi=$('#file');
+$('#pick').addEventListener('click',()=>fi.click());
+$('#drop').addEventListener('click',()=>fi.click());
+$('#drop').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click()}});
+fi.addEventListener('change',()=>{if(fi.files[0])load(fi.files[0]);fi.value=''});
+for(const ev of ['dragenter','dragover'])document.addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.add('over')});
+for(const ev of ['dragleave','drop'])document.addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.remove('over')});
+document.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)load(f)});
+$('#copyAll').addEventListener('click',()=>doCopy(false));
+$('#copyGrid').addEventListener('click',()=>doCopy(true));
+$('#resetAlias').addEventListener('click',()=>{alias={};custom=[];store.set(LS_ALIAS,alias);store.set(LS_CUSTOM,custom);render()});
+})();
+</script>
+</body>
+</html>
