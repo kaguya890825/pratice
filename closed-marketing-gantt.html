@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>封閉式行銷甘特圖填表工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --paper:#F6F9F9; --surface:#FFFFFF; --ink:#1B2B30; --muted:#5B6E73;
+  --line:#D3DEE0; --teal:#0F6E77; --teal-ink:#FFFFFF; --tint:#E0F7FA;
+  --warn-bg:#FFF4E0; --warn-ink:#8A4B08; --bad:#C0362C; --cell-empty:#FFFFFF;
+  --weekend:#EEF4F5; --focus:#1E88E5;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#121A1C; --surface:#1A2427; --ink:#E4ECEE; --muted:#9AAEB3;
+    --line:#2E3D41; --teal:#46B3BD; --teal-ink:#0C1A1C; --tint:#1E3A3E;
+    --warn-bg:#3A2A12; --warn-ink:#F3C27A; --bad:#FF7B70; --cell-empty:#1F2B2E;
+    --weekend:#1C2A2D; --focus:#64B5F6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#121A1C; --surface:#1A2427; --ink:#E4ECEE; --muted:#9AAEB3;
+  --line:#2E3D41; --teal:#46B3BD; --teal-ink:#0C1A1C; --tint:#1E3A3E;
+  --warn-bg:#3A2A12; --warn-ink:#F3C27A; --bad:#FF7B70; --cell-empty:#1F2B2E;
+  --weekend:#1C2A2D; --focus:#64B5F6; color-scheme:dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC","Heiti TC",sans-serif;font-size:15px;line-height:1.6}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1480px;margin:0 auto;padding:28px 24px 48px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding-bottom:18px;border-bottom:2px solid var(--ink)}
+h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.02em}
+.sub{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.btn{border:1px solid var(--ink);background:var(--surface);padding:8px 16px;border-radius:4px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--tint)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:var(--teal-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.small{padding:4px 10px;font-size:13px}
+
+.drop{margin-top:28px;border:2px dashed var(--line);border-radius:6px;background:var(--surface);
+  padding:48px 24px;text-align:center;cursor:pointer}
+.drop.over{border-color:var(--teal);background:var(--tint)}
+.drop strong{display:block;font-size:18px;margin-bottom:6px}
+.drop p{margin:0;color:var(--muted)}
+
+.status{display:flex;flex-wrap:wrap;gap:8px 28px;align-items:baseline;margin:22px 0 14px}
+.status .file{font-weight:700}
+.stat{color:var(--muted)} .stat b{color:var(--ink);font-size:18px;margin-right:2px}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:12px 14px;
+  background:var(--tint);border-radius:4px;margin-bottom:14px}
+.seg{display:inline-flex;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.seg label{padding:5px 12px;cursor:pointer;font-size:14px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--ink);color:var(--paper)}
+.seg label:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:-2px}
+.toolbar .spacer{flex:1}
+
+.panel{border-left:4px solid var(--warn-ink);background:var(--warn-bg);color:var(--warn-ink);
+  padding:12px 16px;margin-bottom:14px;border-radius:0 4px 4px 0}
+.panel h2{font-size:15px;margin:0 0 8px}
+.panel ul{margin:0;padding-left:20px}
+.unk{display:grid;grid-template-columns:minmax(110px,auto) 1fr;gap:8px 14px;align-items:center;margin-top:6px}
+.unk .name{font-weight:700}
+.unk .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--ink)}
+.unk .eg{color:var(--warn-ink);font-size:13px;width:100%}
+.unk select,.unk input[type=text]{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:3px 6px}
+.unk input[type=color]{width:34px;height:28px;border:1px solid var(--line);padding:1px;background:var(--surface)}
+
+.gridwrap{overflow-x:auto;border:1px solid var(--ink);background:var(--surface)}
+table.g{border-collapse:collapse;font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;font-size:12px}
+table.g th,table.g td{border:1px solid var(--line);padding:0}
+table.g thead th{background:var(--surface);font-weight:500;width:68px;min-width:68px;max-width:68px;height:22px;text-align:center}
+table.g td{width:68px;min-width:68px;max-width:68px}
+table.g thead tr.wd th{color:var(--muted);font-weight:400}
+table.g thead th.we{background:var(--weekend)}
+table.g th.grp,table.g th.typ{background:var(--tint);text-align:center;padding:4px 8px;white-space:nowrap;font-weight:500;
+  position:sticky;z-index:2}
+table.g th.grp{left:0;min-width:74px}
+table.g th.typ{left:74px;min-width:76px;border-right:2px solid var(--ink)}
+table.g thead th.corner{position:sticky;left:0;z-index:3;background:var(--surface);width:150px;min-width:150px;max-width:150px}
+table.g tr.grpend td,table.g tr.grpend th{border-bottom:2px solid var(--ink)}
+table.g td.wkend{border-right:2px solid var(--ink)}
+.cell{display:block;width:100%;height:30px;border:0;background:var(--cell-empty);cursor:pointer;
+  padding:0 2px;font-size:12px;line-height:1.15;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell:hover{box-shadow:inset 0 0 0 2px var(--ink)}
+.cell.st-new::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 7px 7px 0;
+  border-color:transparent var(--teal) transparent transparent}
+.cell.st-conflict{box-shadow:inset 0 0 0 2px var(--bad)}
+.cell.st-manual{outline:2px dashed var(--ink);outline-offset:-3px}
+.cell.st-unknown{background:repeating-linear-gradient(45deg,var(--warn-bg),var(--warn-bg) 4px,transparent 4px,transparent 8px);
+  color:var(--warn-ink);font-weight:700}
+
+.key{display:flex;flex-wrap:wrap;gap:14px 26px;margin-top:16px;align-items:flex-start}
+.legend{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-block;font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;
+  font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif}
+.marks{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:13px;align-items:center}
+.marks .sw{display:inline-block;width:22px;height:14px;vertical-align:-2px;margin-right:6px;background:var(--cell-empty);
+  position:relative;border:1px solid var(--line)}
+.sw.new::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 6px 6px 0;border-color:transparent var(--teal) transparent transparent}
+.sw.conflict{box-shadow:inset 0 0 0 2px var(--bad)}
+.sw.manual{outline:2px dashed var(--ink);outline-offset:-3px}
+
+details.rules{margin-top:22px;border-top:1px solid var(--line);padding-top:12px}
+details.rules summary{cursor:pointer;font-weight:500}
+details.rules p,details.rules li{color:var(--muted);max-width:78ch}
+
+dialog{border:1px solid var(--ink);border-radius:6px;padding:0;max-width:min(440px,92vw);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(10,20,22,.35)}
+.dlg{padding:18px 20px}
+.dlg h3{margin:0 0 4px;font-size:17px}
+.dlg .where{color:var(--muted);margin:0 0 12px;font-size:14px}
+.dlg .src{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:13px;
+  white-space:pre-wrap;margin-bottom:12px;max-height:180px;overflow:auto}
+.dlg label.f{display:block;font-size:14px;margin-bottom:4px}
+.dlg select{width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.err{margin-top:20px;padding:12px 16px;border-left:4px solid var(--bad);background:var(--surface);color:var(--bad)}
+.hidden{display:none !important}
+@media (max-width:640px){.wrap{padding:18px 12px 36px}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>封閉式行銷甘特圖填表工具</h1>
+      <p class="sub">上傳每月的「封閉式行銷整體規劃」，把「月曆」頁籤的 EDM、APP 推播、SMS 排程依圖例自動填進「甘特圖」頁籤，再下載回填好的 Excel。</p>
+    </div>
+    <div>
+      <input type="file" id="file" accept=".xlsx" hidden>
+      <button class="btn" id="pick">選擇 Excel 檔</button>
+    </div>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇或拖曳 Excel 檔">
+    <strong>把當月的 .xlsx 拖到這裡</strong>
+    <p>檔案需同時有「月曆」與「甘特圖」兩個頁籤；甘特圖第 1 列要先填好當月日期。檔案只在你的瀏覽器裡處理，不會上傳。</p>
+  </div>
+  <div id="err" class="err hidden" role="alert"></div>
+
+  <section id="app" class="hidden">
+    <div class="status">
+      <span class="file" id="fname"></span>
+      <span class="stat"><b id="sNew">0</b> 格新填</span>
+      <span class="stat"><b id="sSame">0</b> 格與原本相同</span>
+      <span class="stat"><b id="sConf">0</b> 格與原本不同</span>
+      <span class="stat"><b id="sMan">0</b> 格手動調整</span>
+    </div>
+
+    <div class="toolbar">
+      <span>已有內容的格子</span>
+      <div class="seg" role="radiogroup" aria-label="已有內容的處理方式">
+        <label><input type="radio" name="mode" value="fill" checked>保留，只補空白</label>
+        <label><input type="radio" name="mode" value="over">以月曆為準覆寫</label>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn small" id="resetMan">清除手動調整</button>
+      <button class="btn primary" id="export">下載回填後的 Excel</button>
+    </div>
+
+    <div id="unkPanel" class="panel hidden">
+      <h2>這些品類不在甘特圖圖例裡，請指定要歸到哪一類</h2>
+      <div id="unkList"></div>
+    </div>
+    <div id="warnPanel" class="panel hidden">
+      <h2>需要留意</h2>
+      <ul id="warnList"></ul>
+    </div>
+
+    <div class="gridwrap"><table class="g" id="grid"></table></div>
+
+    <div class="key">
+      <div class="legend" id="legend"></div>
+      <div class="marks">
+        <span><span class="sw new"></span>這次從月曆新填</span>
+        <span><span class="sw conflict"></span>與甘特圖原本內容不同</span>
+        <span><span class="sw manual"></span>手動調整</span>
+        <span>點任一格可查看月曆原文並修改</span>
+      </div>
+    </div>
+
+    <details class="rules">
+      <summary>對應規則</summary>
+      <ul>
+        <li>月曆「eDM」：灰底（其他單位）放 EDM 全會員列，其餘放 EDM 封閉列；「CDP eDM」放封閉CDP列。</li>
+        <li>月曆「APP公眾」放 APP 公眾列；「APP封閉」的兩列依序放 APP 封閉的兩列。</li>
+        <li>月曆「SMS」的兩列依序放 SMS 的兩列。</li>
+        <li>格子內容取「｜」前的品類，去掉 (品類)、(中央)、(廠商負擔) 等前綴後對應甘特圖第 14 列的圖例，例如服飾鞋包→服飾、會員→(會員)；灰底一律為 (其他單位)。</li>
+        <li>你在上方指定的品類對應會記在這個瀏覽器，下個月自動套用。</li>
+      </ul>
+      <button class="btn small" id="resetAlias">清除已記住的品類對應</button>
+    </details>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg">
+    <h3 id="dTitle"></h3>
+    <p class="where" id="dWhere"></p>
+    <div class="src" id="dSrc"></div>
+    <label class="f" for="dSel">甘特圖要顯示</label>
+    <select id="dSel"></select>
+    <div class="acts">
+      <button class="btn small" value="auto" id="dAuto">還原自動結果</button>
+      <button class="btn small" value="cancel">取消</button>
+      <button class="btn small primary" value="ok">套用</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(function(){
+'use strict';
+const NS='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const PNS='http://schemas.openxmlformats.org/package/2006/relationships';
+const RID='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const $=s=>document.querySelector(s);
+
+/* ---------- 規則設定 ---------- */
+const RULES=[
+  {ch:'edm',    gray:true,  row:3,  grp:'EDM發送', typ:'全會員'},
+  {ch:'edm',    gray:false, row:4,  grp:'EDM發送', typ:'封閉'},
+  {ch:'cdpedm',             row:5,  grp:'EDM發送', typ:'封閉CDP'},
+  {ch:'app公眾',            row:6,  grp:'APP推播', typ:'公眾'},
+  {ch:'app封閉', line:0,    row:7,  grp:'APP推播', typ:'封閉 1'},
+  {ch:'app封閉', line:1,    row:8,  grp:'APP推播', typ:'封閉 2'},
+  {ch:'sms',     line:0,    row:9,  grp:'SMS發送', typ:'第 1 則'},
+  {ch:'sms',     line:1,    row:10, grp:'SMS發送', typ:'第 2 則'}
+];
+const BASE_ALIAS={'會員':'(會員)','會員處':'(其他單位)','服飾鞋包':'服飾','親子用品':'親子','3C家電':'3C',
+  '文具潮藝':'文具','美妝保養':'美妝','圖書':'中文','中文書':'中文','外文書':'外文'};
+const OTHER='(其他單位)';
+const LS_ALIAS='closedGantt.alias.v1', LS_CUSTOM='closedGantt.customLegend.v1';
+const store={
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+
+/* ---------- XML / xlsx 工具 ---------- */
+const parseXml=s=>new DOMParser().parseFromString(s,'application/xml');
+const ser=d=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+new XMLSerializer().serializeToString(d).replace(/^\s*<\?xml[^>]*\?>\s*/,'');
+const kids=(el,n)=>el?Array.from(el.childNodes).filter(x=>x.nodeType===1&&x.localName===n):[];
+const kid=(el,n)=>kids(el,n)[0]||null;
+const colIdx=L=>{let n=0;for(const c of L)n=n*26+c.charCodeAt(0)-64;return n};
+const colL=n=>{let s='';while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
+const splitRef=ref=>{const m=/^([A-Z]+)(\d+)$/.exec(ref);return {c:colIdx(m[1]),r:+m[2]}};
+const norm=s=>String(s).replace(/\s+/g,'').toLowerCase();
+function siText(si){let s='';for(const ch of si.childNodes){if(ch.localName==='t')s+=ch.textContent;
+  else if(ch.localName==='r')for(const t of kids(ch,'t'))s+=t.textContent;}return s}
+const hex=rgb=>rgb&&/^[0-9A-Fa-f]{8}$/.test(rgb)?'#'+rgb.slice(2):(rgb&&/^[0-9A-Fa-f]{6}$/.test(rgb)?'#'+rgb:null);
+function isGray(rgb){if(!rgb)return false;const h=rgb.slice(-6);const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  return r===g&&g===b&&r>=0x99&&r<=0xE6}
+
+async function openBook(buf){
+  const zip=await JSZip.loadAsync(buf);
+  const txt=async p=>{const f=zip.file(p);return f?await f.async('string'):null};
+  const wb=parseXml(await txt('xl/workbook.xml'));
+  const rels=parseXml(await txt('xl/_rels/workbook.xml.rels'));
+  const relMap={};for(const r of rels.getElementsByTagNameNS(PNS,'Relationship'))relMap[r.getAttribute('Id')]=r.getAttribute('Target');
+  const sheets=[];for(const s of wb.getElementsByTagNameNS(NS,'sheet')){let t=relMap[s.getAttributeNS(RID,'id')];
+    t=t.startsWith('/')?t.slice(1):'xl/'+t.replace(/^\.\//,'');sheets.push({name:s.getAttribute('name'),path:t})}
+  const ssx=await txt('xl/sharedStrings.xml');
+  const ss=ssx?Array.from(parseXml(ssx).getElementsByTagNameNS(NS,'si')).map(siText):[];
+  const stDoc=parseXml(await txt('xl/styles.xml'));const root=stDoc.documentElement;
+  const fillsEl=kid(root,'fills'),fontsEl=kid(root,'fonts'),cellXfsEl=kid(root,'cellXfs');
+  const fills=kids(fillsEl,'fill').map(f=>{const p=kid(f,'patternFill');if(!p||p.getAttribute('patternType')==='none')return null;
+    const fg=kid(p,'fgColor');return fg&&fg.getAttribute('rgb')||null});
+  const fonts=kids(fontsEl,'font').map(f=>{const c=kid(f,'color');return c&&c.getAttribute('rgb')||null});
+  const B={zip,sheets,ss,stDoc,fillsEl,cellXfsEl,fills,fonts,xfEls:kids(cellXfsEl,'xf')};
+  B.styleOf=s=>{const x=B.xfEls[s]||B.xfEls[0];return {fill:B.fills[+(x.getAttribute('fillId')||0)]||null,font:B.fonts[+(x.getAttribute('fontId')||0)]||null}};
+  B.readSheet=async name=>{const sh=sheets.find(s=>s.name===name);if(!sh)return null;
+    const doc=parseXml(await txt(sh.path));const sd=doc.getElementsByTagNameNS(NS,'sheetData')[0];const cells=new Map();let maxRow=0;
+    for(const row of kids(sd,'row'))for(const c of kids(row,'c')){const ref=c.getAttribute('r');if(!ref)continue;
+      const t=c.getAttribute('t'),v=kid(c,'v');let val=null;
+      if(t==='s'&&v)val=ss[+v.textContent];else if(t==='inlineStr'){const is=kid(c,'is');val=is?siText(is):null}
+      else if(v)val=(t==='str'||t==='e'||t==='b')?v.textContent:Number(v.textContent);
+      if(val==='')val=null;const s=c.hasAttribute('s')?+c.getAttribute('s'):0;
+      cells.set(ref,{val,s,el:c});maxRow=Math.max(maxRow,splitRef(ref).r)}
+    return {name,path:sh.path,doc,sd,cells,maxRow}};
+  return B;
+}
+
+/* ---------- 解析月曆 ---------- */
+function parseCalendar(B,sh){
+  const get=(c,r)=>sh.cells.get(colL(c)+r);const W='一二三四五六日';let dayCols=null;
+  for(let r=1;r<=15&&!dayCols;r++){const f=[];for(let c=1;c<=80;c++){const x=get(c,r);const v=x&&typeof x.val==='string'?x.val.trim():'';
+      if(v.length===1&&W.includes(v))f.push({c,w:W.indexOf(v)})}
+    if(f.length>=5)dayCols=f.sort((a,b)=>a.w-b.w).map(o=>o.c)}
+  if(!dayCols)throw new Error('「月曆」頁籤找不到星期列（一～日），請確認版型沒有改動。');
+  const dateRows=[];for(let r=1;r<=sh.maxRow;r++){const a=get(1,r);if(a&&typeof a.val==='string'&&a.val.trim()==='日期')dateRows.push(r)}
+  if(!dateRows.length)throw new Error('「月曆」頁籤的 A 欄找不到「日期」列，無法判斷週次。');
+  const h=dateRows.length>1?dateRows[1]-dateRows[0]:8;const entries=[];let month=null;
+  for(let r=1;r<=6&&!month;r++){const a=get(1,r);const m=a&&typeof a.val==='string'&&/(\d{1,2})\/1\s*[-~～]/.exec(a.val);if(m)month=+m[1]}
+  dateRows.forEach((dr,i)=>{const end=i+1<dateRows.length?dateRows[i+1]:dr+h;const info=[];let ch=null,line=0;
+    for(let r=dr+1;r<end;r++){const a=get(1,r);const av=a&&a.val!=null?String(a.val).trim():'';
+      if(av&&av!=='日期'){ch=av;line=0}else line++;info.push({r,ch,line})}
+    for(const c of dayCols){const dv=get(c,dr);if(!dv||typeof dv.val!=='number')continue;const day=Math.round(dv.val);
+      for(const ri of info){if(!ri.ch)continue;const x=get(c,ri.r);if(!x||x.val==null)continue;const text=String(x.val).trim();if(!text)continue;
+        entries.push({day,ch:ri.ch,chn:norm(ri.ch),line:ri.line,text,rgb:B.styleOf(x.s).fill,ref:colL(c)+ri.r})}}});
+  return {entries,month};
+}
+
+/* ---------- 解析甘特圖 ---------- */
+function parseGantt(B,sh){
+  const get=(c,r)=>sh.cells.get(colL(c)+r);let hdr=null;const dayCol={};let ym=null;
+  for(let r=1;r<=5&&!hdr;r++){const hits=[];for(let c=1;c<=80;c++){const x=get(c,r);if(x&&typeof x.val==='number'&&x.val>30000&&x.val<80000)hits.push({c,v:x.val})}
+    if(hits.length>=20){hdr=r;for(const h of hits){const d=new Date(Date.UTC(1899,11,30)+Math.round(h.v)*864e5);
+      if(!ym)ym={y:d.getUTCFullYear(),m:d.getUTCMonth()+1};if(d.getUTCMonth()+1===ym.m)dayCol[d.getUTCDate()]={c:h.c,wd:d.getUTCDay()}}}}
+  if(!hdr)throw new Error('「甘特圖」頁籤第 1～5 列找不到日期列，請先在第 1 列填好當月每一天的日期。');
+  const maxRule=Math.max(...RULES.map(r=>r.row));let lr=null;
+  for(let r=maxRule+1;r<=sh.maxRow&&!lr;r++)for(let c=1;c<=80;c++){const x=get(c,r);if(x&&x.val===OTHER){lr=r;break}}
+  if(!lr)throw new Error('「甘特圖」頁籤找不到圖例列（含「(其他單位)」的那一列）。');
+  const legend=[];let lastCol=0;
+  for(let c=1;c<=80;c++){const x=get(c,lr);if(x&&typeof x.val==='string'&&x.val.trim()){const st=B.styleOf(x.s);
+    legend.push({label:x.val.trim(),s:x.s,ssi:x.el.getAttribute('t')==='s'?kid(x.el,'v').textContent:null,fill:st.fill,font:st.font});lastCol=c}}
+  const existing=new Map();
+  for(const rule of RULES)for(const d in dayCol){const x=get(dayCol[d].c,rule.row);if(x&&x.val!=null&&String(x.val).trim())existing.set(rule.row+'|'+d,String(x.val).trim())}
+  return {dayCol,ym,legendRow:lr,legend,legendLastCol:lastCol,existing};
+}
+
+/* ---------- 狀態 ---------- */
+let BUF=null,FNAME='',BOOK=null,CAL=null,GAN=null;
+let overrides=new Map();
+let alias=store.get(LS_ALIAS,{}),custom=store.get(LS_CUSTOM,[]);
+let pendingUnk={};
+const mode=()=>document.querySelector('input[name=mode]:checked').value;
+const allLegend=()=>{const l=GAN.legend.map(x=>({...x}));for(const c of custom)if(!l.find(x=>x.label===c.label))l.push({label:c.label,fill:c.color,font:null,custom:true});return l};
+const legendOf=lab=>allLegend().find(x=>x.label===lab);
+
+function labelFor(text,rgb){
+  if(isGray(rgb))return {label:OTHER};
+  let p=text.split(/[｜|]/)[0].trim().replace(/^((\([^)]*\))|(（[^）]*）))+/,'').trim();
+  const leg=allLegend().map(x=>x.label);
+  if(leg.includes(p))return {label:p};
+  const a=alias[p]||BASE_ALIAS[p];if(a&&leg.includes(a))return {label:a};
+  return {unknown:p};
+}
+
+function compute(){
+  const auto=new Map(),unk=new Map(),warns=[];
+  for(const e of CAL.entries){
+    const g=isGray(e.rgb);
+    let cands=RULES.filter(r=>r.ch===e.chn&&(r.gray===undefined||r.gray===g));
+    if(!cands.length){if(!warns.some(w=>w.k==='ch'+e.chn))warns.push({k:'ch'+e.chn,t:`月曆的通路「${e.ch}」沒有對應的甘特圖列，這些排程沒有填入（例如 ${e.day} 日「${e.text.split('\n')[0]}」）。`});continue}
+    if(cands.some(r=>r.line!==undefined))cands=cands.filter(r=>r.line===e.line);
+    if(!GAN.dayCol[e.day]){warns.push({t:`甘特圖沒有 ${e.day} 日這一欄，「${e.ch}｜${e.text.split('\n')[0]}」沒有填入。`});continue}
+    const rule=cands.find(r=>!auto.has(r.row+'|'+e.day));
+    if(!rule){warns.push({t:`${e.day} 日的「${e.ch}」排程超過甘特圖能放的列數，「${e.text.split('\n')[0]}」沒有填入（月曆 ${e.ref}）。`});continue}
+    const lf=labelFor(e.text,e.rgb);const key=rule.row+'|'+e.day;
+    auto.set(key,{label:lf.label||null,unknown:lf.unknown||null,texts:[e.ch+'｜'+e.text.replace(/^[^｜]*｜/,m=>m)],raw:e});
+    if(lf.unknown){const u=unk.get(lf.unknown)||{n:0,eg:e.text.split('\n')[0],day:e.day};u.n++;unk.set(lf.unknown,u)}
+  }
+  if(CAL.month&&GAN.ym&&CAL.month!==GAN.ym.m)warns.unshift({t:`月曆是 ${CAL.month} 月，但甘特圖第 1 列的日期是 ${GAN.ym.m} 月，請先更新甘特圖的日期列。`});
+  return {auto,unk,warns};
+}
+
+function finalCells(res){
+  const out=new Map();const m=mode();
+  for(const rule of RULES)for(const d in GAN.dayCol){const key=rule.row+'|'+d;
+    const ex=GAN.existing.get(key)||null,a=res.auto.get(key)||null,al=a&&a.label||null,ov=overrides.get(key);
+    let fin,st='';
+    if(ov!==undefined){fin=ov||null;st='manual'}
+    else if(a&&a.unknown&&!ex){fin=null;st='unknown'}
+    else if(m==='fill'){fin=ex||al}
+    else{fin=al||ex}
+    if(!st){if(ex&&al&&ex!==al)st='conflict';else if(!ex&&al)st='new';else if(ex&&al&&ex===al)st='same'}
+    out.set(key,{rule,day:+d,ex,a,fin,st})}
+  return out;
+}
+
+/* ---------- 畫面 ---------- */
+let RES=null,FIN=null;
+function render(){
+  RES=compute();FIN=finalCells(RES);
+  const c={new:0,same:0,conflict:0,manual:0};for(const v of FIN.values())if(c[v.st]!==undefined)c[v.st]++;
+  $('#sNew').textContent=c.new;$('#sSame').textContent=c.same;$('#sConf').textContent=c.conflict;$('#sMan').textContent=c.manual;
+
+  // 未對應品類
+  const ul=$('#unkList');ul.innerHTML='';
+  if(RES.unk.size){$('#unkPanel').classList.remove('hidden');
+    for(const [p,u] of RES.unk){const row=document.createElement('div');row.className='unk';
+      const opts=allLegend().map(l=>`<option value="${esc(l.label)}">${esc(l.label)}</option>`).join('');
+      row.innerHTML=`<div class="name">${esc(p)}</div><div class="ctl">
+        <select aria-label="${esc(p)} 要歸到"><option value="">選擇圖例…</option>${opts}<option value="__new">新增為新圖例</option></select>
+        <span class="newbox hidden"><input type="text" value="${esc(p)}" aria-label="新圖例名稱" size="8"> <input type="color" value="#FFE599" aria-label="新圖例顏色"></span>
+        <button class="btn small">套用</button>
+        <span class="eg">${u.n} 格，例如 ${u.day} 日「${esc(u.eg)}」</span></div>`;
+      const sel=row.querySelector('select'),nb=row.querySelector('.newbox');
+      sel.addEventListener('change',()=>nb.classList.toggle('hidden',sel.value!=='__new'));
+      row.querySelector('button').addEventListener('click',()=>{
+        if(sel.value==='__new'){const name=nb.querySelector('input[type=text]').value.trim();if(!name)return;
+          const color='FF'+nb.querySelector('input[type=color]').value.slice(1).toUpperCase();
+          if(!allLegend().find(l=>l.label===name)){custom.push({label:name,color});store.set(LS_CUSTOM,custom)}
+          alias[p]=name}
+        else if(sel.value)alias[p]=sel.value;else return;
+        store.set(LS_ALIAS,alias);render()});
+      ul.appendChild(row)}
+  }else $('#unkPanel').classList.add('hidden');
+
+  const wl=$('#warnList');wl.innerHTML='';
+  if(RES.warns.length){$('#warnPanel').classList.remove('hidden');for(const w of RES.warns){const li=document.createElement('li');li.textContent=w.t;wl.appendChild(li)}}
+  else $('#warnPanel').classList.add('hidden');
+
+  // 表格
+  const days=Object.keys(GAN.dayCol).map(Number).sort((a,b)=>a-b);const WD='日一二三四五六';const M=GAN.ym.m;
+  let h='<thead><tr><th class="corner" colspan="2" rowspan="2">'+GAN.ym.y+' 年 '+M+' 月</th>';
+  for(const d of days){const wd=GAN.dayCol[d].wd;h+=`<th class="${wd===0||wd===6?'we':''}">${M}/${d}</th>`}
+  h+='</tr><tr class="wd">';for(const d of days){const wd=GAN.dayCol[d].wd;h+=`<th class="${wd===0||wd===6?'we':''}">${WD[wd]}</th>`}
+  h+='</tr></thead><tbody>';
+  RULES.forEach((rule,i)=>{const first=i===0||RULES[i-1].grp!==rule.grp;const last=i===RULES.length-1||RULES[i+1].grp!==rule.grp;
+    const span=RULES.filter(r=>r.grp===rule.grp).length;
+    h+=`<tr class="${last?'grpend':''}">`;if(first)h+=`<th class="grp" rowspan="${span}" style="border-bottom:2px solid var(--ink)">${rule.grp}</th>`;
+    h+=`<th class="typ">${rule.typ}</th>`;
+    for(const d of days){const f=FIN.get(rule.row+'|'+d);const wd=GAN.dayCol[d].wd;let style='',txt='',cls='cell';
+      if(f.st==='unknown'){cls+=' st-unknown';txt='?'+f.a.unknown}
+      else if(f.fin){const l=legendOf(f.fin);const bg=l&&hex(l.fill),fg=l&&hex(l.font);
+        style=`background:${bg||'var(--cell-empty)'};color:${fg||(bg?'#1B2B30':'var(--ink)')}`;txt=f.fin}
+      if(f.st==='new')cls+=' st-new';if(f.st==='conflict')cls+=' st-conflict';if(f.st==='manual')cls+=' st-manual';
+      const tip=`${M}/${d}（${WD[wd]}）${rule.grp} ${rule.typ}`+(f.a?'\n月曆：'+f.a.raw.ch+'｜'+f.a.raw.text:'')+(f.ex?'\n甘特圖原本：'+f.ex:'');
+      h+=`<td class="${wd===0?'wkend':''}"><button class="${cls}" style="${style}" data-k="${rule.row}|${d}" title="${esc(tip)}">${esc(txt)}</button></td>`}
+    h+='</tr>'});
+  h+='</tbody>';$('#grid').innerHTML=h;
+
+  $('#legend').innerHTML=allLegend().map(l=>`<span class="chip" style="background:${hex(l.fill)||'var(--surface)'};color:${hex(l.font)||(hex(l.fill)?'#1B2B30':'var(--ink)')}">${esc(l.label)}</span>`).join('');
+  $('#export').disabled=RES.unk.size>0;
+  $('#export').title=RES.unk.size?'請先指定上方未對應的品類':'';
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ---------- 單格編輯 ---------- */
+let editKey=null;
+$('#grid').addEventListener('click',e=>{const b=e.target.closest('button.cell');if(!b)return;editKey=b.dataset.k;const f=FIN.get(editKey);
+  const WD='日一二三四五六';$('#dTitle').textContent=`${GAN.ym.m}/${f.day}（${WD[GAN.dayCol[f.day].wd]}）`;
+  $('#dWhere').textContent=`${f.rule.grp}　${f.rule.typ}`;
+  const lines=[];if(f.a)lines.push('月曆原文：\n'+f.a.raw.text+'\n（'+f.a.raw.ch+'，儲存格 '+f.a.raw.ref+'）');else lines.push('月曆這天沒有排程。');
+  if(f.ex)lines.push('甘特圖原本：'+f.ex);$('#dSrc').textContent=lines.join('\n\n');
+  $('#dSel').innerHTML='<option value="">（空白）</option>'+allLegend().map(l=>`<option value="${esc(l.label)}">${esc(l.label)}</option>`).join('');
+  $('#dSel').value=f.fin||'';$('#dlg').showModal()});
+$('#dlg').addEventListener('close',()=>{const v=$('#dlg').returnValue;if(!editKey)return;
+  if(v==='ok')overrides.set(editKey,$('#dSel').value);else if(v==='auto')overrides.delete(editKey);editKey=null;render()});
+
+/* ---------- 回填匯出 ---------- */
+async function exportXlsx(){
+  const B=await openBook(BUF);const sh=await B.readSheet('甘特圖');const doc=sh.doc;
+  const cache=new Map();
+  const xfBorder=s=>(B.xfEls[s]||B.xfEls[0]).getAttribute('borderId')||'0';
+  const addXf=(baseS,patch)=>{const x=B.xfEls[baseS].cloneNode(true);for(const k in patch)x.setAttribute(k,patch[k]);B.cellXfsEl.appendChild(x);B.xfEls.push(x);return B.xfEls.length-1};
+  const legendMap={};for(const l of GAN.legend)legendMap[l.label]={s:l.s,ssi:l.ssi};
+  // 自訂圖例：新增底色樣式並寫進圖例列
+  const used=new Set([...FIN.values()].map(f=>f.fin).filter(Boolean));
+  let col=GAN.legendLastCol;const baseLeg=GAN.legend.find(l=>l.label==='全站')||GAN.legend[0];
+  for(const c of custom){if(legendMap[c.label]||!used.has(c.label))continue;
+    const pf=B.stDoc.createElementNS(NS,'patternFill');pf.setAttribute('patternType','solid');
+    const fg=B.stDoc.createElementNS(NS,'fgColor');fg.setAttribute('rgb',c.color);const bg=B.stDoc.createElementNS(NS,'bgColor');bg.setAttribute('rgb',c.color);
+    pf.appendChild(fg);pf.appendChild(bg);const fl=B.stDoc.createElementNS(NS,'fill');fl.appendChild(pf);B.fillsEl.appendChild(fl);
+    const fid=kids(B.fillsEl,'fill').length-1;B.fillsEl.setAttribute('count',String(fid+1));
+    const s=addXf(baseLeg.s,{fillId:String(fid),applyFill:'1'});legendMap[c.label]={s,ssi:null};
+    col++;setCell(ensure(colL(col)+GAN.legendRow),c.label,s,null)}
+  function ensure(ref){const hit=sh.cells.get(ref);if(hit)return hit.el;const {r,c}=splitRef(ref);
+    let row=kids(sh.sd,'row').find(x=>+x.getAttribute('r')===r);
+    if(!row){row=doc.createElementNS(NS,'row');row.setAttribute('r',String(r));const after=kids(sh.sd,'row').find(x=>+x.getAttribute('r')>r);sh.sd.insertBefore(row,after||null)}
+    row.removeAttribute('spans');
+    const el=doc.createElementNS(NS,'c');el.setAttribute('r',ref);const after=kids(row,'c').find(x=>splitRef(x.getAttribute('r')).c>c);row.insertBefore(el,after||null);
+    sh.cells.set(ref,{val:null,s:0,el});return el}
+  function setCell(el,text,s,ssi){while(el.firstChild)el.removeChild(el.firstChild);el.removeAttribute('t');el.setAttribute('s',String(s));
+    if(text==null)return;if(ssi!=null){el.setAttribute('t','s');const v=doc.createElementNS(NS,'v');v.textContent=ssi;el.appendChild(v)}
+    else{el.setAttribute('t','inlineStr');const is=doc.createElementNS(NS,'is'),t=doc.createElementNS(NS,'t');t.textContent=text;is.appendChild(t);el.appendChild(is)}}
+  let n=0;
+  for(const f of FIN.values()){if((f.fin||null)===(f.ex||null))continue;
+    const ref=colL(GAN.dayCol[f.day].c)+f.rule.row;const el=ensure(ref);const curS=el.hasAttribute('s')?+el.getAttribute('s'):0;const bId=xfBorder(curS);
+    if(!f.fin){const k='clear|'+curS;if(!cache.has(k))cache.set(k,addXf(curS,{fillId:'0'}));setCell(el,null,cache.get(k),null);n++;continue}
+    const lg=legendMap[f.fin];const k=f.fin+'|'+bId;if(!cache.has(k))cache.set(k,addXf(lg.s,{borderId:bId,applyBorder:'1'}));
+    setCell(el,f.fin,cache.get(k),lg.ssi);n++}
+  B.cellXfsEl.setAttribute('count',String(B.xfEls.length));
+  B.zip.file('xl/styles.xml',ser(B.stDoc));B.zip.file(sh.path,ser(doc));
+  const blob=await B.zip.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=FNAME.replace(/\.xlsx$/i,'')+'_甘特圖補齊.xlsx';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  return n;
+}
+window.__exportForTest=exportXlsx;
+
+/* ---------- 上傳 ---------- */
+async function load(file){
+  $('#err').classList.add('hidden');
+  try{
+    if(typeof JSZip==='undefined')throw new Error('讀取元件沒有載入，請確認網路連線後重新整理頁面。');
+    BUF=await file.arrayBuffer();FNAME=file.name;BOOK=await openBook(BUF);
+    const names=BOOK.sheets.map(s=>s.name);
+    if(!names.includes('月曆'))throw new Error('這個檔案沒有「月曆」頁籤。');
+    if(!names.includes('甘特圖'))throw new Error('這個檔案沒有「甘特圖」頁籤。');
+    CAL=parseCalendar(BOOK,await BOOK.readSheet('月曆'));GAN=parseGantt(BOOK,await BOOK.readSheet('甘特圖'));
+    overrides=new Map();$('#fname').textContent=FNAME;$('#app').classList.remove('hidden');$('#drop').classList.add('hidden');render();
+  }catch(e){console.error(e);$('#err').textContent='無法讀取：'+e.message;$('#err').classList.remove('hidden')}
+}
+const fi=$('#file');
+$('#pick').addEventListener('click',()=>fi.click());
+$('#drop').addEventListener('click',()=>fi.click());
+$('#drop').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fi.click()}});
+fi.addEventListener('change',()=>{if(fi.files[0])load(fi.files[0]);fi.value=''});
+for(const ev of ['dragenter','dragover'])document.addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.add('over')});
+for(const ev of ['dragleave','drop'])document.addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.remove('over')});
+document.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)load(f)});
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',render));
+$('#resetMan').addEventListener('click',()=>{overrides=new Map();render()});
+$('#resetAlias').addEventListener('click',()=>{alias={};custom=[];store.set(LS_ALIAS,alias);store.set(LS_CUSTOM,custom);render()});
+$('#export').addEventListener('click',async()=>{const b=$('#export');b.disabled=true;const t=b.textContent;b.textContent='產生中…';
+  try{await exportXlsx()}catch(e){console.error(e);$('#err').textContent='下載失敗：'+e.message;$('#err').classList.remove('hidden')}
+  b.textContent=t;b.disabled=RES.unk.size>0});
+})();
+</script>
+</body>
+</html>
