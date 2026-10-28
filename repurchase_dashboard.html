@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>回購／再購分析儀表板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#F2F4F7;--panel:#FFFFFF;--ink:#18202B;--muted:#5B6575;--line:#D8DDE5;
+  --navy:#14336E;--navy-soft:#DCE5F6;--brown:#7B4A20;--brown-soft:#F1E3D4;
+  --pos:#1E5BD0;--neg:#C2372C;--hl:#FFF2CC;--focus:#E89B00;--on-navy:#FFFFFF;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#11151B;--panel:#1A2029;--ink:#E5E9EF;--muted:#98A2B1;--line:#2D3643;
+  --navy:#86A8F0;--navy-soft:#22304A;--brown:#D59D69;--brown-soft:#3A2C20;
+  --pos:#7CAAFF;--neg:#FF877C;--hl:#3B3322;--on-navy:#0F1724;color-scheme:dark;}}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:15px;line-height:1.6;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 64px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:6px 0 16px;border-bottom:3px solid var(--navy)}
+h1{font-size:27px;font-weight:900;margin:0;letter-spacing:.01em;line-height:1.25}
+h1 small{display:block;font-size:14px;font-weight:400;color:var(--muted);margin-top:4px;letter-spacing:0}
+h1 .ver{font-size:12px;font-weight:500;color:var(--muted);margin-left:8px;vertical-align:4px}
+h2{font-size:18px;font-weight:700;margin:0 0 10px}
+h3{font-size:15px;font-weight:700;margin:0 0 8px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:inherit;font-size:14px;font-weight:500;border-radius:6px;padding:8px 14px;cursor:pointer;
+  border:1.5px solid var(--navy);background:var(--navy);color:var(--on-navy)}
+.btn.ghost{background:transparent;color:var(--navy)}
+.btn.small{font-size:13px;padding:3px 10px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,.seg:focus-visible,tr.row:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+label.file{position:relative;overflow:hidden}
+label.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+section{margin-top:22px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.status{margin-top:12px;font-size:14px;color:var(--muted);min-height:22px;white-space:pre-line}
+.status.err{color:var(--neg)}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.empty p{max-width:600px;margin:8px auto}
+.mapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px 16px;margin-top:10px}
+.mapgrid label{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}
+.mapgrid label b{color:var(--ink);font-weight:500}
+select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin-top:3px;max-width:100%}
+input[type=url],input[type=password]{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);margin-top:3px;width:300px;max-width:100%}
+.settings{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:flex-end}
+.settings label{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}
+.chk{display:flex;flex-direction:row!important;align-items:center;gap:6px;color:var(--ink)!important;font-size:14px!important;padding-bottom:6px}
+.meta{font-size:13px;color:var(--muted);margin-top:10px}
+.warn{font-size:13px;color:var(--neg);margin-top:6px}
+.flowhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.scopepick{display:flex;align-items:center;gap:8px;font-size:14px}
+.flows{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.flows{grid-template-columns:1fr}}
+.flow .cap{font-size:13px;color:var(--muted);margin-bottom:6px}
+.flow .cap strong{color:var(--ink);font-size:15px}
+.bar{display:flex;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.seg{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;justify-content:center;
+  padding:0 10px;min-width:64px;font-size:13px;line-height:1.3;position:relative}
+.seg .n{font-size:18px;font-weight:700}
+.seg.cur{background:var(--navy);color:var(--on-navy)}
+.seg.prev{background:var(--brown-soft);color:var(--ink)}
+.seg.now2{background:var(--navy-soft);color:var(--ink)}
+.seg[aria-pressed="true"]{box-shadow:inset 0 0 0 3px var(--focus)}
+.extra{margin-top:10px}
+.extra .seg{border:1px solid var(--line);border-radius:6px;height:auto;padding:8px 12px;flex-direction:row;gap:10px;align-items:baseline;background:var(--panel);color:var(--ink);display:inline-flex}
+.def{font-size:12.5px;color:var(--muted);margin-top:6px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.sum{border-collapse:collapse;width:100%;min-width:980px;font-size:14px}
+table.sum th,table.sum td{border:1px solid var(--line);padding:5px 8px;text-align:right;white-space:nowrap}
+table.sum th{font-weight:700;font-size:13px;line-height:1.35;text-align:center}
+table.sum th.gc{background:var(--navy);color:var(--on-navy)}
+table.sum th.gp{background:var(--brown);color:var(--on-navy)}
+table.sum th.gd{background:var(--hl);color:var(--ink)}
+table.sum td:first-child,table.sum th:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
+table.sum td.d{background:var(--hl)}
+table.sum tr.row{cursor:pointer}
+table.sum tr.row:hover td{background:var(--navy-soft)}
+table.sum tr.row.on td{background:var(--navy-soft);font-weight:700}
+table.sum tr.total td{font-weight:700;border-top:2px solid var(--ink)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.gap{border-left:3px solid var(--line)!important}
+.profhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:10px}
+.proftitle{font-size:20px;font-weight:900}
+.proftitle span{font-weight:400;color:var(--muted);font-size:15px;margin-left:6px}
+.profgrid{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;margin-top:12px}
+@media (max-width:860px){.profgrid{grid-template-columns:1fr}}
+table.cat{border-collapse:collapse;width:100%;font-size:14px}
+table.cat th,table.cat td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.cat th{font-size:12.5px;color:var(--muted);font-weight:500}
+table.cat td:first-child,table.cat th:first-child{text-align:left}
+table.yrs td:nth-child(3){white-space:normal;text-align:left;max-width:320px;font-size:13px;color:var(--muted)}
+table.yrs td:nth-child(2){text-align:left}
+.mini{display:inline-block;height:8px;background:var(--navy);border-radius:2px;vertical-align:1px;margin-right:6px}
+.mini.p{background:var(--brown)}
+.dist{margin-bottom:16px}
+.drow{display:grid;grid-template-columns:104px 1fr 92px;gap:8px;align-items:center;font-size:13.5px;padding:2px 0}
+.drow .track{height:12px;background:var(--line);border-radius:3px;overflow:hidden}
+.drow .fill{height:100%;background:var(--navy)}
+.drow .v{text-align:right;color:var(--muted)}
+.exports{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+details{margin-top:10px;font-size:14px}
+details summary{cursor:pointer;color:var(--navy);font-weight:500}
+details ul{margin:8px 0;padding-left:20px}
+@media (prefers-reduced-motion:no-preference){.bar .seg{transition:flex-grow .35s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>回購／再購分析儀表板<span class="ver">v2.1</span><small>上傳訂單明細，依全站與各品類拆出回購、未回購、再購、未再購會員</small></h1>
+    <div class="actions">
+      <label class="btn file">上傳訂單明細<input id="fileIn" type="file" multiple accept=".xlsx,.xls,.csv,.tsv,.txt"></label>
+      <button class="btn ghost" id="demoBtn" type="button">用示範資料試跑</button>
+    </div>
+  </header>
+  <div class="status" id="status" role="status"></div>
+
+  <section id="dataSec">
+    <div class="panel">
+      <div class="flowhead">
+        <h2>資料</h2>
+        <label class="chk"><input type="checkbox" id="chkRemember" checked><span id="rememberLbl">記住今年以前的資料（只存在這台電腦的瀏覽器）</span></label>
+      </div>
+      <div id="emptyState" class="empty">
+        <p>需要的欄位：會員編號、訂單日期、類別1-2。有母訂單號碼、銷售金額、會員加入日、首購日、年齡區間、會員卡別的話會一起分析。</p>
+        <p>檔案可以分多包、分多次上傳，同一年份會自動合併；同一個 Excel 裡分多個工作表也可以。</p>
+      </div>
+      <div class="tablewrap"><table class="cat yrs" id="yearTable"></table></div>
+      <div class="def" id="dataHint"></div>
+      <div class="actions" style="margin-top:10px"><button class="btn ghost small" id="clearBtn" type="button" hidden>清除記住的資料</button></div>
+      <details id="mapDetails">
+        <summary>欄位對應（自動偵測）</summary>
+        <div class="mapgrid" id="mapGrid"></div>
+        <div class="def">改過的對應會套用在之後上傳的檔案。已讀入的年份若要套用，請先移除該年份再重新上傳。</div>
+      </details>
+    </div>
+  </section>
+
+  <div id="dash" hidden>
+    <section>
+      <div class="panel">
+        <div class="settings">
+          <label>今年（分析年）<select id="selY"></select></label>
+          <label>再購判定方式<select id="selMode">
+            <option value="split">以分界月份切開：之前有買、之後又回來</option>
+            <option value="count">累計到指定月份，購買 2 次以上</option>
+          </select></label>
+          <label id="lblM"><span>分界月份</span><select id="selM"></select></label>
+          <label>「過去有購」指<select id="selLook">
+            <option value="last">去年有購</option>
+            <option value="all">資料內任一更早年份有購</option>
+          </select></label>
+          <label>新舊會員別判斷時點<select id="selBasis">
+            <option value="last">最新一筆訂單（截至分析年）</option>
+            <option value="yfirst">分析年第一筆訂單</option>
+          </select></label>
+          <label class="chk"><input type="checkbox" id="chkSame" checked>去年用同期月份比較</label>
+        </div>
+        <div class="meta" id="metaLine"></div>
+        <div class="warn" id="warnLine"></div>
+        <details>
+          <summary>目前使用的定義</summary>
+          <ul id="defList"></ul>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <div class="flowhead">
+          <h2 id="flowTitle">會員流向</h2>
+          <label class="scopepick">範圍<select id="selScope"></select></label>
+        </div>
+        <div class="flows">
+          <div class="flow"><div class="cap" id="cap1"></div><div class="bar" id="bar1"></div></div>
+          <div class="flow"><div class="cap" id="cap2"></div><div class="bar" id="bar2"></div></div>
+        </div>
+        <div class="extra" id="extra"></div>
+        <div class="def">點選色塊，下方會列出這群會員的品類購買、新舊會員別、最後消費年、年齡與卡別。</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <h2>各品類回購與再購</h2>
+        <div class="def" style="margin:-4px 0 10px">品類數字是「同品類」回購（去年買中文書、今年又買中文書）。全站是不重複人數，各品類加總不會等於全站。點一列可切換上方範圍。</div>
+        <div class="tablewrap"><table class="sum" id="sumTable"></table></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <div class="profhead">
+          <div class="proftitle" id="profTitle"></div>
+          <div class="def" id="profDef"></div>
+        </div>
+        <div class="profgrid">
+          <div>
+            <h3>品類購買狀況</h3>
+            <div class="tablewrap"><table class="cat" id="catTable"></table></div>
+          </div>
+          <div>
+            <div class="dist"><h3>新舊會員別</h3><div id="dNo"></div></div>
+            <div class="dist"><h3 id="hLast">最後消費年</h3><div id="dLast"></div></div>
+            <div class="dist" id="boxLastAll"><h3>最後消費年（全站）</h3><div id="dLastAll"></div></div>
+            <div class="dist"><h3>年齡區間</h3><div id="dAge"></div></div>
+            <div class="dist"><h3>會員卡別</h3><div id="dCard"></div></div>
+          </div>
+        </div>
+        <div class="exports">
+          <button class="btn" id="xlsBtn" type="button">下載 Excel 報表</button>
+          <button class="btn ghost" id="segBtn" type="button">下載這群會員名單（CSV）</button>
+          <button class="btn ghost" id="tagBtn" type="button">下載會員標籤表（給 Google Sheets／Looker Studio）</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="shareSec" hidden>
+    <div class="panel">
+      <h2>分享給夥伴</h2>
+      <div class="def" style="margin:-4px 0 12px">分享的是目前畫面上的設定與彙總數字，不含會員編號。夥伴可以切換品類、點選分群，但不能改設定或上傳資料。</div>
+      <div class="actions"><button class="btn" id="shareHtmlBtn" type="button">匯出分享版（HTML）</button></div>
+      <h3 style="margin-top:18px">同步到 Google Sheets</h3>
+      <div class="settings">
+        <label>同步網址（部署 A）<input id="syncUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <label>同步金鑰<input id="syncKey" type="password" autocomplete="off"></label>
+        <label>夥伴檢視網址（部署 B）<input id="viewUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+      </div>
+      <div class="actions" style="margin-top:12px"><button class="btn" id="syncBtn" type="button">同步到 Google Sheets</button><a id="viewLink" class="btn ghost" target="_blank" rel="noopener" hidden>打開夥伴檢視頁</a></div>
+      <div class="def" id="syncInfo"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const XLSX_URL='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+/*CORE*/
+const KNOWN_ORDER=['中文書','日文書','外文書','雜誌','影音','童書','親子用品','文具潮藝','服飾鞋包','美妝保養','生活家居','食品保健','3C','家電','休閒戶外','電子書'];
+const FIELDS=[
+ {k:'id',label:'會員編號',req:true,p:['會員編號','會員id','memberid','member_id','會員代號']},
+ {k:'date',label:'訂單日期（或年月）',req:true,p:['訂單日期','交易日期','訂購日期','購買日期','訂單時間','年月','order_date']},
+ {k:'cat',label:'品類（類別1-2）',req:true,p:['類別1-2','類別1_2','品類','大類','category']},
+ {k:'ord',label:'母訂單號碼',req:false,p:['母訂單號碼','母單號碼','訂單號碼','訂單編號','order_id']},
+ {k:'amt',label:'銷售金額',req:false,p:['銷售金額(純金)','銷售金額(點加金)','純金','銷售金額','金額','amount']},
+ {k:'join',label:'會員加入日',req:false,p:['會員加入日','加入日','入會日','註冊日']},
+ {k:'first',label:'首購日',req:false,p:['首購日','首次購買日','首購日期']},
+ {k:'age',label:'年齡區間／年齡／生日',req:false,p:['年齡區間','年齡','生日','出生日期','age','birthday']},
+ {k:'card',label:'會員卡別',req:false,p:['會員卡別','卡別','card']},
+ {k:'no',label:'新舊會員別（沒有加入日／首購日時才用）',req:false,p:['新舊會員身分別','新舊會員別','新舊會員','身分別','new_old']},
+];
+const AGE_BANDS=['未滿20','20-29','30-39','40-49','50-59','60+','未知'];
+
+function normH(s){return String(s==null?'':s).toLowerCase().replace(/（/g,'(').replace(/）/g,')').replace(/\s+/g,'');}
+function autoMap(headers){
+  const used=new Set(),map={},H=headers.map(normH);
+  for(const f of FIELDS){
+    let hit=-1;
+    for(const p of f.p){const np=normH(p);const i=H.findIndex((h,j)=>!used.has(j)&&h===np);if(i>=0){hit=i;break;}}
+    if(hit<0)for(const p of f.p){const np=normH(p);const i=H.findIndex((h,j)=>!used.has(j)&&h.includes(np));if(i>=0){hit=i;break;}}
+    if(hit>=0){used.add(hit);map[f.k]=headers[hit];}else map[f.k]='';
+  }
+  return map;
+}
+function findHeaderRow(rows){
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const r=rows[i]||[];
+    if(r.some(c=>{const h=normH(c);return FIELDS[0].p.some(p=>h.includes(normH(p)));}))return i;
+  }
+  return 0;
+}
+function excelSerial(n){const d=new Date(Math.round((Math.floor(n)-25569)*864e5));return {y:d.getUTCFullYear(),m:d.getUTCMonth()+1,d:d.getUTCDate()};}
+function parseDate(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date){if(isNaN(v))return null;return {y:v.getFullYear(),m:v.getMonth()+1,d:v.getDate()};}
+  if(typeof v==='number'){
+    if(v>20000&&v<80000)return excelSerial(v);
+    if(v>190000&&v<210000){const m=v%100;return m>=1&&m<=12?{y:Math.floor(v/100),m,d:0}:null;}
+    if(v>19000101&&v<21001231){const m=Math.floor(v/100)%100;return m>=1&&m<=12?{y:Math.floor(v/10000),m,d:v%100}:null;}
+    return null;
+  }
+  const s=String(v).trim();
+  if(/^\d{5}(\.\d+)?$/.test(s))return excelSerial(+s);
+  const r=s.match(/^(\d{4})\D{0,3}(\d{1,2})(?:\D{0,3}(\d{1,2}))?/);
+  if(r){const m=+r[2];if(m>=1&&m<=12)return {y:+r[1],m,d:r[3]?+r[3]:0};}
+  return null;
+}
+function dkey(d){return d?d.y*10000+d.m*100+(d.d||0):0;}
+function parseAmt(v){if(typeof v==='number')return v;const n=Number(String(v==null?'':v).replace(/[,\s$NT]/g,''));return isFinite(n)?n:0;}
+function normId(v){return String(v==null?'':v).trim().replace(/\.0+$/,'');}
+function ageBand(v,today){
+  if(v==null||v==='')return '未知';
+  if(typeof v==='string'){const s=v.trim();if(!s)return '未知';if(/^\d{1,2}_/.test(s)||/[歲岁]/.test(s))return s;}
+  let age=null;
+  if(v instanceof Date){age=today.getFullYear()-v.getFullYear();}
+  else{
+    const s=String(v).trim();
+    if(/^\d{4}\D\d{1,2}/.test(s)||/^\d{8}$/.test(s)){const d=parseDate(s);if(d)age=today.getFullYear()-d.y;}
+    else{const n=Number(s.replace(/[^\d.]/g,''));if(n>0&&n<120)age=Math.floor(n);else if(n>20000&&n<80000){age=today.getFullYear()-excelSerial(n).y;}else if(s)return s;}
+  }
+  if(age==null||age<0||age>110)return '未知';
+  if(age<20)return '未滿20';if(age<30)return '20-29';if(age<40)return '30-39';if(age<50)return '40-49';if(age<60)return '50-59';return '60+';
+}
+function parseCSV(t){
+  const nl=t.indexOf('\n'),first=t.slice(0,nl>0?nl:t.length);
+  const d=first.split('\t').length>first.split(',').length?'\t':',';
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=ch;}
+    else if(ch==='"')q=true;else if(ch===d){row.push(f);f='';}
+    else if(ch==='\n'){row.push(f);rows.push(row);row=[];f='';}
+    else if(ch!=='\r')f+=ch;}
+  if(f!==''||row.length){row.push(f);rows.push(row);}
+  return rows;
+}
+function decodeText(buf){
+  let text=new TextDecoder('utf-8').decode(buf);
+  if((text.slice(0,200000).match(/\uFFFD/g)||[]).length>3){try{text=new TextDecoder('big5').decode(buf);}catch(e){}}
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+  return text;
+}
+function poolPush(p,v){let i=p.m.get(v);if(i===undefined){i=p.a.length;p.m.set(v,i);p.a.push(v);}return i;}
+function newPartial(){const P=()=>({m:new Map(),a:[]});
+  return {ids:P(),cats:P(),ords:P(),ages:P(),cards:P(),nos:P(),mem:[],mo:[],dd:[],cat:[],ord:[],amt:[],
+    fD:[],fJ:[],fF:[],lD:[],lJ:[],lF:[],age:[],card:[],no:[],has:{}};}
+/* one sheet of rows -> per-year partials in acc */
+function processRows(rows,mapIn,acc){
+  const hr=findHeaderRow(rows);const headers=(rows[hr]||[]).map(x=>String(x==null?'':x).trim());
+  const auto=autoMap(headers.filter(Boolean));
+  const map={};for(const f of FIELDS){const want=mapIn&&mapIn[f.k];map[f.k]=want!==undefined&&want!==null&&(want===''||headers.includes(want))?want:auto[f.k];}
+  const ix={};for(const f of FIELDS)ix[f.k]=map[f.k]?headers.indexOf(map[f.k]):-1;
+  const missing=FIELDS.filter(f=>f.req&&ix[f.k]<0).map(f=>f.label);
+  if(missing.length)return {ok:false,error:'找不到必要欄位：'+missing.join('、'),headers:headers.filter(Boolean),map};
+  const today=new Date();let n=0,bad=0;
+  const has={ord:ix.ord>=0,amt:ix.amt>=0,join:ix.join>=0,first:ix.first>=0,age:ix.age>=0,card:ix.card>=0,no:ix.no>=0};
+  for(let i=hr+1;i<rows.length;i++){
+    const row=rows[i];if(!row)continue;
+    const id=normId(row[ix.id]);if(!id)continue;n++;
+    const d=parseDate(row[ix.date]);if(!d||d.y<1990||d.y>2100){bad++;continue;}
+    let P=acc[d.y];if(!P)P=acc[d.y]=newPartial();
+    for(const k in has)if(has[k])P.has[k]=true;
+    const before=P.ids.a.length,m=poolPush(P.ids,id);
+    if(m===before){P.fD.push(99999999);P.fJ.push(0);P.fF.push(0);P.lD.push(-1);P.lJ.push(0);P.lF.push(0);P.age.push(-1);P.card.push(-1);P.no.push(-1);}
+    const cname=String(row[ix.cat]==null?'':row[ix.cat]).trim()||'未分類';
+    const dk=dkey(d);
+    const ov=ix.ord>=0?normId(row[ix.ord]):'';
+    const okey=ov?ov:'d'+id+'|'+dk;
+    P.mem.push(m);P.mo.push(d.m);P.dd.push(d.d||0);P.cat.push(poolPush(P.cats,cname));P.ord.push(poolPush(P.ords,okey));P.amt.push(ix.amt>=0?parseAmt(row[ix.amt]):0);
+    const j=ix.join>=0?dkey(parseDate(row[ix.join])):0,f=ix.first>=0?dkey(parseDate(row[ix.first])):0;
+    if(dk<P.fD[m]){P.fD[m]=dk;P.fJ[m]=j;P.fF[m]=f;}
+    if(dk>=P.lD[m]){P.lD[m]=dk;if(j)P.lJ[m]=j;if(f)P.lF[m]=f;
+      if(ix.age>=0&&row[ix.age]!==''&&row[ix.age]!=null)P.age[m]=poolPush(P.ages,ageBand(row[ix.age],today));
+      if(ix.card>=0&&String(row[ix.card]).trim())P.card[m]=poolPush(P.cards,String(row[ix.card]).trim());
+      if(ix.no>=0&&String(row[ix.no]).trim())P.no[m]=poolPush(P.nos,String(row[ix.no]).trim());}
+  }
+  return {ok:true,headers:headers.filter(Boolean),map,rows:n,bad};
+}
+function packPartial(P){
+  return {ids:P.ids.a,cats:P.cats.a,ordKeys:P.ords.a,ages:P.ages.a,cards:P.cards.a,nos:P.nos.a,has:P.has,
+    mem:Int32Array.from(P.mem),mo:Int8Array.from(P.mo),dd:Int8Array.from(P.dd),cat:Int16Array.from(P.cat),ord:Int32Array.from(P.ord),amt:Float64Array.from(P.amt),
+    fD:Int32Array.from(P.fD),fJ:Int32Array.from(P.fJ),fF:Int32Array.from(P.fF),lD:Int32Array.from(P.lD),lJ:Int32Array.from(P.lJ),lF:Int32Array.from(P.lF),
+    age:Int16Array.from(P.age),card:Int16Array.from(P.card),no:Int16Array.from(P.no)};
+}
+/* whole file (all sheets) -> {ok, years:{y:packed}, rows, bad, sheets, headers, map, error} */
+function processBuffer(buf,name,mapIn,XL){
+  const out={ok:false,years:{},rows:0,bad:0,sheets:[],skipped:[],headers:[],map:null,error:''};
+  const acc={};
+  const handle=(rows,sheet)=>{const r=processRows(rows,mapIn,acc);
+    if(!out.headers.length||r.ok){out.headers=r.headers;out.map=r.map;}
+    if(r.ok){out.ok=true;out.rows+=r.rows;out.bad+=r.bad;out.sheets.push(sheet);}else{out.skipped.push(sheet);if(!out.error)out.error=r.error;}};
+  if(/\.(csv|tsv|txt)$/i.test(name))handle(parseCSV(decodeText(buf)),'');
+  else{
+    if(!XL)throw new Error('Excel 讀取元件沒有載入，請確認網路連線，或把檔案另存成 CSV。');
+    const wb=XL.read(new Uint8Array(buf),{type:'array',dense:true});
+    for(const sn of wb.SheetNames){const rows=XL.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});if(rows.length<2)continue;handle(rows,sn);wb.Sheets[sn]=null;}
+  }
+  for(const y in acc)out.years[y]=packPartial(acc[y]);
+  if(out.ok)out.error='';
+  return out;
+}
+
+/* growable typed array */
+class GA{constructor(T,cap){this.T=T;this.a=new T(cap||4096);this.n=0;}
+  push(v){if(this.n===this.a.length){const b=new this.T(this.a.length*2);b.set(this.a);this.a=b;}this.a[this.n++]=v;}
+  out(){return this.a.slice(0,this.n);}
+  static of(T,arr){const g=new GA(T,Math.max(16,arr.length));g.a.set(arr);g.n=arr.length;return g;}}
+const mkPool=(arr)=>{const p={m:new Map(),a:[]};if(arr)for(const v of arr)poolPush(p,v);return p;};
+/* one year's data, built from any number of files */
+class YearB{
+  constructor(year){this.year=year;this.files=[];this.has={};this.ids=mkPool();this.cats=mkPool();this.ords=mkPool();this.ages=mkPool();this.cards=mkPool();this.nos=mkPool();
+    this.mem=new GA(Int32Array);this.mo=new GA(Int8Array);this.dd=new GA(Int8Array);this.cat=new GA(Int16Array);this.ord=new GA(Int32Array);this.amt=new GA(Float64Array);
+    this.fD=[];this.fJ=[];this.fF=[];this.lD=[];this.lJ=[];this.lF=[];this.age=[];this.card=[];this.no=[];}
+  static from(ch){const b=new YearB(ch.year);b.files=ch.files.map(f=>({...f}));b.has={...ch.has};
+    b.ids=mkPool(ch.ids);b.cats=mkPool(ch.cats);b.ords=mkPool(ch.ordKeys);b.ages=mkPool(ch.ages);b.cards=mkPool(ch.cards);b.nos=mkPool(ch.nos);
+    b.mem=GA.of(Int32Array,ch.mem);b.mo=GA.of(Int8Array,ch.mo);b.dd=GA.of(Int8Array,ch.dd);b.cat=GA.of(Int16Array,ch.cat);b.ord=GA.of(Int32Array,ch.ord);b.amt=GA.of(Float64Array,ch.amt);
+    for(const k of ['fD','fJ','fF','lD','lJ','lF','age','card','no'])b[k]=Array.from(ch[k]);return b;}
+  merge(P,file){
+    for(const k in P.has)if(P.has[k])this.has[k]=true;
+    const idR=new Int32Array(P.ids.length);
+    for(let i=0;i<P.ids.length;i++){const before=this.ids.a.length,g=poolPush(this.ids,P.ids[i]);idR[i]=g;
+      if(g===before){this.fD.push(99999999);this.fJ.push(0);this.fF.push(0);this.lD.push(-1);this.lJ.push(0);this.lF.push(0);this.age.push(-1);this.card.push(-1);this.no.push(-1);}}
+    const catR=P.cats.map(c=>poolPush(this.cats,c)),ordR=P.ordKeys.map(o=>poolPush(this.ords,o));
+    const ageR=P.ages.map(v=>poolPush(this.ages,v)),cardR=P.cards.map(v=>poolPush(this.cards,v)),noR=P.nos.map(v=>poolPush(this.nos,v));
+    for(let i=0;i<P.mem.length;i++){this.mem.push(idR[P.mem[i]]);this.mo.push(P.mo[i]);this.dd.push(P.dd[i]);this.cat.push(catR[P.cat[i]]);this.ord.push(ordR[P.ord[i]]);this.amt.push(P.amt[i]);}
+    for(let i=0;i<P.ids.length;i++){const g=idR[i];
+      if(P.fD[i]<this.fD[g]){this.fD[g]=P.fD[i];this.fJ[g]=P.fJ[i];this.fF[g]=P.fF[i];}
+      if(P.lD[i]>=this.lD[g]){this.lD[g]=P.lD[i];if(P.lJ[i])this.lJ[g]=P.lJ[i];if(P.lF[i])this.lF[g]=P.lF[i];
+        if(P.age[i]>=0)this.age[g]=ageR[P.age[i]];if(P.card[i]>=0)this.card[g]=cardR[P.card[i]];if(P.no[i]>=0)this.no[g]=noR[P.no[i]];}}
+    if(file){const ex=this.files.find(f=>f.key===file.key);if(ex)ex.rows+=P.mem.length;else this.files.push({...file,rows:P.mem.length});}
+  }
+  chunk(){let maxM=0;const mo=this.mo.out();for(let i=0;i<mo.length;i++)if(mo[i]>maxM)maxM=mo[i];
+    return {year:this.year,files:this.files.map(f=>({...f})),has:{...this.has},n:this.mem.n,maxM,
+      ids:this.ids.a.slice(),cats:this.cats.a.slice(),ordKeys:this.ords.a.slice(),ages:this.ages.a.slice(),cards:this.cards.a.slice(),nos:this.nos.a.slice(),
+      mem:this.mem.out(),mo,dd:this.dd.out(),cat:this.cat.out(),ord:this.ord.out(),amt:this.amt.out(),
+      fD:Int32Array.from(this.fD),fJ:Int32Array.from(this.fJ),fF:Int32Array.from(this.fF),lD:Int32Array.from(this.lD),lJ:Int32Array.from(this.lJ),lF:Int32Array.from(this.lF),
+      age:Int16Array.from(this.age),card:Int16Array.from(this.card),no:Int16Array.from(this.no),savedAt:Date.now()};}
+}
+
+const catDisp=raw=>String(raw).replace(/^\s*\d+\s*[_\-.、]\s*/,'')||String(raw);
+const catPrefix=raw=>{const m=String(raw).match(/^\s*(\d+)/);return m?+m[1]:500;};
+/* year chunks -> analysis arrays */
+function assemble(chunks){
+  chunks=[...chunks].sort((a,b)=>a.year-b.year);
+  const memIdx=new Map(),ids=[],catIdx=new Map(),cats=[],catPre=[];
+  let n=0;for(const c of chunks)n+=c.n;
+  const mem=new Int32Array(n),yr=new Int16Array(n),mo=new Int8Array(n),cat=new Int16Array(n),ord=new Int32Array(n),amt=new Float64Array(n);
+  const lastMonth={},parts=[],has={};let off=0,ordOff=0;
+  for(const ch of chunks){
+    for(const k in ch.has)if(ch.has[k])has[k]=true;
+    const gm=new Int32Array(ch.ids.length);
+    for(let i=0;i<ch.ids.length;i++){let g=memIdx.get(ch.ids[i]);if(g===undefined){g=ids.length;memIdx.set(ch.ids[i],g);ids.push(ch.ids[i]);}gm[i]=g;}
+    const cm=ch.cats.map(raw=>{const d=catDisp(raw);let c=catIdx.get(d);if(c===undefined){c=cats.length;catIdx.set(d,c);cats.push(d);catPre.push(catPrefix(raw));}return c;});
+    for(let i=0;i<ch.n;i++){const j=off+i;mem[j]=gm[ch.mem[i]];yr[j]=ch.year;mo[j]=ch.mo[i];cat[j]=cm[ch.cat[i]];ord[j]=ordOff+ch.ord[i];amt[j]=ch.amt[i];}
+    lastMonth[ch.year]=ch.maxM;off+=ch.n;ordOff+=ch.ordKeys.length;parts.push({ch,gm});
+  }
+  const rank=c=>{const k=KNOWN_ORDER.indexOf(cats[c]);if(k>=0)return k;if(/其他|未分類/.test(cats[c]))return 9000+catPre[c];return 100+catPre[c];};
+  const order=cats.map((_,i)=>i).sort((a,b)=>rank(a)-rank(b)||a-b);
+  const remap=new Int16Array(cats.length);order.forEach((c,i)=>remap[c]=i);
+  for(let i=0;i<n;i++)cat[i]=remap[cat[i]];
+  return {n,ids,cats:order.map(c=>cats[c]),mem,yr,mo,cat,ord,amt,parts,has,lastMonth,years:chunks.map(c=>c.year)};
+}
+
+const NO_LABELS=['oldold','oldnew','newnew','資料異常','未知'];
+function judgeNo(j,f,od){if(!j||!f||!od)return 4;if(j<od&&f<od)return 0;if(j<od&&f>=od)return 1;if(j>=od&&f>=od)return 2;return 3;}
+/* member attributes as of analysis year Y */
+function memberAttrs(D,Y,basis){
+  const N=D.ids.length,lastD=new Int32Array(N).fill(-1),J=new Int32Array(N),F=new Int32Array(N),ref=new Int32Array(N);
+  const age=new Array(N).fill('未知'),card=new Array(N).fill('未知'),given=new Array(N).fill('');
+  for(const {ch,gm} of D.parts){if(ch.year>Y)continue;
+    for(let i=0;i<ch.ids.length;i++){const g=gm[i];if(ch.lD[i]<0||ch.lD[i]<lastD[g])continue;
+      lastD[g]=ch.lD[i];ref[g]=ch.lD[i];if(ch.lJ[i])J[g]=ch.lJ[i];if(ch.lF[i])F[g]=ch.lF[i];
+      if(ch.age[i]>=0)age[g]=ch.ages[ch.age[i]];if(ch.card[i]>=0)card[g]=ch.cards[ch.card[i]];if(ch.no[i]>=0)given[g]=ch.nos[ch.no[i]];}}
+  if(basis==='yfirst')for(const {ch,gm} of D.parts){if(ch.year!==Y)continue;
+    for(let i=0;i<ch.ids.length;i++){const g=gm[i];if(ch.fD[i]>=99999999)continue;ref[g]=ch.fD[i];if(ch.fJ[i])J[g]=ch.fJ[i];if(ch.fF[i])F[g]=ch.fF[i];}}
+  const useDates=!!(D.has.join&&D.has.first);
+  const no=new Array(N);
+  for(let g=0;g<N;g++){if(lastD[g]<0){no[g]='未知';continue;}
+    if(useDates){const s=judgeNo(J[g],F[g],ref[g]);no[g]=s===4&&given[g]?given[g]:NO_LABELS[s];}
+    else no[g]=given[g]||'未知';}
+  return {lastD,J,F,ref,no,age,card,useDates};
+}
+
+function buildYear(D,Y){
+  const K=D.cats.length,KK=K+1,recMap=new Map();
+  const recMem=[],recScope=[],mY=[],mY1=[],mY2=[],e1=[],e2=[],aY=[],aY1=[],lastY=[];
+  const rid=(m,s)=>{const k=m*KK+s+1;let r=recMap.get(k);
+    if(r===undefined){r=recMem.length;recMap.set(k,r);recMem.push(m);recScope.push(s);mY.push(0);mY1.push(0);mY2.push(0);e1.push(0);e2.push(0);aY.push(0);aY1.push(0);lastY.push(0);}return r;};
+  for(let i=0;i<D.n;i++){
+    const y=D.yr[i];if(y>Y)continue;
+    const m=D.mem[i],c=D.cat[i],bit=1<<(D.mo[i]-1),a=D.amt[i];
+    for(const s of [c,-1]){
+      const r=rid(m,s);if(y>lastY[r])lastY[r]=y;
+      if(y===Y){mY[r]|=bit;aY[r]+=a;}
+      else if(y===Y-1){mY1[r]|=bit;aY1[r]+=a;}
+      else if(y===Y-2){mY2[r]|=bit;e1[r]=1;}
+      else{e1[r]=1;e2[r]=1;}
+    }
+  }
+  const nrec=recMem.length,cnt=new Uint16Array(nrec*24),seen=new Set();
+  for(let i=0;i<D.n;i++){
+    const y=D.yr[i];if(y!==Y&&y!==Y-1)continue;
+    const m=D.mem[i],c=D.cat[i],off=(y===Y?0:12)+D.mo[i]-1,yb=y===Y?0:1;
+    for(const s of [c,-1]){
+      const key=(D.ord[i]*KK+(s+1))*2+yb;
+      if(seen.has(key))continue;seen.add(key);
+      const r=recMap.get(m*KK+s+1);if(cnt[r*24+off]<65535)cnt[r*24+off]++;
+    }
+  }
+  return {Y,K,KK,L:D.lastMonth[Y]||12,n:nrec,recMap,recMem:Int32Array.from(recMem),recScope:Int16Array.from(recScope),
+    mY:Uint16Array.from(mY),mY1:Uint16Array.from(mY1),mY2:Uint16Array.from(mY2),e1:Uint8Array.from(e1),e2:Uint8Array.from(e2),
+    aY:Float64Array.from(aY),aY1:Float64Array.from(aY1),lastY:Int16Array.from(lastY),cnt};
+}
+
+function tally(B,opt){
+  const K=B.K,L=B.L,M=opt.M;
+  const T=[];for(let i=0;i<=K;i++)T.push({A:0,B:0,N:0,C:0,D:0,E:0,F:0,E1:0,F1:0,Yc:0});
+  const flags=new Uint8Array(B.n);
+  const full=0xFFF,same=opt.same?((1<<L)-1):full;
+  const before=(1<<(M-1))-1,thru=(1<<M)-1,after=full&~before;
+  const all=opt.look==='all';
+  for(let r=0;r<B.n;r++){
+    const t=T[B.recScope[r]+1],mY=B.mY[r],mY1=B.mY1[r],mY2=B.mY2[r];
+    const pc=all?(mY1>0||B.e1[r]===1):mY1>0;
+    const pp=all?(mY2>0||B.e2[r]===1):mY2>0;
+    let f=0;
+    if(mY)t.Yc++;
+    if(pc){t.A++;if(mY){t.B++;f|=1;}else f|=2;}else if(mY){t.N++;f|=4;}
+    if(pp){t.C++;if(mY1&same)t.D++;}
+    if(opt.mode==='split'){
+      if(mY&before){t.E++;if(mY&after){t.F++;f|=8;}else f|=16;}
+      if(mY1&before){t.E1++;if(mY1&after&same)t.F1++;}
+    }else{
+      const o=r*24;
+      if(mY&thru){t.E++;let c=0;for(let k=0;k<M;k++)c+=B.cnt[o+k];if(c>=2){t.F++;f|=8;}else f|=16;}
+      if(mY1&thru){t.E1++;let c=0;for(let k=0;k<M;k++)c+=B.cnt[o+12+k];if(c>=2)t.F1++;}
+    }
+    flags[r]=f;
+  }
+  return {T,flags};
+}
+
+function profile(D,B,R,A,scope,bit){
+  const members=[],scopeLast=new Map();
+  for(let r=0;r<B.n;r++)if(B.recScope[r]===scope&&(R.flags[r]&bit)){const m=B.recMem[r];members.push(m);const y=B.lastY[r];scopeLast.set(y,(scopeLast.get(y)||0)+1);}
+  const KK=B.KK;
+  const cats=D.cats.map((name,c)=>{let y=0,y1=0,a=0,a1=0;
+    for(const m of members){const r=B.recMap.get(m*KK+c+1);if(r===undefined)continue;
+      if(B.mY[r]){y++;a+=B.aY[r];}if(B.mY1[r]){y1++;a1+=B.aY1[r];}}
+    return {name,y,y1,a,a1};});
+  const dist=(fn)=>{const mp=new Map();for(const m of members){const v=fn(m);mp.set(v,(mp.get(v)||0)+1);}return mp;};
+  return {members,cats,scopeLast,allLast:dist(m=>Math.floor(A.lastD[m]/10000)),no:dist(m=>A.no[m]),age:dist(m=>A.age[m]),card:dist(m=>A.card[m])};
+}
+
+/* every scope x segment profile in one pass (for the view and sharing) */
+function fullProfiles(D,B,R,A){
+  const K=B.K,N=D.ids.length,BITS=[1,2,4,8,16];
+  const off=new Int32Array(N+1);
+  for(let r=0;r<B.n;r++)if(B.recScope[r]>=0)off[B.recMem[r]+1]++;
+  for(let i=0;i<N;i++)off[i+1]+=off[i];
+  const pos=off.slice(0,N),idx=new Int32Array(off[N]);
+  for(let r=0;r<B.n;r++)if(B.recScope[r]>=0)idx[pos[B.recMem[r]]++]=r;
+  const P=[];for(let s=0;s<=K;s++)P.push(BITS.map(()=>({n:0,cy:new Float64Array(K),cy1:new Float64Array(K),ca:new Float64Array(K),no:new Map(),last:new Map(),allLast:new Map(),age:new Map(),card:new Map()})));
+  const inc=(mp,k)=>mp.set(k,(mp.get(k)||0)+1);
+  for(let r=0;r<B.n;r++){const f=R.flags[r];if(!f)continue;
+    const row=P[B.recScope[r]+1],m=B.recMem[r],ly=B.lastY[r],al=Math.floor(A.lastD[m]/10000);
+    for(let b=0;b<5;b++){if(!(f&BITS[b]))continue;const p=row[b];p.n++;
+      for(let j=off[m];j<off[m+1];j++){const cr=idx[j],c=B.recScope[cr];if(B.mY[cr]){p.cy[c]++;p.ca[c]+=B.aY[cr];}if(B.mY1[cr])p.cy1[c]++;}
+      inc(p.no,A.no[m]);inc(p.last,ly);inc(p.allLast,al);inc(p.age,A.age[m]);inc(p.card,A.card[m]);}}
+  return P.map(row=>row.map(p=>({n:p.n,cats:Array.from(p.cy,(v,c)=>[v,p.cy1[c],Math.round(p.ca[c])]),no:[...p.no],last:[...p.last],allLast:[...p.allLast],age:[...p.age],card:[...p.card]})));
+}
+
+/* demo data shaped like ec訂單明細表 */
+function makeDemo(){
+  let seed=20261026;const rnd=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+  const CAT=[['01_中文書',234370,69871,251096,74626,450],['02_日文書',6605,715,6699,738,600],['03_外文書',23771,3624,28765,4076,900],['04_雜誌',30483,5912,39282,6982,250],['05_影音',27134,4012,20733,4925,700],['06_童書',41820,10579,42205,11208,400],['07_親子用品',30859,4680,30015,4861,800],['08_文具潮藝',70482,13634,74491,17055,500],['09_服飾鞋包',28137,2913,25113,3385,1800],['10_美妝保養',30000,5080,31752,5908,1200],['11_生活家居',38298,6214,44132,7912,1000],['12_食品保健',19186,3575,21112,4472,700],['13_3C',20971,1328,23571,1867,2500],['14_家電',9411,506,9380,632,3500],['15_休閒戶外',17820,1359,12649,1331,1500],['16_電子書',26041,5832,1969,584,300]];
+  const SC=20,N=24000;
+  const w=[];let tot=0;for(let i=0;i<N;i++){tot+=1/Math.pow(i+1,0.35);w.push(tot);}
+  const pick=(set,ex)=>{for(;;){const x=rnd()*tot;let lo=0,hi=N-1;while(lo<hi){const mid=(lo+hi)>>1;if(w[mid]<x)lo=mid+1;else hi=mid;}if(!set.has(lo)&&!(ex&&ex.has(lo)))return lo;}};
+  const buys=[];
+  for(const [,A,B,C,D] of CAT){
+    const s24=new Set();while(s24.size<Math.round(C/SC))s24.add(pick(s24));
+    const s25=new Set();for(const m of s24)if(rnd()<D/C)s25.add(m);while(s25.size<Math.round(A/SC))s25.add(pick(s25,s24));
+    const s26=new Set();for(const m of s25)if(rnd()<B/A)s26.add(m);const tgt=s26.size+Math.round(A*0.42/SC);while(s26.size<tgt)s26.add(pick(s26,s25));
+    buys.push([s24,s25,s26]);
+  }
+  const cards=['一般會員','一般會員','一般會員','一般會員','金卡會員','金卡會員','聯名卡','學生卡'];
+  const bands=['02_20歲以下','03_21歲到25歲','04_26歲到30歲','05_31歲到35歲','06_36歲到40歲','07_41歲到45歲','08_46歲到50歲','09_51歲以上'];
+  const mcard=[],mage=[],mnew=[];
+  for(let i=0;i<N;i++){mcard.push(cards[Math.floor(rnd()*cards.length)]);mage.push(bands[Math.floor(rnd()*bands.length)]);mnew.push(rnd()<0.5);}
+  const pad=n=>String(n).padStart(2,'0');
+  const body=[];let ord=26000000;const firstBuy=new Array(N).fill('9999/99/99');
+  buys.forEach((sets,ci)=>{const [name,,,,,avg]=CAT[ci];
+    sets.forEach((set,yi)=>{const y=2024+yi,maxM=y===2026?9:12;
+      for(const m of set){let k=1+(rnd()<0.45?1:0)+(rnd()<0.2?1:0);
+        while(k--){const ds=`${y}/${pad(1+Math.floor(rnd()*maxM))}/${pad(1+Math.floor(rnd()*28))}`;
+          if(ds<firstBuy[m])firstBuy[m]=ds;
+          body.push([m,String(ord++),ds,name,Math.round(avg*(0.4+rnd()*1.4))]);}}});});
+  const joinD=firstBuy.map((f,m)=>{if(f[0]==='9')return '';if(mnew[m])return f;const y=2012+Math.floor(rnd()*(+f.slice(0,4)-2012));return `${y}/${pad(1+Math.floor(rnd()*12))}/${pad(1+Math.floor(rnd()*28))}`;});
+  const rows=[['會員編號','訂單日期','母訂單號碼','會員加入日','首購日','年齡區間','類別1-2','銷售金額(點加金)','會員卡別']];
+  for(const [m,o,ds,name,a] of body)rows.push(['M'+String(100000+m),ds,o,joinD[m]<firstBuy[m]?joinD[m]:firstBuy[m],firstBuy[m],mage[m],name,a,mcard[m]]);
+  return rows;
+}
+/*ENDCORE*/
+
+/* ---------- storage (IndexedDB, this browser only) ---------- */
+const DB={
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('repurchase_dashboard',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('years'))r.result.createObjectStore('years',{keyPath:'year'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});},
+  async tx(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('years',mode);const st=t.objectStore('years');const q=fn(st);t.oncomplete=()=>{db.close();res(q&&q.result);};t.onerror=()=>{db.close();rej(t.error);};t.onabort=()=>{db.close();rej(t.error);};});},
+  all(){return this.tx('readonly',s=>s.getAll());},
+  put(c){return this.tx('readwrite',s=>s.put(c));},
+  del(y){return this.tx('readwrite',s=>s.delete(y));},
+  clear(){return this.tx('readwrite',s=>s.clear());},
+};
+
+/* ---------- worker for reading files ---------- */
+const WORKER_SRC=`const FIELDS=${JSON.stringify(FIELDS)};const AGE_BANDS=${JSON.stringify(AGE_BANDS)};\n`+
+  [normH,autoMap,findHeaderRow,excelSerial,parseDate,dkey,parseAmt,normId,ageBand,parseCSV,decodeText,poolPush,newPartial,processRows,packPartial,processBuffer].map(f=>f.toString()).join('\n')+
+  `\nlet XL=false;
+onmessage=e=>{const {buf,name,map}=e.data;try{
+  if(!/\\.(csv|tsv|txt)$/i.test(name)&&!XL){importScripts(${JSON.stringify(XLSX_URL)});XL=true;}
+  const res=processBuffer(buf,name,map,self.XLSX);
+  const tr=[];for(const y in res.years){const p=res.years[y];for(const k in p){if(p[k]&&p[k].buffer instanceof ArrayBuffer)tr.push(p[k].buffer);}}
+  postMessage(res,tr);
+}catch(err){postMessage({ok:false,fatal:true,error:String(err&&err.message||err)});}};`;
+let WORKER=null,WORKER_OK=true;
+function getWorker(){if(!WORKER_OK)return null;if(!WORKER){try{WORKER=new Worker(URL.createObjectURL(new Blob([WORKER_SRC],{type:'text/javascript'})));}catch(e){WORKER_OK=false;return null;}}return WORKER;}
+function readInWorker(buf,name,map){
+  const w=getWorker();
+  if(!w)return Promise.resolve(processBuffer(buf,name,map,window.XLSX));
+  return new Promise(res=>{
+    w.onmessage=e=>{const r=e.data;
+      if(r.fatal&&/importScripts|NetworkError|Failed to execute/i.test(r.error)){WORKER_OK=false;w.terminate();WORKER=null;res(null);}else res(r);};
+    w.onerror=ev=>{ev.preventDefault();WORKER_OK=false;w.terminate();WORKER=null;res(null);};
+    w.postMessage({buf,name,map},[buf]);
+  });
+}
+
+/* ---------- UI ---------- */
+/*VIEW*/
+const V_NO=['oldold','oldnew','newnew','資料異常','未知'];
+const V_AGE=['未滿20','20-29','30-39','40-49','50-59','60+','未知'];
+const SEG_KEYS=['rep','lost','neu','again','once'];
+const VS={scope:-1,seg:'rep'};
+const $=id=>document.getElementById(id);
+const fmt=n=>n==null||!isFinite(n)?'—':Math.round(n).toLocaleString('en-US');
+const pct=(a,b)=>b>0?a/b:null;
+const fp=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const fpp=v=>v==null?'—':(v>0?'+':'')+(v*100).toFixed(1)+'%';
+const stripPre=s=>String(s).replace(/^\d{1,2}_/,'');
+function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const k in attrs){if(k==='class')e.className=attrs[k];else if(k==='text')e.textContent=attrs[k];else if(k.startsWith('on'))e.addEventListener(k.slice(2),attrs[k]);else e.setAttribute(k,attrs[k]);}
+  for(const c of kids){if(c==null)continue;e.append(c instanceof Node?c:document.createTextNode(String(c)));}return e;}
+function vScopeName(i){return i<0?'全站':SNAP.cats[i];}
+function vSeg(){
+  const s=SNAP.s,Y=s.Y,M=s.M,L=s.L,past=s.look==='last'?`${Y-1} 年有購`:`${Y} 年以前曾有購`;
+  const endTxt=L<12?`（資料到 ${L} 月）`:'';
+  return {
+    rep:{name:'回購',bit:1,def:`${past}，${Y} 年再次購買${endTxt}`},
+    lost:{name:'未回購',bit:2,def:`${past}，${Y} 年尚未購買${endTxt}`},
+    neu:{name:'今年新進',bit:4,def:`${Y} 年有購，但${s.look==='last'?`${Y-1} 年沒買`:'過去都沒買'}`},
+    again:{name:'再購',bit:8,def:s.mode==='split'?`${Y} 年 1–${M-1} 月有購，${M} 月（含）之後又回來買`:`${Y} 年 1–${M} 月累計購買 2 次以上`},
+    once:{name:'未再購',bit:16,def:s.mode==='split'?`${Y} 年 1–${M-1} 月有購，${M} 月（含）之後沒有再買`:`${Y} 年 1–${M} 月只購買 1 次`},
+  };
+}
+function vProf(){return SNAP.P[VS.scope+1][SEG_KEYS.indexOf(VS.seg)];}
+function viewRender(){
+  if(!SNAP)return;
+  const s=SNAP.s,Y=s.Y,L=s.L,T=SNAP.T,SI=vSeg(),ys=SNAP.years;
+  if(VS.scope>=SNAP.cats.length)VS.scope=-1;
+  $('dash').hidden=false;
+  if($('vSub'))$('vSub').textContent=`資料更新於 ${new Date(SNAP.at).toLocaleString('zh-TW',{hour12:false})}`+(SNAP.demo?'（示範資料）':'');
+  $('metaLine').textContent=`設定：分析年 ${Y}，${s.mode==='split'?`再購以 ${s.M} 月分界`:`再購為 1–${s.M} 月購買 2 次以上`}，過去有購指${s.look==='last'?'去年有購':'任一更早年份有購'}，去年用${s.same?'同期月份':'全年'}比較。資料年份 ${ys.join('、')}，${Y} 年資料到 ${L} 月。購買次數以${SNAP.has.ord?'不重複母訂單號碼':'不重複購買日'}計算。`+(SNAP.demo?' 目前是示範資料。':'');
+  const w=[];
+  if(!ys.includes(Y-1))w.push(`沒有 ${Y-1} 年資料，算不出回購。`);
+  if(!ys.includes(Y-2))w.push(`沒有 ${Y-2} 年資料，去年同口徑比較會是空白。`);
+  if(s.mode==='split'&&s.M>L)w.push(`分界月份 ${s.M} 月晚於 ${Y} 年最新資料月份 ${L} 月，再購人數會是 0。`);
+  if(s.mode==='count'&&s.M>L)w.push(`累計月份 ${s.M} 月晚於 ${Y} 年最新資料月份 ${L} 月，今年的累計期間不完整。`);
+  $('warnLine').textContent=w.join(' ');
+  const dl=$('defList');dl.replaceChildren();
+  for(const k of SEG_KEYS)dl.append(el('li',null,el('b',{text:SI[k].name+'：'}),SI[k].def));
+  dl.append(el('li',{text:s.same?`去年比較用同期：${Y-1} 年也只看到 ${L} 月。`:`去年比較用全年，若 ${Y} 年未滿一年，回購率差異會偏低。`}));
+  dl.append(el('li',{text:'品類口徑為同品類回購；全站為不重複會員。'}));
+  dl.append(el('li',{text:SNAP.useDates?`新舊會員別：以${s.basis==='last'?`每位會員截至 ${Y} 年的最新一筆訂單`:`每位會員 ${Y} 年的第一筆訂單（今年沒買的人用最新一筆）`}為準，比對該筆的會員加入日、首購日。oldold＝加入日、首購日都早於訂單日；oldnew＝加入日早於訂單日、首購日等於或晚於訂單日；newnew＝加入日、首購日都等於或晚於訂單日。`:'新舊會員別：資料缺會員加入日或首購日，沿用資料中的欄位或標為未知。'}));
+  dl.append(el('li',{text:`最後消費年：截至 ${Y} 年，資料中最後一次購買的年份；選品類範圍時另外顯示該品類的最後消費年。`}));
+  const ss=$('selScope');ss.replaceChildren();ss.append(el('option',{value:-1,text:'全站'}));
+  SNAP.cats.forEach((c,i)=>ss.append(el('option',{value:i,text:c})));ss.value=VS.scope;
+  ss.onchange=()=>{VS.scope=+ss.value;viewRender();};
+  vFlow(T[VS.scope+1],SI);vTable(T);vProfile(SI);
+}
+function vSegBtn(key,n,base,cls,SI){
+  const b=el('button',{class:'seg '+cls,type:'button','aria-pressed':String(VS.seg===key),title:SI[key].def,
+    onclick:()=>{VS.seg=key;viewRender();$('profTitle').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});}},
+    el('span',{text:SI[key].name}),el('span',{class:'n',text:fmt(n)}),el('span',{text:fp(pct(n,base))}));
+  b.style.flexGrow=String(Math.max(n,base*0.12)||1);b.style.flexBasis='0';
+  return b;
+}
+function vFlow(t,SI){
+  const s=SNAP.s,Y=s.Y,sn=vScopeName(VS.scope);
+  $('flowTitle').textContent=`${sn}會員流向`;
+  $('cap1').replaceChildren(s.look==='last'?`${Y-1} 年有購 `:'過去有購 ',el('strong',{text:fmt(t.A)}),' 人，今年回來了嗎？');
+  $('bar1').replaceChildren(vSegBtn('rep',t.B,t.A,'cur',SI),vSegBtn('lost',t.A-t.B,t.A,'prev',SI));
+  $('cap2').replaceChildren(s.mode==='split'?`${Y} 年 ${s.M===2?'1':'1–'+(s.M-1)} 月有購 `:`${Y} 年 1–${s.M} 月有購 `,el('strong',{text:fmt(t.E)}),' 人，有再買嗎？');
+  $('bar2').replaceChildren(vSegBtn('again',t.F,t.E,'cur',SI),vSegBtn('once',t.E-t.F,t.E,'now2',SI));
+  const nb=el('button',{class:'seg',type:'button','aria-pressed':String(VS.seg==='neu'),title:SI.neu.def,onclick:()=>{VS.seg='neu';viewRender();}},
+    el('span',{text:SI.neu.name}),el('span',{class:'n',text:fmt(t.N)}),el('span',{text:`占${Y}年有購 ${fp(pct(t.N,t.Yc))}`}));
+  $('extra').replaceChildren(nb);
+}
+function vTable(T){
+  const s=SNAP.s,Y=s.Y,tb=$('sumTable');tb.replaceChildren();
+  const head=el('thead'),h1=el('tr');
+  const cols=[['類別','',2,1],[`${Y} 回購（同品類）`,'gc',1,3],[`${Y-1} 回購${s.same?'（同期）':''}`,'gp',1,3],['回購率<br>差異','gd',2,1],[`${Y} 再購`,'gc',1,3],[`${Y-1} 同口徑`,'gp',1,1],['再購率<br>差異','gd',2,1],[`${Y}<br>新進`,'gc',2,1]];
+  for(const [t,c,rs,cs] of cols){const th=el('th',{class:c,rowspan:rs,colspan:cs});th.innerHTML=t;h1.append(th);}
+  const h2=el('tr');
+  const sub=[[`${s.look==='last'?Y-1+' 有購':'過去有購'}<br>A`,'gc'],[`${Y} 再回購<br>B`,'gc'],['回購率<br>B/A','gc'],[`${s.look==='last'?Y-2+' 有購':'過去有購'}<br>C`,'gp'],[`${Y-1} 再回購<br>D`,'gp'],['回購率<br>D/C','gp'],['再購基數<br>E','gc'],['再購人數<br>F','gc'],['再購率<br>F/E','gc'],['再購率','gp']];
+  for(const [t,c] of sub){const th=el('th',{class:c});th.innerHTML=t;h2.append(th);}
+  head.append(h1,h2);tb.append(head);
+  const body=el('tbody');
+  for(const idx of [...SNAP.cats.map((_,i)=>i+1),0]){
+    const t=T[idx],sc=idx-1;
+    const r1=pct(t.B,t.A),r0=pct(t.D,t.C),a1=pct(t.F,t.E),a0=pct(t.F1,t.E1);
+    const d1=r1!=null&&r0!=null?r1-r0:null,d2=a1!=null&&a0!=null?a1-a0:null;
+    const tr=el('tr',{class:'row'+(idx===0?' total':'')+(VS.scope===sc?' on':''),tabindex:'0'});
+    const pick=()=>{VS.scope=sc;viewRender();};
+    tr.addEventListener('click',pick);tr.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pick();}});
+    tr.append(el('td',{text:idx===0?'全站（不重複）':SNAP.cats[sc]}),
+      el('td',{text:fmt(t.A)}),el('td',{text:fmt(t.B)}),el('td',{text:fp(r1)}),
+      el('td',{class:'gap',text:fmt(t.C)}),el('td',{text:fmt(t.D)}),el('td',{text:fp(r0)}),
+      el('td',{class:'d '+(d1>0?'pos':d1<0?'neg':''),text:fpp(d1)}),
+      el('td',{class:'gap',text:fmt(t.E)}),el('td',{text:fmt(t.F)}),el('td',{text:fp(a1)}),
+      el('td',{text:fp(a0)}),el('td',{class:'d '+(d2>0?'pos':d2<0?'neg':''),text:fpp(d2)}),
+      el('td',{class:'gap',text:fmt(t.N)}));
+    body.append(tr);
+  }
+  tb.append(body);
+}
+function vProfile(SI){
+  const seg=SI[VS.seg],sn=vScopeName(VS.scope),p=vProf(),n=p.n,Y=SNAP.s.Y;
+  $('profTitle').replaceChildren(`${sn}／${seg.name}會員`,el('span',{text:fmt(n)+' 人'}));
+  $('profDef').textContent=seg.def+(VS.scope>=0?`（以${sn}判定）`:'');
+  const rows=p.cats.map((c,i)=>({name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2]})).sort((a,b)=>VS.seg==='lost'?b.y1-a.y1:b.y-a.y);
+  const ct=$('catTable');ct.replaceChildren();
+  ct.append(el('thead',null,el('tr',null,el('th',{text:'品類'}),el('th',{text:`${Y} 有買`}),el('th',{text:'占這群'}),el('th',{text:`${Y-1} 有買`}),el('th',{text:'占這群'}),el('th',{text:`${Y} 人均金額`}))));
+  const tb=el('tbody'),mx=Math.max(1,...rows.map(r=>Math.max(r.y,r.y1)));
+  for(const r of rows){
+    if(!r.y&&!r.y1)continue;
+    const b1=el('span',{class:'mini'});b1.style.width=(r.y/mx*48)+'px';
+    const b0=el('span',{class:'mini p'});b0.style.width=(r.y1/mx*48)+'px';
+    tb.append(el('tr',null,el('td',{text:r.name}),el('td',{text:fmt(r.y)}),el('td',null,b1,fp(pct(r.y,n))),el('td',{text:fmt(r.y1)}),el('td',null,b0,fp(pct(r.y1,n))),el('td',{text:SNAP.has.amt&&r.y?fmt(r.a/r.y):'—'})));
+  }
+  if(!tb.children.length)tb.append(el('tr',null,el('td',{colspan:6,text:'這群目前沒有會員。'})));
+  ct.append(tb);
+  vDist('dNo',p.no,n,'no',true);
+  $('hLast').textContent=VS.scope<0?'最後消費年':`最後消費年（${sn}）`;
+  vDist('dLast',p.last,n,'year',true);
+  $('boxLastAll').hidden=VS.scope<0;if(VS.scope>=0)vDist('dLastAll',p.allLast,n,'year',true);
+  vDist('dAge',p.age,n,'label',SNAP.has.age);
+  vDist('dCard',p.card,n,'count',SNAP.has.card);
+}
+function vSortKeys(pairs,mode){
+  const mp=new Map(pairs);let keys=[...mp.keys()];
+  if(mode==='year')return keys.sort((a,b)=>b-a);
+  if(mode==='no'){const o=v=>{const i=V_NO.indexOf(v);return i<0?50:i;};return keys.sort((a,b)=>o(a)-o(b));}
+  if(mode==='label'){const o=v=>{if(v==='未知')return 1e9;const i=V_AGE.indexOf(v);if(i>=0)return i;const m=String(v).match(/^(\d+)/);return m?+m[1]:5e8;};return keys.sort((a,b)=>o(a)-o(b)||String(a).localeCompare(String(b)));}
+  return keys.sort((a,b)=>(a==='未知')-(b==='未知')||mp.get(b)-mp.get(a));
+}
+function vDist(id,pairs,n,mode,has){
+  const box=$(id);box.replaceChildren();
+  if(!has){box.append(el('div',{class:'def',text:'資料沒有這個欄位。'}));return;}
+  const mp=new Map(pairs);
+  for(const k of vSortKeys(pairs,mode)){const v=mp.get(k);const fill=el('div',{class:'fill'});fill.style.width=(v/Math.max(1,n)*100)+'%';
+    box.append(el('div',{class:'drow'},el('span',{text:mode==='label'?stripPre(k):k}),el('div',{class:'track'},fill),el('span',{class:'v',text:`${fmt(v)}（${fp(pct(v,n))}）`})));}
+}
+/*ENDVIEW*/
+
+let SNAP=null;
+const fdate=k=>k>0&&k<99999999?`${Math.floor(k/10000)}/${String(Math.floor(k/100)%100).padStart(2,'0')}/${String(k%100).padStart(2,'0')}`:'';
+const status=(t,err)=>{const s=$('status');s.textContent=t;s.className='status'+(err?' err':'');};
+const tick=()=>new Promise(r=>setTimeout(r,20));
+const THIS_YEAR=new Date().getFullYear();
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v===null?d:v;}catch(e){return d;}},set:(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}}};
+
+const ACTIVE=new Map();let IS_DEMO=false;
+let MAP_OVR={};try{MAP_OVR=JSON.parse(LS.get('rp_map','{}'));}catch(e){}
+let LAST_HEADERS=[],LAST_MAP={};
+let RAW=null,YB=null,RES=null,ATTR=null;
+const S={Y:null,M:7,mode:'split',look:'last',same:true,basis:'last'};
+$('chkRemember').checked=LS.get('rp_remember','1')==='1';
+$('rememberLbl').textContent=`記住 ${THIS_YEAR} 年以前的資料（只存在這台電腦的瀏覽器）`;
+$('chkRemember').addEventListener('change',e=>{LS.set('rp_remember',e.target.checked?'1':'0');if(e.target.checked)persistAll().then(renderData);});
+
+async function persistAll(){
+  if(IS_DEMO||!$('chkRemember').checked)return;
+  for(const [y,a] of ACTIVE){if(y<THIS_YEAR&&(a.dirty||!a.stored)){try{await DB.put(a.chunk);a.stored=true;a.dirty=false;a.chunk.savedAt=Date.now();}catch(err){status(`${y} 年資料沒有存進瀏覽器：${err.message||err}。資料仍可在這次使用。`,true);}}}
+}
+function renderData(){
+  const tb=$('yearTable');tb.replaceChildren();
+  const years=[...ACTIVE.keys()].sort((a,b)=>a-b);
+  $('emptyState').hidden=years.length>0;
+  $('clearBtn').hidden=!years.some(y=>ACTIVE.get(y).stored);
+  if(!years.length){$('dataHint').textContent='';return;}
+  tb.append(el('thead',null,el('tr',null,el('th',{text:'年份'}),el('th',{text:'來源'}),el('th',{text:'檔案'}),el('th',{text:'列數'}),el('th',{text:'會員數'}),el('th',{text:'月份'}),el('th',{text:''}))));
+  const body=el('tbody');
+  for(const y of years){const a=ACTIVE.get(y),c=a.chunk;
+    const src=IS_DEMO?'示範資料':a.stored?(a.dirty?'已記住，這次有新增':`已記住（${new Date(c.savedAt).toLocaleDateString('zh-TW')}）`):(y<THIS_YEAR&&$('chkRemember').checked?'本次上傳':'本次上傳，關閉頁面後需重傳');
+    const months=[...new Set(c.mo)].sort((a,b)=>a-b);
+    const rm=el('button',{class:'btn ghost small',type:'button',onclick:()=>removeYear(y)},'移除');
+    body.append(el('tr',null,el('td',{text:y}),el('td',{text:src}),el('td',{text:c.files.map(f=>f.name).join('、')}),el('td',{text:fmt(c.n)}),el('td',{text:fmt(c.ids.length)}),
+      el('td',{text:months.length?`${months[0]}–${months[months.length-1]} 月`+(months.length<months[months.length-1]-months[0]+1?'（有缺月）':''):'—'}),el('td',null,rm)));}
+  tb.append(body);
+  const stored=years.filter(y=>ACTIVE.get(y).stored);
+  $('dataHint').textContent=stored.length&&!IS_DEMO?`${stored.join('、')} 年已記在這個瀏覽器，下次打開會自動載入，只要上傳新的月份或年份即可。同一年份再上傳新檔案會合併進去；要整年重來請先按「移除」。`:'';
+}
+async function removeYear(y){
+  const a=ACTIVE.get(y);if(!a)return;
+  if(a.stored&&!confirm(`要移除 ${y} 年的資料嗎？瀏覽器裡記住的這一年也會一併刪除。`))return;
+  ACTIVE.delete(y);if(a.stored){try{await DB.del(y);}catch(e){}}
+  renderData();await analyze(true);
+}
+$('clearBtn').addEventListener('click',async()=>{
+  if(!confirm('要清除這個瀏覽器記住的所有年份嗎？本次上傳的資料會留到關閉頁面為止。'))return;
+  try{await DB.clear();}catch(e){}
+  for(const [y,a] of [...ACTIVE]){if(a.stored&&!a.dirty)ACTIVE.delete(y);else a.stored=false;}
+  renderData();await analyze(true);status('已清除瀏覽器記住的資料。');
+});
+function renderMapping(){
+  const g=$('mapGrid');g.replaceChildren();
+  for(const f of FIELDS){
+    const sel=el('select',null);
+    sel.append(el('option',{value:'',text:f.req?'（請選擇）':'（不使用）'}));
+    const cur=MAP_OVR[f.k]!==undefined?MAP_OVR[f.k]:(LAST_MAP[f.k]||'');
+    const opts=new Set(LAST_HEADERS);if(cur)opts.add(cur);
+    for(const h of opts){const o=el('option',{value:h,text:h});if(h===cur)o.selected=true;sel.append(o);}
+    sel.addEventListener('change',()=>{MAP_OVR[f.k]=sel.value;LS.set('rp_map',JSON.stringify(MAP_OVR));});
+    g.append(el('label',null,el('b',{text:f.label+(f.req?'（必要）':'')}),sel));
+  }
+}
+const allFileKeys=()=>{const s=new Map();for(const [y,a] of ACTIVE)for(const f of a.chunk.files)s.set(f.key,y);return s;};
+$('fileIn').addEventListener('change',async e=>{
+  const files=[...e.target.files];e.target.value='';if(!files.length)return;
+  if(IS_DEMO){ACTIVE.clear();IS_DEMO=false;await loadStored();}
+  const known=allFileKeys(),msgs=[],touched=new Set();let anyFail=false;
+  for(let fi=0;fi<files.length;fi++){
+    const f=files[fi],key=f.name+'|'+f.size;
+    if(known.has(key)){msgs.push(`${f.name}：已讀入過（${known.get(key)} 年），略過。`);continue;}
+    status(`讀取 ${f.name}（${fi+1}/${files.length}，${(f.size/1048576).toFixed(1)} MB）…\n大檔案會花一點時間，畫面不會卡住。`);await tick();
+    let res=null;
+    try{const buf=await f.arrayBuffer();res=await readInWorker(buf,f.name,MAP_OVR);
+      if(res===null){status(`改用主畫面讀取 ${f.name}…`);await tick();res=processBuffer(await f.arrayBuffer(),f.name,MAP_OVR,window.XLSX);}}
+    catch(err){res={ok:false,error:err.message||String(err)};}
+    if(res.headers&&res.headers.length){LAST_HEADERS=res.headers;LAST_MAP=res.map||{};}
+    if(!res.ok){anyFail=true;msgs.push(`${f.name}：${res.error||'讀取失敗'}`);continue;}
+    const ys=Object.keys(res.years).map(Number).sort();
+    for(const y of ys){
+      let a=ACTIVE.get(y);
+      if(!a){a={chunk:null,builder:new YearB(y),stored:false,dirty:true};ACTIVE.set(y,a);}
+      else if(!a.builder){status(`合併到 ${y} 年…`);await tick();a.builder=YearB.from(a.chunk);}
+      a.builder.merge(res.years[y],{key,name:f.name,size:f.size});a.dirty=true;touched.add(y);
+    }
+    msgs.push(`${f.name}：${fmt(res.rows)} 列，年份 ${ys.join('、')}`+(res.sheets.length>1?`（${res.sheets.length} 個工作表）`:'')+(res.bad?`，${fmt(res.bad)} 列日期無法辨識已略過`:'')+(res.skipped.length&&res.sheets.length?`，略過工作表：${res.skipped.join('、')}`:''));
+    known.set(key,ys[0]);
+  }
+  for(const y of touched){const a=ACTIVE.get(y);a.chunk=a.builder.chunk();}
+  renderMapping();if(anyFail)$('mapDetails').open=true;
+  await persistAll();renderData();
+  await analyze(true,msgs.join('\n'),anyFail);
+});
+$('demoBtn').addEventListener('click',async()=>{
+  status('產生示範資料…');await tick();
+  const rows=makeDemo(),acc={};const r=processRows(rows,{},acc);
+  LAST_HEADERS=r.headers;LAST_MAP=r.map;renderMapping();
+  ACTIVE.clear();IS_DEMO=true;
+  for(const y in acc){const b=new YearB(+y);b.merge(packPartial(acc[y]),{key:'demo',name:'示範資料',size:0});ACTIVE.set(+y,{chunk:b.chunk(),builder:null,stored:false,dirty:false});}
+  renderData();await analyze(true);
+});
+
+async function analyze(resetY,prefix,isErr){
+  const chunks=[...ACTIVE.values()].map(a=>a.chunk);
+  if(!chunks.length){$('dash').hidden=true;$('shareSec').hidden=true;RAW=null;SNAP=null;if(prefix)status(prefix,isErr);return;}
+  status((prefix?prefix+'\n':'')+'計算中…',isErr);await tick();
+  RAW=assemble(chunks);
+  const sy=$('selY');sy.replaceChildren();for(const y of RAW.years)sy.append(el('option',{value:y,text:y}));
+  if(resetY||!RAW.years.includes(S.Y)){S.Y=RAW.years[RAW.years.length-1];VS.scope=-1;}
+  sy.value=S.Y;
+  await rebuild(true,prefix,isErr);
+}
+function buildSnapshot(){
+  return {v:1,at:new Date().toISOString(),demo:IS_DEMO,s:{Y:S.Y,M:S.M,mode:S.mode,look:S.look,same:S.same,basis:S.basis,L:YB.L},
+    years:RAW.years,cats:RAW.cats,has:{ord:!!RAW.has.ord,amt:!!RAW.has.amt,age:!!RAW.has.age,card:!!RAW.has.card},useDates:ATTR.useDates,
+    T:RES.T,P:fullProfiles(RAW,YB,RES,ATTR)};
+}
+async function rebuild(newYear,prefix,isErr){
+  if(newYear){YB=buildYear(RAW,S.Y);fillMonths();}
+  ATTR=memberAttrs(RAW,S.Y,S.basis);
+  RES=tally(YB,S);SNAP=buildSnapshot();viewRender();$('shareSec').hidden=false;renderShare();
+  status((prefix?prefix+'\n':'')+(IS_DEMO?'示範資料：數字為模擬，只用來試跑功能。':'分析完成。')+` 共 ${RAW.ids.length.toLocaleString()} 位會員、${RAW.n.toLocaleString()} 列資料。`,isErr);
+}
+function fillMonths(){
+  const sm=$('selM'),L=YB.L,minM=S.mode==='split'?2:1;sm.replaceChildren();
+  for(let m=minM;m<=12;m++)sm.append(el('option',{value:m,text:m+' 月'}));
+  if(S.M<minM)S.M=minM;
+  if(S.M>L&&L>=minM)S.M=L;
+  sm.value=S.M;
+  $('lblM').firstChild.textContent=S.mode==='split'?'分界月份':'累計到';
+}
+$('selY').addEventListener('change',e=>{S.Y=+e.target.value;rebuild(true);});
+$('selM').addEventListener('change',e=>{S.M=+e.target.value;rebuild(false);});
+$('selMode').addEventListener('change',e=>{S.mode=e.target.value;fillMonths();rebuild(false);});
+$('selLook').addEventListener('change',e=>{S.look=e.target.value;rebuild(false);});
+$('selBasis').addEventListener('change',e=>{S.basis=e.target.value;rebuild(false);});
+$('chkSame').addEventListener('change',e=>{S.same=e.target.checked;rebuild(false);});
+
+/* ---------- exports ---------- */
+const stamp=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');};
+function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
+const csvCell=v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
+function summaryAoa(){
+  const s=SNAP.s,Y=s.Y,T=SNAP.T;
+  const head=['類別',`${s.look==='last'?Y-1:'過去'}有購人數 A`,`${Y}回購人數 B`,'回購率 B/A',`${s.look==='last'?Y-2:'過去'}有購人數 C`,`${Y-1}回購人數 D`,'回購率 D/C','回購率差異',`${Y}再購基數 E`,`${Y}再購人數 F`,'再購率 F/E',`${Y-1}同口徑再購率`,'再購率差異',`${Y}新進人數`,`${Y}有購人數`];
+  const aoa=[head];
+  for(const idx of [...SNAP.cats.map((_,i)=>i+1),0]){const t=T[idx];
+    const r1=pct(t.B,t.A),r0=pct(t.D,t.C),a1=pct(t.F,t.E),a0=pct(t.F1,t.E1);
+    aoa.push([idx===0?'全站(不重複)':SNAP.cats[idx-1],t.A,t.B,r1,t.C,t.D,r0,r1!=null&&r0!=null?r1-r0:null,t.E,t.F,a1,a0,a1!=null&&a0!=null?a1-a0:null,t.N,t.Yc]);}
+  return aoa;
+}
+function settingsAoa(){
+  const s=SNAP.s,SI=vSeg();
+  const a=[['項目','設定'],['資料更新時間',new Date(SNAP.at).toLocaleString('zh-TW',{hour12:false})],['分析年',s.Y],['資料最新月份',s.L+' 月'],['再購判定',s.mode==='split'?`以 ${s.M} 月分界`:`累計到 ${s.M} 月、2 次以上`],['過去有購',s.look==='last'?'去年有購':'任一更早年份'],['去年比較',s.same?'同期月份':'全年'],['新舊會員別判斷時點',s.basis==='last'?'最新一筆訂單（截至分析年）':'分析年第一筆訂單'],['購買次數計算',SNAP.has.ord?'不重複母訂單號碼':'不重複購買日'],['資料來源',SNAP.demo?'示範資料（模擬）':[...ACTIVE.entries()].sort((a,b)=>a[0]-b[0]).map(([y,x])=>`${y}：${x.chunk.files.map(f=>f.name).join('、')}`).join('；')],[]];
+  for(const k of SEG_KEYS)a.push([SI[k].name,SI[k].def]);
+  a.push(['新舊會員別','oldold＝加入日、首購日都早於訂單日；oldnew＝加入日早於訂單日、首購日等於或晚於訂單日；newnew＝加入日、首購日都等於或晚於訂單日']);
+  a.push(['品類口徑','同品類回購；全站為不重複會員，各品類加總不等於全站']);
+  return a;
+}
+function profilesAoa(){
+  const SI=vSeg(),Y=SNAP.s.Y;
+  const a=[['分析年','範圍','分群','分群人數','維度','項目','人數','占比','金額']];
+  SNAP.P.forEach((row,si)=>row.forEach((p,bi)=>{
+    const sc=si===0?'全站':SNAP.cats[si-1],sg=SI[SEG_KEYS[bi]].name,n=p.n;
+    const add=(dim,item,v,amt)=>a.push([Y,sc,sg,n,dim,item,v,n?v/n:0,amt==null?'':amt]);
+    p.cats.forEach((c,i)=>{if(c[0])add(`品類（${Y}有買）`,SNAP.cats[i],c[0],c[2]);if(c[1])add(`品類（${Y-1}有買）`,SNAP.cats[i],c[1]);});
+    for(const [k,v] of p.no)add('新舊會員別',k,v);
+    for(const [k,v] of p.last)add(si===0?'最後消費年':'最後消費年（該品類）',String(k),v);
+    if(si>0)for(const [k,v] of p.allLast)add('最後消費年（全站）',String(k),v);
+    if(SNAP.has.age)for(const [k,v] of p.age)add('年齡區間',stripPre(k),v);
+    if(SNAP.has.card)for(const [k,v] of p.card)add('會員卡別',k,v);
+  }));
+  return a;
+}
+$('xlsBtn').addEventListener('click',()=>{
+  if(typeof XLSX==='undefined'){status('Excel 元件沒有載入，無法匯出。',true);return;}
+  const wb=XLSX.utils.book_new(),SI=vSeg(),seg=SI[VS.seg],p=vProf(),n=p.n,Y=SNAP.s.Y;
+  const a1=summaryAoa();const ws1=XLSX.utils.aoa_to_sheet(a1);
+  for(let r=1;r<a1.length;r++)for(const c of [3,6,7,10,11,12]){const a=XLSX.utils.encode_cell({r,c});if(ws1[a]&&typeof ws1[a].v==='number')ws1[a].z='0.0%';}
+  ws1['!cols']=a1[0].map((_,i)=>({wch:i?14:16}));XLSX.utils.book_append_sheet(wb,ws1,'回購再購總表');
+  const a2=[[`${vScopeName(VS.scope)}／${seg.name}會員`,n],[seg.def],[],['品類',`${Y}有買人數`,'占這群',`${Y-1}有買人數`,'占這群',`${Y}購買金額`,`${Y}人均金額`]];
+  const pr=[];
+  p.cats.map((c,i)=>({name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2]})).sort((a,b)=>b.y-a.y).forEach(r=>{if(r.y||r.y1){a2.push([r.name,r.y,pct(r.y,n),r.y1,pct(r.y1,n),r.a,r.y?r.a/r.y:null]);pr.push([a2.length-1,[2,4]]);}});
+  const block=(title,pairs,mode,lab)=>{const mp=new Map(pairs);a2.push([],[title,'人數','占比']);for(const k of vSortKeys(pairs,mode)){a2.push([lab?lab(k):k,mp.get(k),pct(mp.get(k),n)]);pr.push([a2.length-1,[2]]);}};
+  block('新舊會員別',p.no,'no');
+  block(VS.scope<0?'最後消費年':`最後消費年（${vScopeName(VS.scope)}）`,p.last,'year');
+  if(VS.scope>=0)block('最後消費年（全站）',p.allLast,'year');
+  if(SNAP.has.age)block('年齡區間',p.age,'label',stripPre);
+  if(SNAP.has.card)block('會員卡別',p.card,'count');
+  const ws2=XLSX.utils.aoa_to_sheet(a2);
+  for(const [r,cs] of pr)for(const c of cs){const a=XLSX.utils.encode_cell({r,c});if(ws2[a]&&typeof ws2[a].v==='number')ws2[a].z='0.0%';}
+  ws2['!cols']=[{wch:18},{wch:12},{wch:10},{wch:12},{wch:10},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'分群輪廓');
+  const ws3=XLSX.utils.aoa_to_sheet(settingsAoa());ws3['!cols']=[{wch:18},{wch:70}];
+  XLSX.utils.book_append_sheet(wb,ws3,'定義與設定');
+  XLSX.writeFile(wb,`回購再購分析_${Y}_${stamp()}.xlsx`);
+});
+function memberCols(m){return [ATTR.no[m],fdate(ATTR.lastD[m]),fdate(ATTR.J[m]),fdate(ATTR.F[m]),stripPre(ATTR.age[m]),ATTR.card[m]];}
+$('segBtn').addEventListener('click',()=>{
+  const SI=vSeg(),seg=SI[VS.seg],sn=vScopeName(VS.scope),KK=YB.KK;
+  const members=profile(RAW,YB,RES,ATTR,VS.scope,seg.bit).members;
+  const parts=['\uFEFF會員編號,範圍,分群,範圍最後消費年,新舊會員別,全站最後消費日,會員加入日,首購日,年齡區間,會員卡別\n'];let buf=[];
+  for(const m of members){const r=YB.recMap.get(m*KK+VS.scope+1);
+    buf.push([RAW.ids[m],sn,seg.name,YB.lastY[r],...memberCols(m)].map(csvCell).join(','));
+    if(buf.length>=5000){parts.push(buf.join('\n')+'\n');buf=[];}}
+  if(buf.length)parts.push(buf.join('\n')+'\n');
+  download(`${sn}_${seg.name}會員_${S.Y}_${stamp()}.csv`,new Blob(parts,{type:'text/csv;charset=utf-8'}));
+});
+$('tagBtn').addEventListener('click',async()=>{
+  status('產生會員標籤表…');await tick();
+  const Y=S.Y,parts=['\uFEFF會員編號,範圍,過去有購,今年有購,回購狀態,再購狀態,今年金額,去年金額,範圍最後消費年,新舊會員別,全站最後消費日,會員加入日,首購日,年齡區間,會員卡別,分析年\n'];
+  let buf=[];
+  for(let r=0;r<YB.n;r++){const f=RES.flags[r];if(!f)continue;const m=YB.recMem[r];
+    const rep=f&1?'回購':f&2?'未回購':f&4?'今年新進':'';const ag=f&8?'再購':f&16?'未再購':'';
+    buf.push([RAW.ids[m],YB.recScope[r]<0?'全站':RAW.cats[YB.recScope[r]],f&3?1:0,YB.mY[r]?1:0,rep,ag,Math.round(YB.aY[r]),Math.round(YB.aY1[r]),YB.lastY[r],...memberCols(m),Y].map(csvCell).join(','));
+    if(buf.length>=5000){parts.push(buf.join('\n')+'\n');buf=[];}}
+  if(buf.length)parts.push(buf.join('\n')+'\n');
+  download(`會員標籤表_${Y}_${stamp()}.csv`,new Blob(parts,{type:'text/csv;charset=utf-8'}));
+  status('會員標籤表已下載：每位會員在全站與各品類各一列，可匯入 Google Sheets 或 Looker Studio 做樞紐與篩選。');
+});
+
+/* ---------- share with teammates ---------- */
+function viewerHTML(embed){
+  const css=document.querySelector('style').textContent;
+  const src=[...document.scripts].filter(s=>!s.src).map(s=>s.textContent).join('\n');
+  const view=src.slice(src.indexOf('/*VIEW*/'),src.indexOf('/*ENDVIEW*/'));
+  const dash=$('dash').cloneNode(true);
+  dash.querySelectorAll('.settings,.exports').forEach(x=>x.remove());
+  dash.querySelectorAll('[id="sumTable"],[id="catTable"],[id="bar1"],[id="bar2"],[id="extra"],[id="defList"]').forEach(x=>x.replaceChildren());
+  dash.hidden=true;
+  const head=`<header class="top"><h1>回購／再購分析<span class="ver">檢視版</span><small id="vSub">載入中…</small></h1></header>`;
+  const data=embed?`const SNAP=${JSON.stringify(SNAP).replace(/</g,'\\u003c')};`:'let SNAP=null;';
+  const boot=embed?'viewRender();':`google.script.run.withSuccessHandler(function(t){if(!t){document.getElementById('vSub').textContent='還沒有同步資料。';return;}SNAP=JSON.parse(t);viewRender();}).withFailureHandler(function(e){document.getElementById('vSub').textContent='讀取失敗：'+(e&&e.message||e);}).getSnapshot();`;
+  return `<!DOCTYPE html>\n<html lang="zh-Hant">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>回購／再購分析（檢視版）</title>\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">\n<style>${css}</style>\n</head>\n<body>\n<div class="wrap">${head}${dash.outerHTML}</div>\n<script>\n${data}\n${view}\n${boot}\n<\/script>\n</body>\n</html>`;
+}
+$('shareHtmlBtn').addEventListener('click',()=>{
+  if(!SNAP)return;
+  download(`回購再購分析_檢視版_${SNAP.s.Y}_${stamp()}.html`,new Blob([viewerHTML(true)],{type:'text/html;charset=utf-8'}));
+  status('分享版已下載。檔案裡只有彙總數字，沒有會員編號，可以直接寄給夥伴或放到共用雲端。');
+});
+function renderShare(){
+  const v=$('viewUrl').value.trim(),a=$('viewLink');
+  if(/^https:\/\/script\.google\.com\//.test(v)){a.href=v;a.hidden=false;}else a.hidden=true;
+  const last=LS.get('rp_lastsync','');
+  $('syncInfo').textContent=last?`上次同步：${last}`:'還沒有同步過。第一次使用請先照「Apps Script 設定步驟」建立同步網址。';
+}
+$('syncUrl').value=LS.get('rp_syncurl','');$('syncKey').value=LS.get('rp_synckey','');$('viewUrl').value=LS.get('rp_viewurl','');
+$('syncUrl').addEventListener('change',e=>LS.set('rp_syncurl',e.target.value.trim()));
+$('syncKey').addEventListener('change',e=>LS.set('rp_synckey',e.target.value));
+$('viewUrl').addEventListener('change',e=>{LS.set('rp_viewurl',e.target.value.trim());renderShare();});
+$('syncBtn').addEventListener('click',async()=>{
+  if(!SNAP)return;
+  const url=$('syncUrl').value.trim(),key=$('syncKey').value;
+  if(!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){status('同步網址格式不對，應該是 https://script.google.com/macros/s/…/exec。',true);return;}
+  if(!key){status('請填入同步金鑰（Apps Script 裡設定的 SECRET）。',true);return;}
+  const body=JSON.stringify({key,snapshot:JSON.stringify(SNAP),viewer:viewerHTML(false),tables:{summary:summaryAoa(),profiles:profilesAoa(),settings:settingsAoa()}});
+  const btn=$('syncBtn');btn.disabled=true;status(`同步中…（${(body.length/1024).toFixed(0)} KB）`);
+  const done=t=>{LS.set('rp_lastsync',t);renderShare();};
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'});
+    const j=await r.json();
+    if(j.ok){const t=new Date().toLocaleString('zh-TW',{hour12:false});done(t);status(`已同步到 Google Sheets（${t}）。夥伴重新整理檢視網址就會看到新資料。`);}
+    else status('同步失敗：'+(j.error||'未知原因'),true);
+  }catch(err){
+    try{await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body});
+      const t=new Date().toLocaleString('zh-TW',{hour12:false})+'（未確認）';done(t);
+      status('資料已送出，但瀏覽器擋住了回覆，無法確認是否成功。請打開夥伴檢視網址看更新時間，或檢查 Google Sheet 的「設定」頁籤。');}
+    catch(e2){status('同步失敗：連不到同步網址。請確認網址正確、部署作業的存取權是「所有人」。',true);}
+  }finally{btn.disabled=false;}
+});
+
+/* ---------- start ---------- */
+async function loadStored(){
+  try{const rows=await DB.all();for(const c of rows||[])if(!ACTIVE.has(c.year))ACTIVE.set(c.year,{chunk:c,builder:null,stored:true,dirty:false});}
+  catch(e){status('這個瀏覽器無法記住資料（可能是無痕模式或已停用網站資料），每次需重新上傳。',true);}
+}
+(async()=>{
+  await loadStored();renderData();
+  if(ACTIVE.size){const ys=[...ACTIVE.keys()].sort();await analyze(true,`已載入這個瀏覽器記住的 ${ys.join('、')} 年資料。`+(ys.includes(THIS_YEAR)?'':` 上傳 ${THIS_YEAR} 年的檔案後會一起分析。`));}
+})();
+</script>
+</body>
+</html>
