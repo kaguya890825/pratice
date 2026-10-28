@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CSV 加 BOM 轉檔工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --paper:#EEF2F0; --surface:#FFFFFF; --ink:#1F2A44; --muted:#5C6B78;
+  --line:#C9D3CF; --accent:#2F6F5E; --accent-ink:#FFFFFF; --accent-soft:#DCEBE5;
+  --warn:#B4541A; --warn-soft:#F7E6DA; --byte:#2F6F5E;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#141B22; --surface:#1C252E; --ink:#E4EAE7; --muted:#9AA9B3;
+    --line:#2E3B45; --accent:#5FB39B; --accent-ink:#0E1A16; --accent-soft:#1F3A33;
+    --warn:#E39A6A; --warn-soft:#3A271C; --byte:#7FCBB4;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#141B22; --surface:#1C252E; --ink:#E4EAE7; --muted:#9AA9B3;
+  --line:#2E3B45; --accent:#5FB39B; --accent-ink:#0E1A16; --accent-soft:#1F3A33;
+  --warn:#E39A6A; --warn-soft:#3A271C; --byte:#7FCBB4;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  font-size:16px; line-height:1.6;
+}
+main{max-width:760px; margin:0 auto; padding:40px 20px 64px}
+h1{font-size:1.75rem; line-height:1.25; margin:0 0 6px; font-weight:700}
+.lede{color:var(--muted); margin:0 0 28px; max-width:60ch}
+
+.drop{
+  position:relative; display:block; cursor:pointer;
+  background:var(--surface); border:2px dashed var(--line); border-radius:14px;
+  padding:36px 24px; text-align:center; transition:border-color .15s, background .15s;
+}
+.drop:hover,.drop:focus-within{border-color:var(--accent)}
+.drop.over{border-color:var(--accent); background:var(--accent-soft)}
+.drop input{position:absolute; inset:0; opacity:0; cursor:pointer}
+.bytes{
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:clamp(2rem,7vw,3.25rem); letter-spacing:.06em; color:var(--byte);
+  line-height:1; margin-bottom:14px;
+}
+.bytes span{display:inline-block; padding:0 .12em}
+.bytes .rest{color:var(--line)}
+.drop strong{display:block; font-size:1.1rem}
+.drop small{color:var(--muted)}
+
+.opts{display:flex; flex-wrap:wrap; gap:8px 20px; margin:16px 2px 0; color:var(--muted); font-size:.92rem}
+.opts label{display:flex; align-items:center; gap:6px; cursor:pointer}
+.opts input{accent-color:var(--accent); width:16px; height:16px}
+
+.toolbar{display:none; align-items:center; justify-content:space-between; gap:12px; margin:32px 0 10px; flex-wrap:wrap}
+.toolbar.show{display:flex}
+.toolbar h2{font-size:1.05rem; margin:0; font-weight:700}
+.toolbar .actions{display:flex; gap:8px}
+
+button{
+  font:inherit; font-size:.92rem; font-weight:500; cursor:pointer;
+  border-radius:8px; padding:8px 14px; border:1px solid var(--line);
+  background:var(--surface); color:var(--ink);
+}
+button.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+button:hover{border-color:var(--accent)}
+button:focus-visible,.drop input:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+button:disabled{opacity:.5; cursor:default}
+
+ul.files{list-style:none; margin:0; padding:0; border-top:1px solid var(--line)}
+ul.files li{
+  display:grid; grid-template-columns:1fr auto; gap:6px 16px; align-items:center;
+  padding:14px 2px; border-bottom:1px solid var(--line);
+}
+.fname{font-weight:500; word-break:break-all}
+.meta{grid-column:1; font-size:.85rem; color:var(--muted)}
+.status{font-size:.85rem; font-weight:500}
+.status.ok{color:var(--accent)}
+.status.warn{color:var(--warn)}
+.note{grid-column:1 / -1; background:var(--warn-soft); color:var(--ink); border-radius:8px; padding:8px 12px; font-size:.86rem}
+.note button{margin-left:8px; padding:4px 10px; font-size:.84rem}
+.preview{
+  grid-column:1 / -1; margin:0; font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:.8rem; color:var(--muted); white-space:pre; overflow-x:auto;
+  background:var(--paper); border-radius:6px; padding:8px 10px; max-height:5.6em;
+}
+.rowbtns{grid-column:2; grid-row:1 / span 2; display:flex; gap:6px; align-items:center}
+
+.toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%);
+  background:var(--ink); color:var(--paper); padding:10px 16px; border-radius:8px; font-size:.9rem;
+  opacity:0; pointer-events:none; transition:opacity .2s}
+.toast.show{opacity:1}
+
+.help{margin-top:40px; color:var(--muted); font-size:.9rem; max-width:62ch}
+.help h3{font-size:.95rem; color:var(--ink); margin:0 0 4px}
+.help p{margin:0 0 14px}
+
+@media (max-width:560px){
+  ul.files li{grid-template-columns:1fr}
+  .rowbtns{grid-column:1; grid-row:auto}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>CSV 加 BOM 轉檔工具</h1>
+  <p class="lede">把 UTF-8 的 CSV 轉成 UTF-8（含 BOM），用 Excel 直接開啟中文就不會變亂碼。檔案只在你的瀏覽器裡處理，不會上傳。</p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="picker" accept=".csv,.txt,text/csv" multiple aria-label="選擇 CSV 檔案">
+    <div class="bytes" aria-hidden="true"><span>EF</span><span>BB</span><span>BF</span><span class="rest">…</span></div>
+    <strong>拖曳 CSV 到這裡，或點一下選擇檔案</strong>
+    <small>可一次放多個檔案</small>
+  </label>
+
+  <div class="opts">
+    <label><input type="checkbox" id="autoBig5" checked> 偵測到非 UTF-8 時，自動當作 Big5 轉換</label>
+    <label><input type="checkbox" id="keepName"> 保留原檔名（不加 _BOM）</label>
+  </div>
+
+  <div class="toolbar" id="toolbar">
+    <h2 id="count">0 個檔案</h2>
+    <div class="actions">
+      <button id="clearBtn">清除清單</button>
+      <button class="primary" id="zipBtn">全部下載（ZIP）</button>
+    </div>
+  </div>
+  <ul class="files" id="list" hidden></ul>
+
+  <div class="help">
+    <h3>已經有 BOM 的檔案</h3>
+    <p>會直接標示「已含 BOM」，下載時不會重複加，內容維持不變。</p>
+    <h3>不是 UTF-8 的檔案</h3>
+    <p>從部分系統匯出的 CSV 可能是 Big5 編碼。工具偵測到後會先用 Big5 解讀、轉成 UTF-8，再加上 BOM；請看預覽確認中文正常再下載。</p>
+  </div>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  const BOM = new Uint8Array([0xEF,0xBB,0xBF]);
+  const items = [];
+  let downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(d => { downloads = d; }).catch(() => {});
+  }
+
+  const $ = id => document.getElementById(id);
+  const drop = $("drop"), picker = $("picker"), list = $("list"), toolbar = $("toolbar");
+
+  function toast(msg){
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+  }
+  function fmtSize(n){
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n/1024).toFixed(1) + " KB";
+    return (n/1048576).toFixed(1) + " MB";
+  }
+  function outName(name){
+    if ($("keepName").checked) return name;
+    const i = name.lastIndexOf(".");
+    return i > 0 ? name.slice(0,i) + "_BOM" + name.slice(i) : name + "_BOM.csv";
+  }
+  function hasBom(u8){ return u8.length >= 3 && u8[0]===0xEF && u8[1]===0xBB && u8[2]===0xBF; }
+  function isUtf8(u8){
+    try { new TextDecoder("utf-8", {fatal:true}).decode(u8); return true; } catch(e){ return false; }
+  }
+  function previewText(text){
+    return text.replace(/^\uFEFF/, "").split(/\r?\n/).slice(0,3).join("\n");
+  }
+
+  function build(item, mode){
+    const src = item.src;
+    if (mode === "big5") {
+      const text = new TextDecoder("big5").decode(src);
+      const enc = new TextEncoder().encode(text.replace(/^\uFEFF/, ""));
+      const out = new Uint8Array(BOM.length + enc.length);
+      out.set(BOM,0); out.set(enc,3);
+      item.out = out; item.mode = "big5"; item.preview = previewText(text);
+      return;
+    }
+    if (hasBom(src)) { item.out = src; item.mode = "had"; }
+    else {
+      const out = new Uint8Array(src.length + 3);
+      out.set(BOM,0); out.set(src,3);
+      item.out = out; item.mode = "added";
+    }
+    item.preview = previewText(new TextDecoder("utf-8").decode(src));
+  }
+
+  async function addFiles(files){
+    for (const f of files) {
+      const src = new Uint8Array(await f.arrayBuffer());
+      const item = { name: f.name, size: f.size, src, utf8: isUtf8(src) };
+      if (!item.utf8 && $("autoBig5").checked) build(item, "big5");
+      else build(item, "utf8");
+      items.push(item);
+    }
+    render();
+  }
+
+  function statusOf(item){
+    if (item.mode === "had") return ["已含 BOM，不需轉換", "ok"];
+    if (item.mode === "big5") return ["已從 Big5 轉成 UTF-8 BOM", "warn"];
+    if (!item.utf8) return ["已加 BOM（但原檔可能不是 UTF-8）", "warn"];
+    return ["已加上 BOM", "ok"];
+  }
+
+  function render(){
+    list.innerHTML = "";
+    list.hidden = items.length === 0;
+    toolbar.classList.toggle("show", items.length > 0);
+    $("count").textContent = items.length + " 個檔案";
+    $("zipBtn").disabled = items.length < 2;
+    $("zipBtn").title = items.length < 2 ? "兩個以上檔案才需要打包" : "";
+
+    items.forEach((item, idx) => {
+      const li = document.createElement("li");
+      const [label, cls] = statusOf(item);
+
+      const name = document.createElement("div");
+      name.className = "fname"; name.textContent = item.name;
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const st = document.createElement("span");
+      st.className = "status " + cls; st.textContent = label;
+      meta.append(fmtSize(item.size) + "　", st);
+
+      const btns = document.createElement("div");
+      btns.className = "rowbtns";
+      const dl = document.createElement("button");
+      dl.className = "primary"; dl.textContent = "下載";
+      dl.addEventListener("click", () => saveOne(item));
+      const rm = document.createElement("button");
+      rm.textContent = "移除"; rm.setAttribute("aria-label", "移除 " + item.name);
+      rm.addEventListener("click", () => { items.splice(idx,1); render(); });
+      btns.append(dl, rm);
+
+      li.append(name, btns, meta);
+
+      if (!item.utf8) {
+        const note = document.createElement("div");
+        note.className = "note";
+        const b = document.createElement("button");
+        if (item.mode === "big5") {
+          note.append("這個檔案不是有效的 UTF-8，已當作 Big5 轉換。若預覽仍是亂碼，可改回原樣加 BOM。");
+          b.textContent = "改為原樣加 BOM";
+          b.addEventListener("click", () => { build(item, "utf8"); render(); });
+        } else {
+          note.append("這個檔案不是有效的 UTF-8，直接加 BOM 後中文可能仍是亂碼。");
+          b.textContent = "改用 Big5 轉換";
+          b.addEventListener("click", () => { build(item, "big5"); render(); });
+        }
+        note.append(b);
+        li.append(note);
+      }
+
+      if (item.preview) {
+        const pre = document.createElement("pre");
+        pre.className = "preview"; pre.textContent = item.preview;
+        li.append(pre);
+      }
+      list.append(li);
+    });
+  }
+
+  async function save(filename, bytes){
+    if (downloads) {
+      try { await downloads.save({ filename, data: bytes }); return true; }
+      catch (e) {
+        if (e && e.code === "declined") return false;
+        if (e && e.code === "rate_limited") { toast("前一個下載確認視窗還開著，請先處理"); return false; }
+      }
+    }
+    const blob = new Blob([bytes], { type: filename.endsWith(".zip") ? "application/zip" : "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return true;
+  }
+
+  async function saveOne(item){
+    if (await save(outName(item.name), item.out)) toast("已下載 " + outName(item.name));
+  }
+
+  $("zipBtn").addEventListener("click", async () => {
+    if (!window.JSZip) { toast("ZIP 元件未載入，請逐一下載"); return; }
+    const zip = new JSZip();
+    const used = new Set();
+    items.forEach(item => {
+      let n = outName(item.name), k = 2;
+      while (used.has(n)) { const i = n.lastIndexOf("."); n = n.slice(0,i) + "(" + k++ + ")" + n.slice(i); }
+      used.add(n); zip.file(n, item.out);
+    });
+    const data = await zip.generateAsync({ type: "uint8array" });
+    if (await save("CSV_BOM.zip", data)) toast("已下載 CSV_BOM.zip");
+  });
+
+  $("clearBtn").addEventListener("click", () => { items.length = 0; render(); });
+  $("keepName").addEventListener("change", () => {});
+
+  picker.addEventListener("change", () => { addFiles(picker.files); picker.value = ""; });
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+})();
+</script>
+</body>
+</html>
