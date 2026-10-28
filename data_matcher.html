@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資料比對工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2024;
+    --paper:#fbfaf8;
+    --line:#dcd7cc;
+    --line-soft:#eae6dc;
+    --accent:#2f5d50;
+    --accent-soft:#e4ece8;
+    --warn:#9a4a3a;
+    --warn-soft:#f3e6e2;
+    --amber:#8a6a1f;
+    --amber-soft:#f6efdc;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;padding:32px 20px 80px;}
+  .wrap{max-width:960px;margin:0 auto;}
+  header{margin-bottom:22px;border-bottom:2px solid var(--ink);padding-bottom:16px;}
+  header .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--accent);margin-bottom:6px;}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.01em;}
+  header p{margin:0;color:#5b5750;font-size:14px;}
+
+  .modes{display:flex;gap:0;margin-bottom:18px;border:1px solid var(--ink);border-radius:8px;overflow:hidden;width:max-content;max-width:100%;}
+  .modes button{font-family:var(--sans);font-size:14px;padding:9px 18px;border:none;background:#fff;color:var(--ink);cursor:pointer;}
+  .modes button + button{border-left:1px solid var(--ink);}
+  .modes button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:600;}
+
+  .step{border:1px solid var(--line);background:#fff;border-radius:10px;padding:20px 22px;margin-bottom:18px;}
+  .step-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .step-num{font-family:var(--mono);font-size:12px;color:var(--accent);border:1px solid var(--accent);border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex:none;}
+  .step-head h2{font-size:16px;margin:0;}
+  .step-head .sub{font-size:12.5px;color:#84806f;margin-left:auto;font-family:var(--mono);}
+  .step-head .tools{margin-left:auto;display:flex;gap:14px;}
+  h3{font-size:13.5px;margin:18px 0 8px;}
+  .note{font-size:12px;color:#8a8577;}
+
+  .opts-grid{display:flex;flex-wrap:wrap;gap:10px 22px;}
+  .opts-grid label, .check{display:flex;align-items:center;gap:6px;font-size:13px;color:#3d3a35;cursor:pointer;}
+  input[type=checkbox], input[type=radio]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);}
+
+  .drop{border:1.5px dashed var(--line);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:.15s border-color,.15s background;background:#fdfcfa;}
+  .drop:hover,.drop.drag{border-color:var(--accent);background:var(--accent-soft);}
+  .drop.chained{border-style:solid;border-color:var(--accent);background:var(--accent-soft);}
+  .drop input{display:none;}
+  .drop .hint{font-size:13px;color:#8a8577;}
+  .drop .fname{font-family:var(--mono);font-size:13.5px;color:var(--ink);margin-top:4px;word-break:break-all;}
+
+  .filegrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:640px){.filegrid{grid-template-columns:1fr;}}
+
+  .chain-path{font-size:12px;color:var(--accent);margin-top:8px;line-height:1.6;word-break:break-all;}
+
+  .meta{margin-top:12px;font-size:12.5px;color:#5b5750;}
+  .meta table{width:100%;border-collapse:collapse;margin-top:6px;}
+  .meta td{padding:3px 0;vertical-align:middle;}
+  .meta td:first-child{color:#8a8577;width:78px;}
+  select{font-family:var(--mono);font-size:12.5px;padding:5px 8px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink);max-width:100%;}
+
+  .keyrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .keyrow .lbl{font-size:12px;color:#8a8577;}
+  .keyrow .eq{font-family:var(--mono);color:#8a8577;}
+
+  .warnline{font-size:12.5px;color:var(--amber);background:var(--amber-soft);border-radius:6px;padding:8px 11px;margin-top:10px;line-height:1.6;}
+  .warnline:empty{display:none;}
+
+  table.grid{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.grid th, table.grid td{padding:6px 8px;border-bottom:1px solid var(--line-soft);text-align:left;vertical-align:middle;}
+  table.grid th{font-weight:600;color:#5b5750;background:#f5f2ea;}
+  table.grid td.num, table.grid th.num{text-align:right;font-family:var(--mono);}
+  .bring-wrap{max-height:280px;overflow:auto;border:1px solid var(--line-soft);border-radius:6px;}
+
+  button.primary{font-family:var(--sans);font-weight:600;font-size:14.5px;color:#fff;background:var(--ink);border:none;border-radius:7px;padding:12px 22px;cursor:pointer;transition:.15s opacity,.15s transform;}
+  button.primary:hover{opacity:.88;}
+  button.primary:active{transform:translateY(1px);}
+  button.primary:disabled{background:#c9c5ba;cursor:not-allowed;}
+  button.ghost{font-family:var(--sans);font-size:13px;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:6px;padding:7px 13px;cursor:pointer;}
+  button.ghost:hover{background:var(--accent-soft);}
+  button.solid{font-family:var(--sans);font-size:13px;font-weight:600;color:#fff;background:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:7px 13px;cursor:pointer;}
+  button.solid:hover{opacity:.9;}
+  button.link{font-family:var(--sans);font-size:12.5px;color:var(--accent);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;}
+  button.link.danger{color:var(--warn);}
+  button.x{border:none;background:none;color:var(--warn);font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;}
+  button:focus-visible, input:focus-visible, select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .status{font-family:var(--mono);font-size:12.5px;color:#8a8577;margin-top:12px;min-height:16px;}
+  .status.err{color:var(--warn);}
+
+  .progress{height:4px;background:var(--line-soft);border-radius:2px;overflow:hidden;margin-top:12px;display:none;}
+  .progress.show{display:block;}
+  .progress > div{height:100%;width:0%;background:var(--accent);transition:.15s width;}
+
+  .results{display:none;}
+  .results.show{display:block;}
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px;}
+  @media (max-width:640px){.stat-row{grid-template-columns:1fr 1fr;}}
+  .stat{border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px;background:#fdfcfa;}
+  .stat .num{font-family:var(--mono);font-size:21px;font-weight:600;}
+  .stat .lbl{font-size:12px;color:#8a8577;margin-top:2px;}
+  .stat .uniq{font-size:12px;color:#5b5750;font-family:var(--mono);}
+  .stat.hit .num{color:var(--accent);}
+  .stat.miss .num{color:var(--warn);}
+  .stat.bonly .num{color:var(--amber);}
+  .overlap{font-size:13px;margin-bottom:4px;}
+  .overlap b{font-family:var(--mono);color:var(--accent);}
+
+  .scope{border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px;margin:14px 0;background:#fdfcfa;}
+  .scope .q{font-size:13px;font-weight:600;margin-bottom:8px;}
+  .scope .opts{display:flex;gap:10px 18px;flex-wrap:wrap;}
+  .scope label{display:flex;align-items:center;gap:6px;font-size:13px;color:#3d3a35;cursor:pointer;}
+  .scope .cnt{font-family:var(--mono);font-size:12px;color:#8a8577;}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+
+  table.preview{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);display:block;overflow-x:auto;white-space:nowrap;border:1px solid var(--line-soft);border-radius:6px;}
+  table.preview th, table.preview td{padding:7px 10px;border-bottom:1px solid var(--line-soft);text-align:left;}
+  table.preview th{background:#f5f2ea;position:sticky;top:0;}
+  table.preview tr:last-child td{border-bottom:none;}
+  .tag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;}
+  .tag.y{background:var(--accent-soft);color:var(--accent);}
+  .tag.n{background:var(--warn-soft);color:var(--warn);}
+
+  .preview-wrap{margin-top:18px;}
+  .preview-wrap .cap{font-size:12px;color:#8a8577;margin-bottom:6px;}
+
+  .bar{display:inline-block;height:7px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-right:6px;}
+  .summary-wrap{overflow-x:auto;}
+
+  footer{margin-top:36px;font-size:12px;color:#a19c8d;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">本機比對工具 · 資料不會上傳到任何伺服器</div>
+    <h1>資料比對工具</h1>
+    <p>上傳 Excel 或 CSV，選擇共同欄位當作比對依據（例如訂單號碼、會員編號…）。可以一對一比對並一輪一輪串接下去，也可以一次拿一份主表對多份名單看重疊。</p>
+  </header>
+
+  <nav class="modes" aria-label="比對模式">
+    <button type="button" data-mode="chain" aria-pressed="true">一對一／多輪串接</button>
+    <button type="button" data-mode="multi" aria-pressed="false">一對多重疊分析</button>
+  </nav>
+
+  <!-- SHARED: cleaning options -->
+  <div class="step">
+    <div class="step-head">
+      <h2>比對前清理</h2>
+      <div class="sub">兩種模式共用</div>
+    </div>
+    <div class="opts-grid">
+      <label><input type="checkbox" id="opt-trim" checked> 去除前後空白</label>
+      <label><input type="checkbox" id="opt-width" checked> 全形轉半形</label>
+      <label><input type="checkbox" id="opt-case" checked> 忽略英文大小寫</label>
+      <label><input type="checkbox" id="opt-zero"> 去除開頭的 0</label>
+      <label><input type="checkbox" id="opt-strip"> 忽略中間的空白、- 與 _</label>
+    </div>
+    <p class="note" style="margin:10px 0 0;">CSV 會以文字讀入，保留編號開頭的 0。Excel 裡被存成「數字」的編號已經沒有開頭的 0，兩邊格式不一致時請勾選「去除開頭的 0」。</p>
+  </div>
+
+  <!-- ================= MODE: CHAIN ================= -->
+  <div id="mode-chain">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">1</div>
+        <h2>上傳主表與比對檔</h2>
+        <div class="tools">
+          <button class="link" id="undo-btn" type="button" hidden>回到上一輪</button>
+          <button class="link danger" id="reset-btn" type="button" hidden>清除所有輪次，重新開始</button>
+        </div>
+      </div>
+      <div class="filegrid">
+        <div>
+          <div class="drop" id="drop-a">
+            <input type="file" id="file-a" accept=".xlsx,.xls,.csv">
+            <div class="hint" id="hint-a">主表（比對結果以此為主）· .xlsx / .xls / .csv</div>
+            <div class="fname" id="fname-a"></div>
+          </div>
+          <div class="chain-path" id="chain-a" hidden></div>
+          <div class="meta" id="meta-a" hidden>
+            <table>
+              <tr id="sheetrow-a"><td>工作表</td><td><select id="sheet-a"></select></td></tr>
+              <tr><td>檔案大小</td><td id="size-a">—</td></tr>
+              <tr><td>列數</td><td id="rows-a">—</td></tr>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="drop" id="drop-b">
+            <input type="file" id="file-b" accept=".xlsx,.xls,.csv">
+            <div class="hint" id="hint-b">比對檔（用來比對主表）· .xlsx / .xls / .csv</div>
+            <div class="fname" id="fname-b"></div>
+          </div>
+          <div class="meta" id="meta-b" hidden>
+            <table>
+              <tr id="sheetrow-b"><td>工作表</td><td><select id="sheet-b"></select></td></tr>
+              <tr><td>檔案大小</td><td id="size-b">—</td></tr>
+              <tr><td>列數</td><td id="rows-b">—</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">2</div>
+        <h2>比對條件與帶回欄位</h2>
+        <div class="sub" id="config-hint">上傳主表與比對檔後設定</div>
+      </div>
+      <div id="config-body" hidden>
+        <div id="keys-wrap"></div>
+        <div class="actions">
+          <button class="ghost" id="add-key" type="button">＋ 新增比對條件</button>
+          <span class="note">多個條件時，必須全部相符才算比對成功</span>
+        </div>
+        <label class="check" style="margin-top:14px;"><input type="checkbox" id="dedup"> 主表同一個鍵值只保留第一筆（先去重再比對）</label>
+        <div class="warnline" id="dup-info"></div>
+
+        <h3>要從比對檔帶回哪些欄位</h3>
+        <div class="bring-wrap">
+          <table class="grid" id="bring-table"></table>
+        </div>
+        <p class="note" style="margin:6px 0 0;">「比對筆數」一定會帶回。比對檔的完整相符資料會另外放在下載檔的明細分頁。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">3</div>
+        <h2>執行比對</h2>
+        <div class="sub" id="ready-hint">請先完成上傳</div>
+      </div>
+      <button class="primary" id="run-btn" disabled>開始比對</button>
+      <div class="progress" id="progress"><div id="progress-bar"></div></div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="step results" id="results-step">
+      <div class="step-head">
+        <div class="step-num">4</div>
+        <h2 id="result-title">比對結果</h2>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="st-total">—</div><div class="lbl">主表列數</div><div class="uniq" id="stu-total"></div></div>
+        <div class="stat hit"><div class="num" id="st-hit">—</div><div class="lbl">比對成功（是）</div><div class="uniq" id="stu-hit"></div></div>
+        <div class="stat miss"><div class="num" id="st-miss">—</div><div class="lbl">比對失敗（否）</div><div class="uniq" id="stu-miss"></div></div>
+        <div class="stat bonly"><div class="num" id="st-bonly">—</div><div class="lbl">只在比對檔</div><div class="uniq" id="stu-bonly"></div></div>
+      </div>
+      <div class="overlap" id="overlap-line"></div>
+      <div class="warnline" id="result-warn"></div>
+
+      <div class="scope" role="radiogroup" aria-label="要保留哪些資料">
+        <div class="q">要保留哪些資料？（預覽、下載與帶入下一輪都套用）</div>
+        <div class="opts">
+          <label><input type="radio" name="scope" value="all" checked> 主表全部 <span class="cnt" id="cnt-all"></span></label>
+          <label><input type="radio" name="scope" value="hit"> 只要比對成功（是） <span class="cnt" id="cnt-hit"></span></label>
+          <label><input type="radio" name="scope" value="miss"> 只要比對失敗（否） <span class="cnt" id="cnt-miss"></span></label>
+          <label><input type="radio" name="scope" value="bonly"> 只在比對檔、不在主表 <span class="cnt" id="cnt-bonly"></span></label>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="ghost" id="download-btn" type="button">下載比對結果 Excel</button>
+        <button class="solid" id="chain-btn" type="button">用這份結果再比對下一個檔案</button>
+      </div>
+
+      <div class="preview-wrap">
+        <div class="cap" id="preview-cap">預覽前 15 筆：</div>
+        <table class="preview" id="preview-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODE: MULTI ================= -->
+  <div id="mode-multi" hidden>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">1</div>
+        <h2>上傳主表</h2>
+      </div>
+      <div class="drop" id="drop-m">
+        <input type="file" id="file-m" accept=".xlsx,.xls,.csv">
+        <div class="hint">主表（例如這期的購買名單）· .xlsx / .xls / .csv</div>
+        <div class="fname" id="fname-m"></div>
+      </div>
+      <div class="meta" id="meta-m" hidden>
+        <table>
+          <tr id="sheetrow-m"><td>工作表</td><td><select id="sheet-m"></select></td></tr>
+          <tr><td>檔案大小</td><td id="size-m">—</td></tr>
+          <tr><td>列數</td><td id="rows-m">—</td></tr>
+          <tr><td>比對欄位</td><td><select id="key-m"></select></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">2</div>
+        <h2>上傳要比對的名單（可多選）</h2>
+      </div>
+      <div class="drop" id="drop-l">
+        <input type="file" id="file-l" accept=".xlsx,.xls,.csv" multiple>
+        <div class="hint">一次選多個檔案，或分批拖進來（例如 TA1、TA2、TA3）</div>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px;">
+        <table class="grid" id="list-table" hidden></table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-num">3</div>
+        <h2>執行重疊分析</h2>
+        <div class="sub" id="ready-hint-m">請先上傳主表與名單</div>
+      </div>
+      <button class="primary" id="run-m" disabled>開始分析</button>
+      <div class="progress" id="progress-m"><div id="progress-bar-m"></div></div>
+      <div class="status" id="status-m"></div>
+    </div>
+
+    <div class="step results" id="results-m">
+      <div class="step-head">
+        <div class="step-num">4</div>
+        <h2>重疊結果</h2>
+        <div class="sub">以不重複鍵值（人數）計算</div>
+      </div>
+      <div class="summary-wrap"><table class="grid" id="summary-table"></table></div>
+      <div class="overlap" id="none-line" style="margin-top:10px;"></div>
+      <div class="warnline" id="result-warn-m"></div>
+      <div class="actions" style="margin-top:12px;">
+        <button class="ghost" id="download-m" type="button">下載重疊分析 Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>多輪比對時，每一輪新增的欄位會加上「_第N輪」以便區分；下載檔內的「比對紀錄」分頁會記下每一輪用的檔案、條件與清理設定。</footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const AGG = {none:'不帶入', first:'第一筆', sum:'合計', count:'筆數（非空白）', list:'清單', uniq:'不重複清單', max:'最大值', min:'最小值'};
+  const AGG_SUFFIX = {first:'', sum:'_合計', count:'_筆數', list:'_清單', uniq:'_不重複清單', max:'_最大', min:'_最小'};
+  const SCOPE_LABEL = {all:'全部', hit:'僅成功', miss:'僅失敗', bonly:'只在比對檔'};
+  const SEP = '\u241F';
+
+  // chain-mode state
+  const S = { a:null, b:null, keyPairs:[], bring:{}, result:null, round:0, history:[], details:[], undo:[] };
+  // multi-mode state
+  const M = { main:null, mainKey:null, lists:[], result:null, seq:0 };
+
+  // ---------- helpers ----------
+  const pad = n => String(n).padStart(2,'0');
+  const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const fmtCell = v => (v instanceof Date) ? fmtDate(v) : v;
+  const fmtN = n => Number(n).toLocaleString();
+  const pct = (a,b) => b ? (a/b*100).toFixed(1) + '%' : '—';
+  const yieldToUI = () => new Promise(r => setTimeout(r, 0));
+  function fmtSize(bytes){
+    if(bytes < 1024) return bytes + ' B';
+    if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  }
+  function esc(v){ return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function toNum(v){
+    if(typeof v === 'number') return v;
+    if(v === null || v === undefined || v === '') return NaN;
+    return Number(String(v).replace(/NT\$|\$|,|\s/g,''));
+  }
+  function toHalf(s){
+    return s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\u3000/g,' ');
+  }
+  function uniqueCol(base, suffix, taken){
+    let name = base + suffix, n = 2;
+    while(taken.has(name)) name = `${base}${suffix}_${n++}`;
+    taken.add(name);
+    return name;
+  }
+  function safeSheetName(s, taken){
+    let base = String(s).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31) || 'Sheet';
+    let name = base, n = 2;
+    while(taken && taken.has(name)){ const sfx = `(${n++})`; name = base.slice(0, 31 - sfx.length) + sfx; }
+    if(taken) taken.add(name);
+    return name;
+  }
+  function mkSelect(options, value){
+    const sel = document.createElement('select');
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      if(Array.isArray(o)){ opt.value = o[0]; opt.textContent = o[1]; } else { opt.value = o; opt.textContent = o; }
+      sel.appendChild(opt);
+    });
+    if(value !== undefined && value !== null) sel.value = value;
+    return sel;
+  }
+  function fillSelect(sel, options, value){
+    sel.innerHTML = '';
+    options.forEach(o => { const opt = document.createElement('option'); opt.value = o; opt.textContent = o; sel.appendChild(opt); });
+    if(value !== undefined && value !== null) sel.value = value;
+  }
+
+  // ---------- key normalization ----------
+  function getOpts(){
+    return {
+      trim: $('opt-trim').checked, width: $('opt-width').checked, case: $('opt-case').checked,
+      zero: $('opt-zero').checked, strip: $('opt-strip').checked
+    };
+  }
+  function optsText(o){
+    const t = [];
+    if(o.trim) t.push('去除前後空白');
+    if(o.width) t.push('全形轉半形');
+    if(o.case) t.push('忽略大小寫');
+    if(o.zero) t.push('去除開頭的0');
+    if(o.strip) t.push('忽略中間空白/-/_');
+    return t.join('、') || '無';
+  }
+  const warn = { big:0 };
+  function normPart(v, o){
+    if(v === null || v === undefined) return '';
+    let s;
+    if(v instanceof Date) s = fmtDate(v);
+    else if(typeof v === 'number'){
+      if(!Number.isFinite(v)) return '';
+      if(Number.isInteger(v)){
+        if(Math.abs(v) >= 1e15) warn.big++;
+        s = BigInt(v).toString();
+      } else s = String(v);
+    } else s = String(v);
+    if(o.width) s = toHalf(s);
+    if(o.trim) s = s.trim();
+    if(s === '') return '';
+    if(o.strip) s = s.replace(/[\s\-_]/g,'');
+    if(o.case) s = s.toLowerCase();
+    if(/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/,'');
+    if(o.zero) s = s.replace(/^0+(?=.)/,'');
+    return s;
+  }
+  function makeKeyFn(cols, o){
+    return row => {
+      if(cols.length === 1) return normPart(row[cols[0]], o);
+      const parts = [];
+      for(const c of cols){ const p = normPart(row[c], o); if(p === '') return ''; parts.push(p); }
+      return parts.join(SEP);
+    };
+  }
+
+  // ---------- key column guessing ----------
+  function scoreHeader(h){
+    h = String(h);
+    if(h.startsWith('是否比對成功') || h.startsWith('比對筆數')) return -10;
+    if(h === '訂單號碼' || h === '會員編號') return 100;
+    if(h.includes('會員') && h.includes('編號')) return 90;
+    if(h.includes('訂單') && h.includes('號碼')) return 90;
+    if(h.includes('訂單編號')) return 85;
+    if(h.includes('會員')) return 60;
+    if(h.includes('訂單')) return 60;
+    if(h.includes('編號') || h.includes('ID') || h.includes('Id')) return 40;
+    return 0;
+  }
+  const guessOne = headers => [...headers].sort((x,y)=>scoreHeader(y)-scoreHeader(x))[0];
+  function guessKey(hA, hB){
+    const commons = hA.filter(h => hB.includes(h));
+    if(commons.length){ commons.sort((x,y)=>scoreHeader(y)-scoreHeader(x)); return {a:commons[0], b:commons[0]}; }
+    return {a: guessOne(hA), b: guessOne(hB)};
+  }
+
+  // ---------- file loading ----------
+  function readBuf(file){
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = e => resolve(e.target.result);
+      r.onerror = () => reject(new Error('讀取檔案失敗'));
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function decodeText(buf){
+    const u8 = new Uint8Array(buf);
+    let text;
+    try{
+      const utf8 = new TextDecoder('utf-8', {fatal:false}).decode(u8);
+      const bad = (utf8.match(/\uFFFD/g) || []).length;
+      text = (bad / Math.max(utf8.length,1) > 0.01) ? new TextDecoder('big5', {fatal:false}).decode(u8) : utf8;
+    }catch(e){ text = new TextDecoder('utf-8', {fatal:false}).decode(u8); }
+    if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    return text;
+  }
+  function parseCSV(text){
+    return new Promise((resolve, reject) => {
+      Papa.parse(text, {
+        header: true, dynamicTyping: false, skipEmptyLines: true, worker: true,
+        complete: res => resolve({ headers: res.meta.fields || [], rows: res.data }),
+        error: err => reject(err instanceof Error ? err : new Error(String(err)))
+      });
+    });
+  }
+  function parseSheetInto(F){
+    const ws = F.wb.Sheets[F.sheet];
+    const json = XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});
+    F.headers = json.length ? Object.keys(json[0]) : ((XLSX.utils.sheet_to_json(ws, {header:1})[0]) || []).map(String);
+    F.rows = json;
+  }
+  async function loadFile(file){
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    const buf = await readBuf(file);
+    if(ext === 'csv'){
+      const p = await parseCSV(decodeText(buf));
+      return { name:file.name, size:file.size, wb:null, sheetNames:[], sheet:'', headers:p.headers, rows:p.rows };
+    }
+    const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true, dense:true});
+    const F = { name:file.name, size:file.size, wb, sheetNames:wb.SheetNames, sheet:wb.SheetNames[0] };
+    parseSheetInto(F);
+    return F;
+  }
+  const fileLabel = F => F.virtual ? F.name : (F.sheetNames.length > 1 ? `${F.name}［${F.sheet}］` : F.name);
+
+  function wireDrop(dropId, inputId, onFiles){
+    const drop = $(dropId), input = $(inputId);
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => { if(input.files.length) onFiles([...input.files]); input.value = ''; });
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', e => { const fs = [...e.dataTransfer.files]; if(fs.length) onFiles(fs); });
+  }
+
+  async function getDownloadsCapability(){
+    try{ if(window.claude && typeof window.claude.use === 'function') return await window.claude.use('downloads'); }catch(e){}
+    return null;
+  }
+  async function saveWorkbook(wb, fname){
+    const downloads = await getDownloadsCapability();
+    if(downloads){
+      try{
+        const arr = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        await downloads.save({filename: fname, data: new Blob([arr], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})});
+        return;
+      }catch(err){ if(err && err.code === 'declined') return; }
+    }
+    XLSX.writeFile(wb, fname);
+  }
+  const dateTag = () => { const t = new Date(); return `${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}`; };
+
+  // ---------- mode switch ----------
+  document.querySelectorAll('.modes button').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.modes button').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    $('mode-chain').hidden = btn.dataset.mode !== 'chain';
+    $('mode-multi').hidden = btn.dataset.mode !== 'multi';
+  }));
+
+  ['opt-trim','opt-width','opt-case','opt-zero','opt-strip'].forEach(id => $(id).addEventListener('change', () => {
+    if(S.result){ hideResults(); setStatus('清理設定已變更，請重新比對。'); }
+    if(M.result){ M.result = null; $('results-m').classList.remove('show'); setStatusM('清理設定已變更，請重新分析。'); }
+    renderDupInfo();
+  }));
+
+  // =====================================================================
+  // CHAIN MODE
+  // =====================================================================
+  function setStatus(msg, isErr){ const el = $('status'); el.textContent = msg; el.classList.toggle('err', !!isErr); }
+  const currentRoundNo = () => S.round + 1;
+
+  function renderPanel(side){
+    const F = S[side];
+    if(!F){
+      $('fname-'+side).textContent = '';
+      $('meta-'+side).hidden = true;
+      return;
+    }
+    $('fname-'+side).textContent = F.name;
+    $('meta-'+side).hidden = false;
+    $('size-'+side).textContent = F.virtual ? '—' : fmtSize(F.size);
+    $('rows-'+side).textContent = fmtN(F.rows.length);
+    const multi = !F.virtual && F.sheetNames.length > 1;
+    $('sheetrow-'+side).hidden = !multi;
+    if(multi) fillSelect($('sheet-'+side), F.sheetNames, F.sheet);
+  }
+
+  ['a','b'].forEach(side => {
+    $('sheet-'+side).addEventListener('change', e => {
+      const F = S[side]; if(!F || !F.wb) return;
+      F.sheet = e.target.value;
+      parseSheetInto(F);
+      if(side === 'b') rebuildBring(true);
+      onSideChanged(side);
+    });
+  });
+
+  function ensureKeyPairs(){
+    if(!S.a) return;
+    S.keyPairs = S.keyPairs.filter(p => S.a.headers.includes(p.a));
+    if(!S.b) return;
+    if(!S.keyPairs.length){ const g = guessKey(S.a.headers, S.b.headers); S.keyPairs = [{a:g.a, b:g.b}]; return; }
+    S.keyPairs.forEach(p => {
+      if(!S.b.headers.includes(p.b)) p.b = S.b.headers.includes(p.a) ? p.a : guessOne(S.b.headers);
+    });
+  }
+
+  function rebuildBring(fresh){
+    if(!S.b){ S.bring = {}; return; }
+    const old = fresh ? {} : S.bring;
+    const nb = {};
+    let sumSet = false, listSet = false;
+    for(const h of S.b.headers){
+      if(old[h] !== undefined){ nb[h] = old[h]; continue; }
+      if(!sumSet && String(h).includes('金額')){ nb[h] = 'sum'; sumSet = true; }
+      else if(!listSet && String(h).includes('名稱')){ nb[h] = 'list'; listSet = true; }
+      else nb[h] = 'none';
+    }
+    S.bring = nb;
+  }
+
+  function renderKeys(){
+    if(!(S.a && S.b)){
+      $('config-body').hidden = true;
+      $('config-hint').textContent = S.a ? '請上傳比對檔' : '上傳主表與比對檔後設定';
+      return;
+    }
+    $('config-body').hidden = false;
+    $('config-hint').textContent = '';
+    const wrap = $('keys-wrap');
+    wrap.innerHTML = '';
+    S.keyPairs.forEach((p, i) => {
+      const row = document.createElement('div'); row.className = 'keyrow';
+      const la = document.createElement('span'); la.className = 'lbl'; la.textContent = '主表';
+      const sa = mkSelect(S.a.headers, p.a);
+      const eq = document.createElement('span'); eq.className = 'eq'; eq.textContent = '＝';
+      const lb = document.createElement('span'); lb.className = 'lbl'; lb.textContent = '比對檔';
+      const sb = mkSelect(S.b.headers, p.b);
+      sa.setAttribute('aria-label', `條件 ${i+1} 主表欄位`);
+      sb.setAttribute('aria-label', `條件 ${i+1} 比對檔欄位`);
+      sa.onchange = () => { p.a = sa.value; afterKeyChange(); };
+      sb.onchange = () => { p.b = sb.value; afterKeyChange(); };
+      row.append(la, sa, eq, lb, sb);
+      if(S.keyPairs.length > 1){
+        const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×';
+        x.setAttribute('aria-label', `移除條件 ${i+1}`);
+        x.onclick = () => { S.keyPairs.splice(i,1); renderKeys(); afterKeyChange(); };
+        row.appendChild(x);
+      }
+      wrap.appendChild(row);
+    });
+  }
+
+  $('add-key').addEventListener('click', () => {
+    if(!(S.a && S.b)) return;
+    const used = new Set(S.keyPairs.map(p => p.a));
+    const common = S.a.headers.find(h => !used.has(h) && S.b.headers.includes(h));
+    const a = common || S.a.headers.find(h => !used.has(h)) || S.a.headers[0];
+    const b = S.b.headers.includes(a) ? a : S.b.headers[0];
+    S.keyPairs.push({a, b});
+    renderKeys(); afterKeyChange();
+  });
+
+  function afterKeyChange(){ hideResults(); renderBring(); renderDupInfo(); }
+
+  function renderBring(){
+    const t = $('bring-table');
+    if(!S.b){ t.innerHTML = ''; return; }
+    const keyB = new Set(S.keyPairs.map(p => p.b));
+    const cols = S.b.headers.filter(h => !keyB.has(h));
+    t.innerHTML = '<thead><tr><th>比對檔欄位</th><th>帶回方式</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    if(!cols.length){ tb.innerHTML = '<tr><td colspan="2" class="note">比對檔除了比對欄位外沒有其他欄位</td></tr>'; }
+    cols.forEach(h => {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = h;
+      const td2 = document.createElement('td');
+      const sel = mkSelect(Object.entries(AGG), S.bring[h] || 'none');
+      sel.setAttribute('aria-label', `${h} 帶回方式`);
+      sel.onchange = () => { S.bring[h] = sel.value; hideResults(); };
+      td2.appendChild(sel);
+      tr.append(td1, td2); tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+  }
+
+  function renderDupInfo(){
+    const el = $('dup-info');
+    if(!(S.a && S.b && S.keyPairs.length)){ el.textContent = ''; return; }
+    const kf = makeKeyFn(S.keyPairs.map(p => p.a), getOpts());
+    const cnt = new Map(); let empty = 0;
+    for(const r of S.a.rows){ const k = kf(r); if(k === ''){ empty++; continue; } cnt.set(k, (cnt.get(k)||0)+1); }
+    let dupKeys = 0, extra = 0;
+    for(const c of cnt.values()) if(c > 1){ dupKeys++; extra += c-1; }
+    const msgs = [];
+    if(dupKeys) msgs.push(`主表有 ${fmtN(dupKeys)} 個鍵值重複出現（多出 ${fmtN(extra)} 列，不重複共 ${fmtN(cnt.size)} 個）。要用「人數」看重疊時，結果區的不重複數字才是準的，或勾選上方的去重。`);
+    if(empty) msgs.push(`主表有 ${fmtN(empty)} 列比對欄位是空白，會被判定為否。`);
+    el.textContent = msgs.join(' ');
+  }
+
+  function checkReady(){
+    const ready = !!(S.a && S.b && S.keyPairs.length);
+    $('run-btn').disabled = !ready;
+    const prefix = S.round > 0 ? `第 ${currentRoundNo()} 輪 · ` : '';
+    $('ready-hint').textContent = prefix + (ready ? '已就緒，可以開始比對' : (S.a ? '請上傳比對檔' : '請先完成上傳'));
+    $('run-btn').textContent = S.round > 0 ? `開始第 ${currentRoundNo()} 輪比對` : '開始比對';
+    $('reset-btn').hidden = S.round === 0;
+    $('undo-btn').hidden = S.undo.length === 0;
+    $('hint-b').textContent = S.round > 0 ? `第 ${currentRoundNo()} 輪要比對的檔案 · .xlsx / .xls / .csv` : '比對檔（用來比對主表）· .xlsx / .xls / .csv';
+  }
+
+  function onSideChanged(){
+    hideResults();
+    renderPanel('a'); renderPanel('b');
+    ensureKeyPairs();
+    renderKeys(); renderBring(); renderDupInfo();
+    checkReady();
+  }
+
+  function hideResults(){
+    S.result = null;
+    $('results-step').classList.remove('show');
+  }
+
+  function renderChainUI(){
+    $('drop-a').classList.toggle('chained', S.round > 0);
+    $('hint-a').textContent = S.round > 0 ? '目前主表（點這裡改傳新檔案會重新開始）' : '主表（比對結果以此為主）· .xlsx / .xls / .csv';
+    const el = $('chain-a');
+    if(!S.history.length){ el.hidden = true; return; }
+    const parts = [S.history[0]['主表來源']].concat(S.history.map(h => `${h['比對檔案']}（${h['帶入下一輪']}）`));
+    el.textContent = '比對路徑：' + parts.join(' → ');
+    el.hidden = false;
+  }
+
+  function resetChain(){
+    S.round = 0; S.history = []; S.details = []; S.undo = [];
+    renderChainUI();
+  }
+
+  wireDrop('drop-a','file-a', async ([file]) => {
+    setStatus(file.size > 80*1024*1024 ? '檔案較大，讀取可能需要一些時間，請稍候…' : '讀取主表中…');
+    try{
+      const F = await loadFile(file);
+      resetChain();
+      S.a = F; S.keyPairs = [];
+      onSideChanged();
+      setStatus('');
+    }catch(err){ setStatus('讀取主表失敗：' + err.message, true); }
+  });
+
+  wireDrop('drop-b','file-b', async ([file]) => {
+    setStatus(file.size > 80*1024*1024 ? '檔案較大，讀取可能需要一些時間，請稍候…' : '讀取比對檔中…');
+    try{
+      const F = await loadFile(file);
+      S.b = F;
+      rebuildBring(true);
+      onSideChanged();
+      setStatus('');
+    }catch(err){ setStatus('讀取比對檔失敗：' + err.message, true); }
+  });
+
+  // ---------- matching ----------
+  async function runMatch(){
+    const progress = $('progress'), bar = $('progress-bar'), runBtn = $('run-btn');
+    progress.classList.add('show'); bar.style.width = '5%';
+    setStatus('建立索引中…');
+    runBtn.disabled = true;
+    await yieldToUI();
+
+    try{
+      const roundNo = currentRoundNo();
+      const suffix = roundNo > 1 ? `_第${roundNo}輪` : '';
+      const opts = getOpts();
+      const keysA = S.keyPairs.map(p => p.a), keysB = S.keyPairs.map(p => p.b);
+      const kA = makeKeyFn(keysA, opts), kB = makeKeyFn(keysB, opts);
+      warn.big = 0;
+
+      // index B
+      const mapB = new Map(); let emptyB = 0;
+      for(const row of S.b.rows){
+        const k = kB(row);
+        if(k === ''){ emptyB++; continue; }
+        let arr = mapB.get(k); if(!arr){ arr = []; mapB.set(k, arr); } arr.push(row);
+      }
+      bar.style.width = '15%'; await yieldToUI();
+
+      // A rows (+ optional dedup)
+      const dedup = $('dedup').checked;
+      let aRows = S.a.rows, aKeys = aRows.map(kA);
+      let removed = 0;
+      if(dedup){
+        const seen = new Set(), nr = [], nk = [];
+        aRows.forEach((r,i) => { const k = aKeys[i]; if(k !== '' && seen.has(k)){ removed++; return; } if(k !== '') seen.add(k); nr.push(r); nk.push(k); });
+        aRows = nr; aKeys = nk;
+      }
+      bar.style.width = '20%'; await yieldToUI();
+
+      // new column names
+      const taken = new Set(S.a.headers);
+      const flagCol = uniqueCol('是否比對成功', suffix, taken);
+      const countCol = uniqueCol('比對筆數', suffix, taken);
+      const keyBset = new Set(keysB);
+      const bringList = Object.entries(S.bring)
+        .filter(([c,a]) => a !== 'none' && !keyBset.has(c) && S.b.headers.includes(c))
+        .map(([c,a]) => ({col:c, agg:a, out: uniqueCol(c + AGG_SUFFIX[a], suffix, taken)}));
+
+      const keysAset = new Set(keysA);
+      const detailCols = S.b.headers.filter(h => !keyBset.has(h) && !keysAset.has(h));
+      const detailHeaders = [...keysA, ...detailCols];
+
+      const resultRows = [], detailRows = [], detailKeys = [];
+      const uA = new Set(), uHit = new Set(), uMiss = new Set();
+      let hit = 0, miss = 0, emptyA = 0;
+      const total = aRows.length, CHUNK = 4000;
+
+      for(let i = 0; i < total; i++){
+        const arow = aRows[i], k = aKeys[i];
+        const matches = k !== '' ? (mapB.get(k) || []) : [];
+        const matched = matches.length > 0;
+        if(k === '') emptyA++; else uA.add(k);
+        if(matched){ hit++; uHit.add(k); } else { miss++; if(k !== '') uMiss.add(k); }
+
+        const out = {};
+        for(const h of S.a.headers) out[h] = fmtCell(arow[h]);
+        out[flagCol] = matched ? '是' : '否';
+        out[countCol] = matches.length;
+        for(const b of bringList){
+          const vals = matches.map(m => m[b.col]);
+          let v = '';
+          switch(b.agg){
+            case 'first': v = vals.length ? fmtCell(vals[0]) : ''; break;
+            case 'sum': v = vals.reduce((s,x) => s + (Number.isFinite(toNum(x)) ? toNum(x) : 0), 0); break;
+            case 'count': v = vals.filter(x => x !== '' && x !== null && x !== undefined).length; break;
+            case 'list': v = vals.filter(x => x !== '' && x !== null && x !== undefined).map(fmtCell).join('、'); break;
+            case 'uniq': v = [...new Set(vals.filter(x => x !== '' && x !== null && x !== undefined).map(x => String(fmtCell(x))))].join('、'); break;
+            case 'max': case 'min': {
+              const ns = vals.map(toNum).filter(Number.isFinite);
+              v = ns.length ? (b.agg === 'max' ? Math.max(...ns) : Math.min(...ns)) : '';
+              break;
+            }
+          }
+          out[b.out] = v;
+        }
+        resultRows.push(out);
+
+        for(const m of matches){
+          const d = {};
+          for(const h of keysA) d[h] = fmtCell(arow[h]);
+          for(const h of detailCols) d[h] = fmtCell(m[h]);
+          detailRows.push(d); detailKeys.push(k);
+        }
+
+        if(i % CHUNK === CHUNK - 1 || i === total - 1){
+          bar.style.width = (20 + Math.round(((i+1)/total) * 65)) + '%';
+          setStatus(`比對中… ${fmtN(i+1)} / ${fmtN(total)}`);
+          await yieldToUI();
+        }
+      }
+
+      // only in B
+      const bOnlyRows = []; let bOnlyU = 0;
+      for(const [k, rows] of mapB){
+        if(uA.has(k)) continue;
+        bOnlyU++;
+        for(const r of rows){ const o = {}; for(const h of S.b.headers) o[h] = fmtCell(r[h]); bOnlyRows.push(o); }
+      }
+      bar.style.width = '95%'; await yieldToUI();
+
+      S.result = {
+        round: roundNo, flagCol, keysA, keysB, opts, dedup, removed,
+        aLabel: S.round > 0 ? S.a.name : fileLabel(S.a), bLabel: fileLabel(S.b),
+        headers: [...S.a.headers, flagCol, countCol, ...bringList.map(b => b.out)],
+        rows: resultRows, bHeaders: [...S.b.headers], bOnlyRows,
+        total, hit, miss, emptyA, emptyB,
+        aU: uA.size, hitU: uHit.size, missU: uMiss.size, bU: mapB.size, bOnlyU,
+        bigNum: warn.big,
+        detail: { round: roundNo, keyCols: keysA, opts, rows: detailRows, keys: detailKeys, headers: detailHeaders }
+      };
+
+      renderResults();
+      bar.style.width = '100%';
+      const cond = S.keyPairs.map(p => `「${p.a}」對「${p.b}」`).join('、');
+      setStatus(`比對完成：主表 ${fmtN(total)} 列，${fmtN(hit)} 列成功、${fmtN(miss)} 列失敗（依 ${cond}）。`);
+      setTimeout(() => progress.classList.remove('show'), 600);
+    }catch(err){
+      setStatus('比對失敗：' + err.message, true);
+      progress.classList.remove('show');
+    }finally{
+      runBtn.disabled = false;
+    }
+  }
+  $('run-btn').addEventListener('click', runMatch);
+
+  const getScope = () => document.querySelector('input[name="scope"]:checked').value;
+  function scopeData(scope){
+    const r = S.result;
+    if(scope === 'bonly') return { headers: r.bHeaders, rows: r.bOnlyRows };
+    if(scope === 'hit') return { headers: r.headers, rows: r.rows.filter(x => x[r.flagCol] === '是') };
+    if(scope === 'miss') return { headers: r.headers, rows: r.rows.filter(x => x[r.flagCol] === '否') };
+    return { headers: r.headers, rows: r.rows };
+  }
+
+  function renderResults(){
+    const r = S.result;
+    if(!r){ $('results-step').classList.remove('show'); return; }
+    $('st-total').textContent = fmtN(r.total);  $('stu-total').textContent = `不重複 ${fmtN(r.aU)}`;
+    $('st-hit').textContent = fmtN(r.hit);      $('stu-hit').textContent = `不重複 ${fmtN(r.hitU)}`;
+    $('st-miss').textContent = fmtN(r.miss);    $('stu-miss').textContent = `不重複 ${fmtN(r.missU)}`;
+    $('st-bonly').textContent = fmtN(r.bOnlyRows.length); $('stu-bonly').textContent = `不重複 ${fmtN(r.bOnlyU)}`;
+    $('overlap-line').innerHTML = `重疊 ${fmtN(r.hitU)} 個不重複鍵值：占主表 <b>${pct(r.hitU, r.aU)}</b>，占比對檔 <b>${pct(r.hitU, r.bU)}</b>（比對檔不重複 ${fmtN(r.bU)}）`;
+    const w = [];
+    if(r.dedup && r.removed) w.push(`已去除主表重複鍵值 ${fmtN(r.removed)} 列。`);
+    else if(r.total !== r.aU + r.emptyA) w.push(`主表有重複鍵值（${fmtN(r.total)} 列對應 ${fmtN(r.aU)} 個不重複鍵值），看人數請以「不重複」為準。`);
+    if(r.emptyA) w.push(`主表 ${fmtN(r.emptyA)} 列比對欄位空白，已判定為否。`);
+    if(r.emptyB) w.push(`比對檔 ${fmtN(r.emptyB)} 列比對欄位空白，未納入比對。`);
+    if(r.bigNum) w.push(`偵測到超過 15 位數的數字編號，Excel 存成數字時尾數會失真，建議在原始檔把該欄設為文字格式再匯出。`);
+    $('result-warn').textContent = w.join(' ');
+    $('cnt-all').textContent = `${fmtN(r.total)} 列`;
+    $('cnt-hit').textContent = `${fmtN(r.hit)} 列`;
+    $('cnt-miss').textContent = `${fmtN(r.miss)} 列`;
+    $('cnt-bonly').textContent = `${fmtN(r.bOnlyRows.length)} 列`;
+    $('result-title').textContent = r.round > 1 ? `第 ${r.round} 輪比對結果` : '比對結果';
+    renderPreview();
+    $('results-step').classList.add('show');
+  }
+
+  function renderPreview(){
+    if(!S.result) return;
+    const scope = getScope();
+    const {headers, rows} = scopeData(scope);
+    $('preview-cap').textContent = `預覽前 15 筆（${SCOPE_LABEL[scope]}，共 ${fmtN(rows.length)} 列）：`;
+    let html = '<thead><tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr></thead><tbody>';
+    for(const row of rows.slice(0,15)){
+      html += '<tr>' + headers.map(h => {
+        if(String(h).startsWith('是否比對成功') && (row[h] === '是' || row[h] === '否')){
+          return `<td><span class="tag ${row[h] === '是' ? 'y' : 'n'}">${row[h]}</span></td>`;
+        }
+        return `<td>${esc(row[h])}</td>`;
+      }).join('') + '</tr>';
+    }
+    if(!rows.length) html += `<tr><td colspan="${headers.length || 1}">沒有資料</td></tr>`;
+    table_set($('preview-table'), html + '</tbody>');
+  }
+  function table_set(el, html){ el.innerHTML = html; }
+  document.querySelectorAll('input[name="scope"]').forEach(r => r.addEventListener('change', renderPreview));
+
+  function roundRecord(r, scope, kept, isDownload){
+    return {
+      '輪次': r.round,
+      '主表來源': r.aLabel,
+      '比對檔案': r.bLabel,
+      '比對條件': r.keysA.map((a,i) => `${a}＝${r.keysB[i]}`).join('；'),
+      '清理設定': optsText(r.opts) + (r.dedup ? '；主表去重' : ''),
+      '主表列數': r.total,
+      '主表不重複': r.aU,
+      '成功列數': r.hit,
+      '成功不重複': r.hitU,
+      '失敗列數': r.miss,
+      '只在比對檔不重複': r.bOnlyU,
+      '重疊率（占主表）': pct(r.hitU, r.aU),
+      '重疊率（占比對檔）': pct(r.hitU, r.bU),
+      '帶入下一輪': isDownload ? `本輪下載：${SCOPE_LABEL[scope]}` : SCOPE_LABEL[scope],
+      '保留列數': kept
+    };
+  }
+
+  // ---------- download ----------
+  $('download-btn').addEventListener('click', async () => {
+    if(!S.result) return;
+    const scope = getScope(), r = S.result;
+    const {headers, rows} = scopeData(scope);
+    const wb = XLSX.utils.book_new(), names = new Set();
+
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, {header: headers}), safeSheetName(scope === 'bonly' ? '只在比對檔' : '比對結果', names));
+
+    if(scope !== 'bonly'){
+      const allDetails = [...S.details, r.detail];
+      for(const d of allDetails){
+        if(!d.rows.length) continue;
+        const kf = makeKeyFn(d.keyCols, d.opts);
+        const keep = new Set(rows.map(kf));
+        const drows = d.rows.filter((x, i) => keep.has(d.keys[i]));
+        if(!drows.length) continue;
+        const name = allDetails.length > 1 ? `第${d.round}輪明細` : '比對檔明細';
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(drows, {header: d.headers}), safeSheetName(name, names));
+      }
+    }
+
+    const log = [...S.history, roundRecord(r, scope, rows.length, true)];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(log), safeSheetName('比對紀錄', names));
+
+    const roundTag = r.round > 1 ? `_第${r.round}輪` : '';
+    const scopeTag = scope === 'all' ? '' : `_${SCOPE_LABEL[scope]}`;
+    await saveWorkbook(wb, `比對結果${roundTag}${scopeTag}_${dateTag()}.xlsx`);
+  });
+
+  // ---------- chain ----------
+  $('chain-btn').addEventListener('click', () => {
+    if(!S.result) return;
+    const scope = getScope(), r = S.result;
+    const {headers, rows} = scopeData(scope);
+    if(!rows.length){ setStatus(`「${SCOPE_LABEL[scope]}」沒有任何資料可以帶入下一輪，請換一個選項。`, true); return; }
+
+    S.undo.push({
+      a:S.a, b:S.b, keyPairs: S.keyPairs.map(p => ({...p})), bring: {...S.bring},
+      result:S.result, round:S.round, history:S.history.slice(), details:S.details.slice(),
+      dedup: $('dedup').checked, scope
+    });
+
+    S.history.push(roundRecord(r, scope, rows.length, false));
+    S.details.push(r.detail);
+    S.round = r.round;
+    S.keyPairs = S.keyPairs.map(p => ({ a: scope === 'bonly' ? p.b : p.a, b: null }));
+    S.a = { virtual:true, name:`第${r.round}輪結果（${SCOPE_LABEL[scope]}）`, size:0, sheetNames:[], headers:[...headers], rows };
+    S.b = null; S.bring = {};
+    $('dedup').checked = false;
+
+    renderChainUI();
+    onSideChanged();
+    setStatus(`已將第 ${r.round} 輪結果（${SCOPE_LABEL[scope]}，${fmtN(rows.length)} 列）設為主表，請上傳下一個要比對的檔案。`);
+    $('drop-a').scrollIntoView({behavior:'smooth', block:'center'});
+  });
+
+  // ---------- undo / reset ----------
+  $('undo-btn').addEventListener('click', () => {
+    const snap = S.undo.pop(); if(!snap) return;
+    Object.assign(S, { a:snap.a, b:snap.b, keyPairs:snap.keyPairs, bring:snap.bring, round:snap.round, history:snap.history, details:snap.details });
+    $('dedup').checked = snap.dedup;
+    renderChainUI();
+    renderPanel('a'); renderPanel('b');
+    renderKeys(); renderBring(); renderDupInfo();
+    S.result = snap.result;
+    document.querySelector(`input[name="scope"][value="${snap.scope}"]`).checked = true;
+    renderResults();
+    checkReady();
+    setStatus(`已回到第 ${snap.result.round} 輪的比對結果，可以換一個保留範圍再帶入下一輪。`);
+  });
+
+  $('reset-btn').addEventListener('click', () => {
+    resetChain();
+    S.a = null; S.b = null; S.keyPairs = []; S.bring = {};
+    $('dedup').checked = false;
+    onSideChanged();
+    setStatus('已清除，請重新上傳主表。');
+  });
+
+  // =====================================================================
+  // MULTI MODE
+  // =====================================================================
+  function setStatusM(msg, isErr){ const el = $('status-m'); el.textContent = msg; el.classList.toggle('err', !!isErr); }
+
+  function invalidateM(){ M.result = null; $('results-m').classList.remove('show'); checkReadyM(); }
+
+  function checkReadyM(){
+    const ready = !!(M.main && M.lists.length);
+    $('run-m').disabled = !ready;
+    $('ready-hint-m').textContent = ready ? `已就緒，共 ${M.lists.length} 份名單` : (M.main ? '請上傳要比對的名單' : '請先上傳主表與名單');
+  }
+
+  function renderMain(){
+    const F = M.main;
+    if(!F){ $('fname-m').textContent = ''; $('meta-m').hidden = true; return; }
+    $('fname-m').textContent = F.name;
+    $('meta-m').hidden = false;
+    $('size-m').textContent = fmtSize(F.size);
+    $('rows-m').textContent = fmtN(F.rows.length);
+    const multi = F.sheetNames.length > 1;
+    $('sheetrow-m').hidden = !multi;
+    if(multi) fillSelect($('sheet-m'), F.sheetNames, F.sheet);
+    if(!F.headers.includes(M.mainKey)) M.mainKey = guessOne(F.headers);
+    fillSelect($('key-m'), F.headers, M.mainKey);
+  }
+  $('sheet-m').addEventListener('change', e => { M.main.sheet = e.target.value; parseSheetInto(M.main); renderMain(); invalidateM(); });
+  $('key-m').addEventListener('change', e => { M.mainKey = e.target.value; invalidateM(); });
+
+  wireDrop('drop-m','file-m', async ([file]) => {
+    setStatusM('讀取主表中…');
+    try{
+      M.main = await loadFile(file);
+      M.mainKey = null;
+      renderMain();
+      // re-guess list keys against the new main table
+      M.lists.forEach(L => { if(L.F.headers.includes(M.mainKey)) L.key = M.mainKey; });
+      renderLists(); invalidateM(); setStatusM('');
+    }catch(err){ setStatusM('讀取主表失敗：' + err.message, true); }
+  });
+
+  wireDrop('drop-l','file-l', async (files) => {
+    for(const file of files){
+      setStatusM(`讀取 ${file.name} 中…`);
+      try{
+        const F = await loadFile(file);
+        const key = (M.mainKey && F.headers.includes(M.mainKey)) ? M.mainKey : guessOne(F.headers);
+        M.lists.push({ id: ++M.seq, F, key });
+      }catch(err){ setStatusM(`讀取 ${file.name} 失敗：${err.message}`, true); return; }
+    }
+    renderLists(); invalidateM(); setStatusM('');
+  });
+
+  function renderLists(){
+    const t = $('list-table');
+    if(!M.lists.length){ t.hidden = true; t.innerHTML = ''; return; }
+    t.hidden = false;
+    t.innerHTML = '<thead><tr><th>名單</th><th>工作表</th><th class="num">列數</th><th>比對欄位</th><th></th></tr></thead>';
+    const tb = document.createElement('tbody');
+    M.lists.forEach(L => {
+      const tr = document.createElement('tr');
+      const tdN = document.createElement('td'); tdN.textContent = L.F.name; tdN.style.wordBreak = 'break-all';
+      const tdS = document.createElement('td');
+      if(L.F.sheetNames.length > 1){
+        const s = mkSelect(L.F.sheetNames, L.F.sheet);
+        s.setAttribute('aria-label', `${L.F.name} 工作表`);
+        s.onchange = () => { L.F.sheet = s.value; parseSheetInto(L.F); if(!L.F.headers.includes(L.key)) L.key = guessOne(L.F.headers); renderLists(); invalidateM(); };
+        tdS.appendChild(s);
+      } else tdS.textContent = '—';
+      const tdR = document.createElement('td'); tdR.className = 'num'; tdR.textContent = fmtN(L.F.rows.length);
+      const tdK = document.createElement('td');
+      const k = mkSelect(L.F.headers, L.key);
+      k.setAttribute('aria-label', `${L.F.name} 比對欄位`);
+      k.onchange = () => { L.key = k.value; invalidateM(); };
+      tdK.appendChild(k);
+      const tdX = document.createElement('td');
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×';
+      x.setAttribute('aria-label', `移除 ${L.F.name}`);
+      x.onclick = () => { M.lists = M.lists.filter(z => z !== L); renderLists(); invalidateM(); };
+      tdX.appendChild(x);
+      tr.append(tdN, tdS, tdR, tdK, tdX); tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+  }
+
+  async function runMulti(){
+    const progress = $('progress-m'), bar = $('progress-bar-m');
+    progress.classList.add('show'); bar.style.width = '5%';
+    $('run-m').disabled = true;
+    setStatusM('建立主表索引中…');
+    await yieldToUI();
+    try{
+      const o = getOpts(); warn.big = 0;
+      const mk = makeKeyFn([M.mainKey], o);
+      const mainKeys = M.main.rows.map(mk);
+      const mainU = new Set(mainKeys.filter(k => k !== ''));
+      const emptyMain = mainKeys.filter(k => k === '').length;
+
+      const labels = [], usedL = new Set();
+      M.lists.forEach(L => {
+        let base = L.F.name.replace(/\.(xlsx|xls|csv)$/i,'');
+        if(L.F.sheetNames.length > 1) base += `［${L.F.sheet}］`;
+        let name = base, n = 2; while(usedL.has(name)) name = `${base}(${n++})`;
+        usedL.add(name); labels.push(name);
+      });
+
+      const sets = [], summary = [];
+      for(let i = 0; i < M.lists.length; i++){
+        const L = M.lists[i];
+        const kf = makeKeyFn([L.key], o);
+        const set = new Set();
+        for(const r of L.F.rows){ const k = kf(r); if(k !== '') set.add(k); }
+        let ov = 0; for(const k of set) if(mainU.has(k)) ov++;
+        sets.push(set);
+        summary.push({ label: labels[i], key: L.key, rows: L.F.rows.length, uniq: set.size, ov, onlyList: set.size - ov });
+        bar.style.width = (10 + Math.round((i+1)/M.lists.length*80)) + '%';
+        setStatusM(`分析中… ${i+1} / ${M.lists.length}`);
+        await yieldToUI();
+      }
+      let none = 0; for(const k of mainU){ if(!sets.some(s => s.has(k))) none++; }
+
+      M.result = { opts:o, labels, sets, summary, mainKeys, mainU: mainU.size, emptyMain, none, bigNum: warn.big };
+      renderMultiResult();
+      bar.style.width = '100%';
+      setStatusM(`分析完成：主表不重複 ${fmtN(mainU.size)} 個，比對 ${M.lists.length} 份名單。`);
+      setTimeout(() => progress.classList.remove('show'), 600);
+    }catch(err){
+      setStatusM('分析失敗：' + err.message, true);
+      progress.classList.remove('show');
+    }finally{
+      $('run-m').disabled = false;
+    }
+  }
+  $('run-m').addEventListener('click', runMulti);
+
+  function renderMultiResult(){
+    const R = M.result;
+    const max = Math.max(1, ...R.summary.map(s => s.ov));
+    let html = '<thead><tr><th>名單</th><th>比對欄位</th><th class="num">名單列數</th><th class="num">名單不重複</th><th class="num">重疊人數</th><th>占主表</th><th class="num">占名單</th><th class="num">只在名單</th></tr></thead><tbody>';
+    for(const s of R.summary){
+      const w = Math.round(s.ov / max * 80);
+      html += `<tr><td>${esc(s.label)}</td><td>${esc(s.key)}</td><td class="num">${fmtN(s.rows)}</td><td class="num">${fmtN(s.uniq)}</td><td class="num">${fmtN(s.ov)}</td><td style="white-space:nowrap;"><span class="bar" style="width:${w}px"></span>${pct(s.ov, R.mainU)}</td><td class="num">${pct(s.ov, s.uniq)}</td><td class="num">${fmtN(s.onlyList)}</td></tr>`;
+    }
+    $('summary-table').innerHTML = html + '</tbody>';
+    $('none-line').innerHTML = `主表不重複 ${fmtN(R.mainU)} 個，其中 <b>${fmtN(R.none)}</b> 個（${pct(R.none, R.mainU)}）不在任何一份名單中。`;
+    const w = [];
+    if(R.emptyMain) w.push(`主表 ${fmtN(R.emptyMain)} 列比對欄位空白，未納入計算。`);
+    if(R.bigNum) w.push('偵測到超過 15 位數的數字編號，Excel 存成數字時尾數會失真，建議把該欄設為文字格式再匯出。');
+    $('result-warn-m').textContent = w.join(' ');
+    $('results-m').classList.add('show');
+  }
+
+  $('download-m').addEventListener('click', async () => {
+    const R = M.result; if(!R) return;
+    const wb = XLSX.utils.book_new(), names = new Set();
+    const sumRows = R.summary.map(s => ({
+      '名單': s.label, '比對欄位': s.key, '名單列數': s.rows, '名單不重複': s.uniq,
+      '重疊人數': s.ov, '占主表': pct(s.ov, R.mainU), '占名單': pct(s.ov, s.uniq), '只在名單': s.onlyList
+    }));
+    sumRows.push({});
+    sumRows.push({ '名單': '主表不重複', '名單列數': R.mainU });
+    sumRows.push({ '名單': '不在任何名單', '名單列數': R.none, '占主表': pct(R.none, R.mainU) });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sumRows, {header:['名單','比對欄位','名單列數','名單不重複','重疊人數','占主表','占名單','只在名單']}), safeSheetName('重疊摘要', names));
+
+    const taken = new Set(M.main.headers);
+    const flagCols = R.labels.map(l => uniqueCol(`在「${l}」`, '', taken));
+    const hitCol = uniqueCol('命中名單數', '', taken);
+    const marked = M.main.rows.map((row, i) => {
+      const o = {}; for(const h of M.main.headers) o[h] = fmtCell(row[h]);
+      const k = R.mainKeys[i]; let c = 0;
+      R.sets.forEach((s, j) => { const y = k !== '' && s.has(k); if(y) c++; o[flagCols[j]] = y ? '是' : '否'; });
+      o[hitCol] = c;
+      return o;
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(marked, {header:[...M.main.headers, ...flagCols, hitCol]}), safeSheetName('主表標記', names));
+
+    const setting = [
+      {'項目':'主表', '內容': fileLabel(M.main)},
+      {'項目':'主表比對欄位', '內容': M.mainKey},
+      {'項目':'清理設定', '內容': optsText(R.opts)},
+      ...M.lists.map((L, i) => ({'項目': `名單 ${i+1}`, '內容': `${fileLabel(L.F)}（欄位：${L.key}）`}))
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(setting), safeSheetName('比對設定', names));
+    await saveWorkbook(wb, `重疊分析_${dateTag()}.xlsx`);
+  });
+
+  checkReady();
+  checkReadyM();
+})();
+</script>
+</body>
+</html>
