@@ -227,6 +227,13 @@ table.sum th .pc{color:inherit;opacity:.85}
 .laysub{flex-basis:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 10px;padding:6px 4px 2px 34px;font-size:13px}
 .laysub label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .layitem.off .laysub{opacity:.45}
+.exbox{margin-top:12px}
+.exbox summary{cursor:pointer;font-weight:500}
+.exbox .exlist{padding:6px 2px;grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.laycats{border-top:1px solid var(--line,#e3e3e3);margin-top:10px;padding-top:10px}
+.laycats h4{margin:0 0 4px;font-size:14px}
+.laycats .actions{margin:6px 0;align-items:center}
+.laycats .laysub{padding:4px 2px 2px}
 .layitem label{flex:1;display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;min-width:0}
 .handle{all:unset;cursor:grab;touch-action:none;padding:4px 6px;color:var(--muted);font-size:16px;line-height:1;border-radius:4px}
 .handle:active{cursor:grabbing}
@@ -239,7 +246,7 @@ table.sum th .pc{color:inherit;opacity:.85}
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>回購／再購分析儀表板<span class="ver">v4.9</span><small>上傳訂單明細，依全站與各品類拆出回購、再購、再回購會員</small></h1>
+    <h1>回購／再購分析儀表板<span class="ver">v5.1</span><small>上傳訂單明細，依全站與各品類拆出回購、再購、再回購會員</small></h1>
     <div class="actions">
       <label class="btn file">上傳訂單明細<input id="fileIn" type="file" multiple accept=".xlsx,.xls,.csv,.tsv,.txt"></label>
       <button class="btn ghost" id="demoBtn" type="button">用示範資料試跑</button>
@@ -297,6 +304,12 @@ table.sum th .pc{color:inherit;opacity:.85}
         <h3>自訂版面</h3>
         <p class="def">勾選要顯示的區塊；按住左邊的握把拖曳，或用箭頭調整順序。設定記在這個瀏覽器。</p>
         <ol class="laylist" id="layList"></ol>
+        <div class="laycats" id="layCats" role="group" aria-labelledby="layCatsH">
+          <h4 id="layCatsH">要顯示的品類</h4>
+          <p class="def">取消勾選的品類不會出現在表格和範圍選單裡；全站人數照樣包含所有品類。Excel 和同步到 Google Sheets 仍保留全部品類。</p>
+          <div class="actions"><button class="btn ghost small" id="layCatAll" type="button">全選</button><button class="btn ghost small" id="layCatNone" type="button">全不選</button><span class="def" id="layCatCount"></span></div>
+          <div class="laysub" id="layCatList"></div>
+        </div>
         <div class="actions"><button class="btn ghost small" id="layReset" type="button">恢復預設</button><button class="btn small" id="layDone" type="button">完成</button></div>
       </div>
     </nav>
@@ -330,6 +343,12 @@ table.sum th .pc{color:inherit;opacity:.85}
             <button class="btn ghost small" id="cClear" type="button" hidden>移除自訂區間</button>
           </div>
           <div class="def" id="cHint"></div>
+          <details id="exDetails" class="exbox">
+            <summary>不算進計算的品類<span class="def" id="exSum"></span></summary>
+            <p class="def">勾選的品類會整個從資料裡拿掉：全站人數、訂單筆次、銷售金額和所有分群都不算它。只買這些品類的會員，就當作那一年沒有購買。只想在畫面上藏起來、不改數字的話，請用「自訂版面」裡的「要顯示的品類」。</p>
+            <div class="laysub exlist" id="exList"></div>
+            <div class="actions"><button class="btn small" id="exApply" type="button">套用並重新計算</button><span class="def" id="exNote"></span></div>
+          </details>
         </div>
       </div>
     </section>
@@ -726,7 +745,7 @@ function mmIndex(mm){let m=MM_IDX.get(mm);if(!m){m=new Map();mm.ids.forEach((id,
 const catDisp=raw=>String(raw).replace(/^\s*\d+\s*[_\-.、]\s*/,'')||String(raw);
 const catPrefix=raw=>{const m=String(raw).match(/^\s*(\d+)/);return m?+m[1]:500;};
 /* year chunks -> analysis arrays */
-function assemble(chunks){
+function assemble(chunks,excl){
   chunks=[...chunks].sort((a,b)=>a.year-b.year);
   const memIdx=new Map(),ids=[],catIdx=new Map(),cats=[],catPre=[];
   let n=0;for(const c of chunks)n+=c.n;
@@ -745,7 +764,16 @@ function assemble(chunks){
   const order=cats.map((_,i)=>i).sort((a,b)=>rank(a)-rank(b)||a-b);
   const remap=new Int16Array(cats.length);order.forEach((c,i)=>remap[c]=i);
   for(let i=0;i<n;i++)cat[i]=remap[cat[i]];
-  return {n,ids,cats:order.map(c=>cats[c]),mem,yr,mo,dk,maxDk,cat,ord,amt,qty,parts,has,lastMonth,years:chunks.map(c=>c.year)};
+  const allCats=order.map(c=>cats[c]);
+  const ex=new Set((excl||[]).filter(c=>allCats.includes(c)));
+  if(!ex.size)return {n,ids,cats:allCats,allCats,excluded:[],exRows:0,mem,yr,mo,dk,maxDk,cat,ord,amt,qty,parts,has,lastMonth,years:chunks.map(c=>c.year)};
+  /* excluded categories leave the data entirely: 全站, orders, amounts and every segment are counted without them */
+  const keepCats=allCats.filter(c=>!ex.has(c)),nc=new Int16Array(allCats.length).fill(-1);
+  allCats.forEach((c,i)=>{if(!ex.has(c))nc[i]=keepCats.indexOf(c);});
+  let n2=0;for(let i=0;i<n;i++)if(nc[cat[i]]>=0)n2++;
+  const T=(A,C)=>new C(n2),m2=T(mem,Int32Array),y2=T(yr,Int16Array),o2=T(mo,Int8Array),d2=T(dk,Int32Array),c2=T(cat,Int16Array),r2_=T(ord,Int32Array),a2=T(amt,Float32Array),q2=T(qty,Float32Array);
+  for(let i=0,j=0;i<n;i++){const c=nc[cat[i]];if(c<0)continue;m2[j]=mem[i];y2[j]=yr[i];o2[j]=mo[i];d2[j]=dk[i];c2[j]=c;r2_[j]=ord[i];a2[j]=amt[i];q2[j]=qty[i];j++;}
+  return {n:n2,ids,cats:keepCats,allCats,excluded:allCats.filter(c=>ex.has(c)),exRows:n-n2,mem:m2,yr:y2,mo:o2,dk:d2,maxDk,cat:c2,ord:r2_,amt:a2,qty:q2,parts,has,lastMonth,years:chunks.map(c=>c.year)};
 }
 
 const NO_LABELS=['oldold','oldnew','newnew','資料異常','未知'];
@@ -1044,7 +1072,11 @@ const IS_OWNER=!!document.getElementById('fileIn');
 const LAY_KEY='rp_layout';
 let LAY=null,LAY_DRAG=0;
 const KPIS=[['yc','有購會員'],['rep','全站回購率'],['rb','全站再購率'],['ag','全站再回購率'],['neu','新進'],['ord','訂單筆次'],['amt','銷售金額'],['aov','平均訂單價'],['atv','客單價'],['per','人均訂單筆次']];
-function layDefault(){return {order:BLOCKS.map(b=>b[0]),hidden:new Set(),kpiHidden:new Set()};}
+function layDefault(){return {order:BLOCKS.map(b=>b[0]),hidden:new Set(),kpiHidden:new Set(),catHidden:new Set()};}
+/* categories hidden on screen (by name). Exports set CAT_ALL so Excel and the Sheets sync keep every category */
+let CAT_ALL=false;
+function catVis(i){if(CAT_ALL||!LAY||!LAY.catHidden||!LAY.catHidden.size)return true;const n=typeof SNAP!=='undefined'&&SNAP&&SNAP.cats?SNAP.cats[i]:null;return n==null||!LAY.catHidden.has(n);}
+function withAllCats(fn){const o=CAT_ALL;CAT_ALL=true;try{return fn();}finally{CAT_ALL=o;}}
 function layGet(){
   let L=null;
   /* the owner's browser keeps the layout; teammates always get the layout the owner shared */
@@ -1054,9 +1086,9 @@ function layGet(){
   const ids=BLOCKS.map(b=>b[0]),order=L.order.filter((k,i,a)=>ids.includes(k)&&a.indexOf(k)===i);
   /* blocks added in a newer version go right after their default neighbour */
   ids.forEach((k,i)=>{if(order.includes(k))return;let at=-1;for(let j=i-1;j>=0&&at<0;j--)at=order.indexOf(ids[j]);order.splice(at+1,0,k);});
-  return {order,hidden:new Set((L.hidden||[]).filter(k=>ids.includes(k))),kpiHidden:new Set((L.kpiHidden||[]).filter(k=>KPIS.some(x=>x[0]===k)))};
+  return {order,hidden:new Set((L.hidden||[]).filter(k=>ids.includes(k))),kpiHidden:new Set((L.kpiHidden||[]).filter(k=>KPIS.some(x=>x[0]===k))),catHidden:new Set((L.catHidden||[]).map(String))};
 }
-function laySave(){if(!IS_OWNER)return;try{localStorage.setItem(LAY_KEY,JSON.stringify({order:LAY.order,hidden:[...LAY.hidden],kpiHidden:[...LAY.kpiHidden]}));}catch(e){}}
+function laySave(){if(!IS_OWNER)return;try{localStorage.setItem(LAY_KEY,JSON.stringify({order:LAY.order,hidden:[...LAY.hidden],kpiHidden:[...LAY.kpiHidden],catHidden:[...LAY.catHidden]}));}catch(e){}}
 const blkSec=k=>document.querySelector(`#blocks>[data-block="${k}"]`);
 const shown=k=>{const x=blkSec(k);return !!x&&!x.hidden;};
 function layApply(){const box=$('blocks');if(!box)return;
@@ -1081,7 +1113,17 @@ function layDrag(h,li,ol){
     document.addEventListener('pointermove',mv,{passive:false});document.addEventListener('pointerup',end);document.addEventListener('pointercancel',end);});
   h.addEventListener('keydown',e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();layMove(li.dataset.k,e.key==='ArrowUp'?-1:1,'handle');}});
 }
-function layList(f){const ol=$('layList');ol.replaceChildren();const pr=layPresent();
+function layCats(){
+  const box=$('layCatList');if(!box)return;box.replaceChildren();
+  const cats=(typeof SNAP!=='undefined'&&SNAP&&SNAP.cats)||[];
+  $('layCats').hidden=!cats.length;
+  const cnt=()=>{const h=cats.filter(c=>LAY.catHidden.has(c)).length;$('layCatCount').textContent=h?`已隱藏 ${h} 個，顯示 ${cats.length-h} 個`:`全部 ${cats.length} 個都顯示`;};
+  for(const c of cats){const cb=el('input',{type:'checkbox'});cb.checked=!LAY.catHidden.has(c);
+    cb.addEventListener('change',()=>{if(cb.checked)LAY.catHidden.delete(c);else LAY.catHidden.add(c);cnt();laySave();viewRender();});
+    box.append(el('label',null,cb,el('span',{text:c})));}
+  cnt();
+}
+function layList(f){const ol=$('layList');ol.replaceChildren();const pr=layPresent();layCats();
   pr.forEach((k,i)=>{const b=BLOCKS.find(x=>x[0]===k),off=LAY.hidden.has(k);
     const cb=el('input',{type:'checkbox'});cb.checked=!off;
     cb.addEventListener('change',()=>{if(cb.checked)LAY.hidden.delete(k);else LAY.hidden.add(k);layCommit(cb.checked,{k,focus:'cb'});});
@@ -1107,6 +1149,8 @@ function layInit(){
   addEventListener('resize',fit);addEventListener('scroll',fit,{passive:true});
   $('layDone').addEventListener('click',()=>{close();btn.focus();});
   $('layReset').addEventListener('click',()=>{LAY=layDefault();layCommit(true);});
+  const setAll=hide=>{const cats=(SNAP&&SNAP.cats)||[];LAY.catHidden=new Set(hide?cats:[]);laySave();layCats();viewRender();};
+  $('layCatAll').addEventListener('click',()=>setAll(false));$('layCatNone').addEventListener('click',()=>setAll(true));
   box.addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('click',()=>{if(!box.hidden&&Date.now()-LAY_DRAG>400)close();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!box.hidden){close();btn.focus();}});
@@ -1181,10 +1225,12 @@ function viewRender(){
   dl.append(el('li',{text:'品類口徑為同品類回購；全站為不重複會員，各品類加總不會等於全站。'}));
   dl.append(el('li',{text:`消費指標：人均訂單筆次＝訂單筆次÷人數；平均訂單價＝銷售金額÷訂單筆次；客單價＝銷售金額÷人數。訂單筆次以${SNAP.has.ord?'不重複母訂單號碼':'不重複購買日'}計，品類的訂單筆次是「有買這個品類的訂單」，銷售金額是該品類的金額。`}));
   dl.append(el('li',{text:E.useDates?`新舊會員別：以${lb.A}的期間（${fdk(s.s0)}–${fdk(s.e0)}）判定。oldold＝會員加入日、首購日都早於 ${fdk(s.s0)}；oldnew＝加入日早於 ${fdk(s.s0)}、首購日落在期間內；newnew＝加入日、首購日都落在期間內；不符合以上的標為資料異常。`:'新舊會員別：資料缺會員加入日或首購日，沿用資料中的欄位或標為未知。'}));
+  if(SNAP.excluded&&SNAP.excluded.length)dl.append(el('li',{text:`不算進計算的品類：${SNAP.excluded.join('、')}。全站人數、訂單筆次、銷售金額和所有分群都不含這些品類；只買這些品類的會員視為沒有購買。`}));
   dl.append(el('li',{text:`最後消費年：分群輪廓裡是截至${lb.A}的最後購買年份；「全體會員最後消費年」一律以資料最新年份為準。`}));
   vTabs();vCut();if(shown('kpi'))vKpis(E);
   const ss=$('selScope');ss.replaceChildren();ss.append(el('option',{value:-1,text:'全站'}));
-  SNAP.cats.forEach((c,i)=>ss.append(el('option',{value:i,text:c})));ss.value=VS.scope;
+  if(VS.scope>=0&&!catVis(VS.scope))VS.scope=-1;
+  SNAP.cats.forEach((c,i)=>{if(catVis(i))ss.append(el('option',{value:i,text:c}));});ss.value=VS.scope;
   ss.onchange=()=>{VS.scope=+ss.value;viewRender();};
   /* hidden blocks are skipped, so turning blocks off also makes clicks faster */
   if(shown('flow'))vFlow(E,SI);if(shown('rep'))vRep(E);if(shown('rb'))vRb(E);if(shown('ag'))vAg(E);if(shown('freq'))vFreq(E,SI);
@@ -1265,7 +1311,7 @@ function vFlow(E,SI){
   $('extra').replaceChildren(nb);
 }
 /* ---- shared table pieces for 回購／再購／再回購 ---- */
-const ROWS=()=>[...SNAP.cats.map((_,i)=>i+1),0];
+const ROWS=()=>[...SNAP.cats.map((_,i)=>i+1).filter(j=>catVis(j-1)),0];
 function vHead(tb,first,groups){
   const h1=el('tr'),h2=el('tr');h1.append(el('th',{class:'stick',rowspan:2,text:first}));
   for(const [t,c,subs] of groups){const th=el('th',{class:c});th.innerHTML=t;
@@ -1336,7 +1382,7 @@ function vFreq(E,SI){
   tb.append(el('thead',null,h1,h2));
   const body=el('tbody');
   const cell=(v,c,p,f)=>{const g=gr(c,p);return el('td',null,v,g==null?null:el('span',{class:'pc '+(g>0?'pos':g<0?'neg':''),text:fpp(g)}));};
-  [0,...SNAP.cats.map((_,i)=>i+1)].forEach(idx=>{const t=T[idx];if(!t.Yc&&idx)return;const sc=idx-1;
+  [0,...SNAP.cats.map((_,i)=>i+1).filter(j=>catVis(j-1))].forEach(idx=>{const t=T[idx];if(!t.Yc&&idx)return;const sc=idx-1;
     const tr=el('tr',{class:idx===0?'total':''},el('td',{text:idx===0?'全站（不重複）':SNAP.cats[sc]}));
     tr.append(cell(fmt(t.Yc),t.Yc,t.Yc1),cell(fmt(t.O),t.O,t.O1),hasA?cell(fmt(t.R),t.R,t.R1):el('td',{text:'—'}));
     if(hasQ)tr.append(cell(fmt(t.Q),t.Q,t.Q1));
@@ -1404,8 +1450,8 @@ function vProfile(E,SI){
 }
 function vCatTable(p,n,lb){
   const hasA=SNAP.has.amt,hasQ=SNAP.has.qty,useLast=VS.seg==='lost';
-  const rows=p.cats.map((c,i)=>({name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2],o:c[3]||0,q:c[4]||0,f:[c[5]||0,c[6]||0,c[7]||0]}))
-    .filter(r=>r.y||r.y1).sort((a,b)=>useLast?b.y1-a.y1:b.y-a.y||b.y1-a.y1);
+  const rows=p.cats.map((c,i)=>({i,name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2],o:c[3]||0,q:c[4]||0,f:[c[5]||0,c[6]||0,c[7]||0]}))
+    .filter(r=>(r.y||r.y1)&&catVis(r.i)).sort((a,b)=>useLast?b.y1-a.y1:b.y-a.y||b.y1-a.y1);
   if(VS.scope<0&&p.m&&rows.length){const bu=p.fq[0]+p.fq[1]+p.fq[2];
     rows.unshift({name:'全站（這群合計）',y:bu,y1:p.fq1[0]+p.fq1[1]+p.fq1[2],a:p.m[1],o:p.m[0],q:p.m[2],f:p.fq,total:true});}
   const ct=$('catTable');ct.replaceChildren();
@@ -1449,7 +1495,7 @@ function vLastMatrix(){
   LM.years.forEach((y,i)=>hr.append(el('th',{class:i===0?'gc':'gp',text:i===0?`${y}（仍活躍）`:String(y)})));
   tb.append(el('thead',null,hr));
   const body=el('tbody');
-  [0,...SNAP.cats.map((_,i)=>i+1)].forEach(idx=>{
+  [0,...SNAP.cats.map((_,i)=>i+1).filter(j=>catVis(j-1))].forEach(idx=>{
     const r=LM.rows[idx],t=LM.total[idx];if(!t&&idx)return;
     const tr=el('tr',{class:idx===0?'total':''},el('td',{text:idx===0?'全站（不重複）':SNAP.cats[idx-1]}),el('td',{text:fmt(t)}));
     r.forEach(v=>tr.append(el('td',null,fmt(v),el('span',{class:'pc',text:fp(pct(v,t))}))));
@@ -1503,14 +1549,14 @@ function vProfileAoa(E){
     a.push([],[`${L?lb.B:lb.A}消費指標`,'數值'],['有購人數',bu],['訂單筆次',mm[0]],['銷售金額',mm[1]],['購買數量',mm[2]],['人均訂單筆次',bu?Math.round(mm[0]/bu*100)/100:null],['平均訂單價',mm[0]?Math.round(mm[1]/mm[0]):null],['客單價',bu?Math.round(mm[1]/bu):null],
       [],[`${L?lb.B:lb.A}一共買了幾次`,'人數','占比'],['僅 1 次',fq[0],P_(pct(fq[0],n))],['2 次',fq[1],P_(pct(fq[1],n))],['3 次以上',fq[2],P_(pct(fq[2],n))]);}
   a.push([],['品類',`${lb.a}有買人數`,'占這群',`${lb.b}有買人數`,'占這群',`${lb.a}訂單筆次`,`${lb.a}銷售金額`,`${lb.a}購買數量`,'人均訂單筆次','平均訂單價','客單價','僅1次','2次','3次以上']);
-  p.cats.map((c,i)=>({name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2],o:c[3]||0,q:c[4]||0,f:[c[5]||0,c[6]||0,c[7]||0]})).sort((x,z)=>z.y-x.y).forEach(r=>{if(r.y||r.y1)a.push([r.name,r.y,P_(pct(r.y,n)),r.y1,P_(pct(r.y1,n)),r.o,r.a,r.q,r.y?r2(r.o/r.y):null,r.o?Math.round(r.a/r.o):null,r.y?Math.round(r.a/r.y):null,...r.f]);});
+  p.cats.map((c,i)=>({name:SNAP.cats[i],y:c[0],y1:c[1],a:c[2],o:c[3]||0,q:c[4]||0,f:[c[5]||0,c[6]||0,c[7]||0]})).filter((r,i)=>catVis(i)).sort((x,z)=>z.y-x.y).forEach(r=>{if(r.y||r.y1)a.push([r.name,r.y,P_(pct(r.y,n)),r.y1,P_(pct(r.y1,n)),r.o,r.a,r.q,r.y?r2(r.o/r.y):null,r.o?Math.round(r.a/r.o):null,r.y?Math.round(r.a/r.y):null,...r.f]);});
   const block=(title,pairs,mode,lab)=>{const mp=new Map(pairs);a.push([],[title,'人數','占比']);for(const k of vSortKeys(pairs,mode))a.push([lab?lab(k):String(k),mp.get(k),P_(pct(mp.get(k),n))]);};
   return a;
 }
 function vFreqAoa(E){
   const T=E.T,Y=E.s.Y,lb=LB(E);
   const a=[['範圍','有購人數','訂單筆次','銷售金額','購買數量','人均訂單筆次','平均訂單價','客單價','僅1次','2次','3次以上','僅1次占比','2次占比','3次以上占比',`${lb.b}有購人數`,`${lb.b}訂單筆次`,`${lb.b}銷售金額`,`${lb.b}購買數量`,'有購人數成長率','訂單筆次成長率','銷售金額成長率','客單價成長率']];
-  [0,...SNAP.cats.map((_,i)=>i+1)].forEach(idx=>{const t=T[idx];if(t.O==null||(!t.Yc&&idx))return;
+  [0,...SNAP.cats.map((_,i)=>i+1).filter(j=>catVis(j-1))].forEach(idx=>{const t=T[idx];if(t.O==null||(!t.Yc&&idx))return;
     const r2=v=>v==null?null:Math.round(v*100)/100,rd=v=>v==null?null:Math.round(v);
     a.push([idx===0?'全站(不重複)':SNAP.cats[idx-1],t.Yc,t.O,Math.round(t.R),Math.round(t.Q),r2(pct(t.O,t.Yc)),rd(pct(t.R,t.O)),rd(pct(t.R,t.Yc)),t.f1,t.f2,t.f3,P_(pct(t.f1,t.Yc)),P_(pct(t.f2,t.Yc)),P_(pct(t.f3,t.Yc)),
       t.Yc1,t.O1,Math.round(t.R1),Math.round(t.Q1),P_(gr(t.Yc,t.Yc1)),P_(gr(t.O,t.O1)),P_(gr(t.R,t.R1)),P_(gr(pct(t.R,t.Yc),pct(t.R1,t.Yc1)))]);});
@@ -1519,7 +1565,7 @@ function vFreqAoa(E){
 function vLMAoa(){
   const LM=SNAP.LM;if(!LM)return [];
   const a=[[`全體會員最後消費年（截至 ${LM.asOf} 年）`],['範圍','不重複會員',...LM.years.map(String),...LM.years.map(y=>y+' 占比')]];
-  [0,...SNAP.cats.map((_,i)=>i+1)].forEach(idx=>{const t=LM.total[idx];if(!t&&idx)return;a.push([idx===0?'全站(不重複)':SNAP.cats[idx-1],t,...LM.rows[idx],...LM.rows[idx].map(v=>P_(pct(v,t)))]);});
+  [0,...SNAP.cats.map((_,i)=>i+1).filter(j=>catVis(j-1))].forEach(idx=>{const t=LM.total[idx];if(!t&&idx)return;a.push([idx===0?'全站(不重複)':SNAP.cats[idx-1],t,...LM.rows[idx],...LM.rows[idx].map(v=>P_(pct(v,t)))]);});
   return a;
 }
 const cellText=c=>c==null?'':typeof c==='object'?(c.p*100).toFixed(1)+'%':String(c);
@@ -1696,9 +1742,10 @@ async function analyze(resetY,prefix,isErr){
   const chunks=[...ACTIVE.values()].map(a=>a.chunk);
   if(!chunks.length){$('dash').hidden=true;$('shareSec').hidden=true;RAW=null;SNAP=null;YB=null;RES=null;if(prefix)status(prefix,isErr);return;}
   status((prefix?prefix+'\n':'')+'計算中…',isErr);await tick();
-  RAW=assemble(chunks);
+  RAW=assemble(chunks,EXCL);
   RAW.mm=MEMBER?MEMBER.rec:null;
   RAW.LM=lastYearMatrix(RAW);
+  renderExcl();
   if(RAW.mm)for(const k in RAW.mm.has)if(RAW.mm.has[k])RAW.has[k]=true;
   DATA_VER++;ENTRY_CACHE.clear();YB=null;RES=null;cwInit();
   const ty=tabKeys();
@@ -1707,6 +1754,7 @@ async function analyze(resetY,prefix,isErr){
   await rebuild(true,prefix,isErr);
 }
 let DATA_VER=0;const ENTRY_CACHE=new Map();
+let EXCL=[];try{const x=JSON.parse(LS.get('rp_excl','[]'));if(Array.isArray(x))EXCL=x.map(String);}catch(e){}
 try{const c=JSON.parse(LS.get('rp_custom','null'));if(c&&c.s&&c.e)S.custom=c;}catch(e){}
 function tabYears(){return RAW.years.slice();}
 function tabKeys(){const k=tabYears();if(S.custom)k.push(periodKey({type:'custom',...S.custom}));return k;}
@@ -1789,7 +1837,7 @@ function makeSnap(){
   for(const k of keys){const e=ENTRY_CACHE.get(entryKey(k));if(e)byYear[k]=e;tabs[k]=tabInfo(k);}
   for(const k of [...new Set([...syncCutKeys(),...(cutBase(S.Y)!=null?[S.Y]:[])])]){const e=ENTRY_CACHE.get(entryKey(k));if(!e)continue;byYear[k]=e;tabs[k]=tabInfo(k);cutKeys.push(k);const sp=specOf(k);(cuts[sp.Y]||(cuts[sp.Y]=[])).push(sp.m);}
   const cal=keys.filter(k=>typeof k==='number');
-  return {v:4,layout:LAY?{order:LAY.order,hidden:[...LAY.hidden],kpiHidden:[...LAY.kpiHidden]}:null,at:new Date().toISOString(),demo:IS_DEMO,cats:RAW.cats,dataYears:RAW.years,years:keys,cuts,cutKeys,tabs,Y0:cal.length?cal[cal.length-1]:keys[0],lastMonth:RAW.lastMonth,
+  return {v:4,layout:LAY?{order:LAY.order,hidden:[...LAY.hidden],kpiHidden:[...LAY.kpiHidden],catHidden:[...LAY.catHidden]}:null,at:new Date().toISOString(),demo:IS_DEMO,cats:RAW.cats,excluded:RAW.excluded||[],dataYears:RAW.years,years:keys,cuts,cutKeys,tabs,Y0:cal.length?cal[cal.length-1]:keys[0],lastMonth:RAW.lastMonth,
     has:{ord:!!RAW.has.ord,amt:!!RAW.has.amt,qty:!!RAW.has.qty,age:!!RAW.has.age,card:!!RAW.has.card},LM:RAW.LM,byYear};
 }
 async function fullSnapshot(){
@@ -1853,6 +1901,17 @@ function toSheet(aoa,widths){
   aoa.forEach((r,ri)=>r.forEach((c,ci)=>{if(c&&typeof c==='object'){const a=XLSX.utils.encode_cell({r:ri,c:ci});if(ws[a])ws[a].z='0.0%';}}));
   if(widths)ws['!cols']=widths.map(w=>({wch:w}));return ws;
 }
+function renderExcl(){
+  const box=$('exList');if(!box||!RAW)return;box.replaceChildren();
+  const pick=new Set(EXCL),cur=new Set(RAW.excluded||[]);
+  for(const c of RAW.allCats||RAW.cats){const cb=el('input',{type:'checkbox',value:c});cb.checked=pick.has(c);
+    cb.addEventListener('change',()=>{if(cb.checked)pick.add(c);else pick.delete(c);EXCL=[...pick];LS.set('rp_excl',JSON.stringify(EXCL));exNote();});
+    box.append(el('label',null,cb,el('span',{text:c})));}
+  const exNote=()=>{const same=EXCL.length===cur.size&&EXCL.every(c=>cur.has(c));$('exApply').disabled=same;$('exNote').textContent=same?'':'設定改了，按「套用並重新計算」才會生效。';};
+  $('exSum').textContent=cur.size?`　目前排除：${[...cur].join('、')}（${fmt(RAW.exRows)} 列）`:'　目前全部品類都計算';
+  exNote();
+}
+$('exApply').addEventListener('click',async()=>{if(!ACTIVE.size)return;await analyze(false,EXCL.length?`已排除 ${EXCL.join('、')}，重新計算。`:'已恢復計算全部品類。');});
 function settingsAoa(){
   const E=E_(),s=E.s,SI=vSeg(E);
   const a=[['項目','設定'],['資料更新時間',new Date(SNAP.at).toLocaleString('zh-TW',{hour12:false})],['分析期間',SNAP.years.map(periodLabel).join('、')],['再購','當期購買 2 次（含）以上；再購率＝再購人數÷當期有購會員'],['再回購觀察區間',`期間的第 1–${s.M-1} 個月，看第 ${s.M} 個月起有沒有回來`],['觀察區間內購買次數',condOf(s)[0]],['過去有購',s.look==='last'?'去年有購':'任一更早年份'],['去年比較',s.same?'同期月份':'全年'],['新舊會員別判斷方式','以分析期間的起訖日比對會員加入日、首購日'],['購買次數計算',SNAP.has.ord?'不重複母訂單號碼':'不重複購買日'],
@@ -1860,6 +1919,7 @@ function settingsAoa(){
   for(const k of SEG_KEYS)a.push([SI[k].name,SI[k].def]);
   a.push(['新舊會員別','oldold＝會員加入日、首購日都早於期間起日；oldnew＝加入日早於起日、首購日在期間內（含起日）；newnew＝加入日、首購日都在期間內；以上皆非＝資料異常']);
   a.push(['品類口徑','同品類回購；全站為不重複會員，各品類加總不等於全站']);
+  a.push(['不算進計算的品類',SNAP.excluded&&SNAP.excluded.length?SNAP.excluded.join('、')+'（全站、訂單筆次、銷售金額與所有分群都不含）':'無']);
   return a;
 }
 /* long tables for Google Sheets / Looker Studio: every year in one table */
@@ -1899,13 +1959,16 @@ function sheetTables(withYearSheets){
   t['設定']=settingsAoa();
   return t;
 }
+{const st=sheetTables;sheetTables=function(){const a=arguments;return withAllCats(()=>st.apply(this,a));};}
 function yearSheets(){
   const t={};for(const y of [...SNAP.years].reverse()){const E=SNAP.byYear[y],nm=typeof y==='number'?y:'自訂區間';if(E){t[`${nm}總表`]=plain(vStackAoa(E));if(E.T[0].O!=null)t[`${nm}消費指標`]=plain(vFreqAoa(E));}}
   return t;
 }
+{const ys=yearSheets;yearSheets=function(){return withAllCats(()=>ys());};}
 $('xlsBtn').addEventListener('click',async()=>{
   if(typeof XLSX==='undefined'){status('Excel 元件沒有載入，無法匯出。',true);return;}
   await fullSnapshot();
+  CAT_ALL=true;try{
   const wb=XLSX.utils.book_new(),E=E_(),Y=E.s.Y;
   if(cutBase(VS.Y)!=null){const sp=specOf(VS.Y);XLSX.utils.book_append_sheet(wb,toSheet(vStackAoa(E),[16,14,14,12,14,14,12,12,14,14,12,14,12,12]),`${sp.Y}_1-${sp.m}月總表`);XLSX.utils.book_append_sheet(wb,toSheet(vFreqAoa(E),[16,10,10,12,10,10,10,10,9,9,9,9,9,9]),`${sp.Y}_1-${sp.m}月消費指標`);}
   for(const y of [...SNAP.years].reverse()){const e=SNAP.byYear[y];if(e)XLSX.utils.book_append_sheet(wb,toSheet(vStackAoa(e),[16,14,14,12,14,14,12,12,14,14,12,14,12,12]),`${typeof y==='number'?y:'自訂區間'}總表`);}
@@ -1915,6 +1978,7 @@ $('xlsBtn').addEventListener('click',async()=>{
   if(SNAP.LM)XLSX.utils.book_append_sheet(wb,toSheet(vLMAoa(),[16,12]),'最後消費年總覽');
   XLSX.utils.book_append_sheet(wb,toSheet(settingsAoa(),[18,70]),'定義與設定');
   XLSX.writeFile(wb,`回購再購分析_${stamp()}.xlsx`);
+  }finally{CAT_ALL=false;}
   status(`Excel 已下載：各年份總表（回購、再購、再回購）、消費指標、${periodLabel(S.Y)} 目前選取的分群輪廓、最後消費年總覽。`);
 });
 function memberCols(m){return [ATTR.no[m],fdate(ATTR.lastD[m]),fdate(ATTR.J[m]),fdate(ATTR.F[m]),stripPre(ATTR.age[m]),ATTR.card[m]];}
