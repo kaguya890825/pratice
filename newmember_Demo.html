@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>新會員活動頁 Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 70px);}
+*,*::before,*::after{box-sizing:inherit;}
+body{margin:0;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .3s;}
+button{font:inherit;color:inherit;cursor:pointer;}
+a{color:inherit;}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;}
+
+/* ================= Themes ================= */
+[data-theme="sunny"]{
+  --bg:#fff7d6;--surface:#fff;--ink:#134361;--muted:#4f6f84;--accent:#0f8b8d;--accent-ink:#fff;--accent2:#ffc61a;
+  --line:#f0d27a;--focus:#0f8b8d;--r:18px;--shadow:0 5px 0 rgba(19,67,97,.14);--deco:transparent;
+  --tbl:#0f8b8d;--tbl-ink:#ffe27a;--usage-bg:#fff;--usage-title:#0f8b8d;--hl:#ffc61a;--kv-r:22px;
+}
+[data-theme="gold"]{
+  --bg:#fbf0d6;--surface:#fffaf0;--ink:#4a3a33;--muted:#7d6a5f;--accent:#c4541c;--accent-ink:#fff;--accent2:#e6c48a;
+  --line:#e6cf9f;--focus:#c4541c;--r:24px;--shadow:0 4px 0 rgba(196,154,90,.35);--deco:#c49a5a;
+  --tbl:#c49a5a;--tbl-ink:#fff;--usage-bg:#fffaf0;--usage-title:#8a5a24;--hl:#f3c677;--kv-r:28px;
+}
+[data-theme="sky"]{
+  --bg:#bcd9f2;--surface:#fff;--ink:#0f2a44;--muted:#48667f;--accent:#d8322a;--accent-ink:#fff;--accent2:#f5c518;
+  --line:#8fbbe3;--focus:#d8322a;--r:16px;--shadow:0 5px 0 rgba(15,42,68,.2);--deco:#fff;
+  --tbl:#3a8fd0;--tbl-ink:#ffe27a;--usage-bg:#e9f4ff;--usage-title:#2b78c2;--hl:#f5c518;--kv-r:20px;
+}
+[data-theme="pastel"]{
+  --bg:#f3eaff;--surface:#fff;--ink:#3b2a66;--muted:#75659c;--accent:#ff5f9e;--accent-ink:#fff;--accent2:#ffd86b;
+  --line:#dccaf7;--focus:#7a4dff;--r:24px;--shadow:0 5px 0 #dccaf7;--deco:transparent;
+  --tbl:#7a4dff;--tbl-ink:#fff;--usage-bg:#fff;--usage-title:#7a4dff;--hl:#ffd86b;--kv-r:30px;
+}
+
+/* ================= Toolbar ================= */
+.toolbar{position:sticky;top:0;z-index:60;background:#111827;color:#f9fafb;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;font-size:14px;}
+.toolbar-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:1160px;margin:0 auto;}
+.toolbar b{margin-right:4px;}
+.theme-btn,.panel-toggle{border:1px solid #374151;background:#1f2937;border-radius:999px;padding:5px 14px;color:#e5e7eb;}
+.theme-btn[aria-pressed="true"]{background:#f9fafb;color:#111827;border-color:#f9fafb;font-weight:700;}
+.toolbar :focus-visible{outline-color:#fbbf24;}
+.spacer{flex:1;}
+.panel{display:none;max-width:1160px;margin:10px auto 2px;padding:12px;background:#1f2937;border-radius:10px;gap:12px 22px;flex-wrap:wrap;}
+.panel.open{display:flex;}
+.panel label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#d1d5db;min-width:170px;}
+.panel input[type=text],.panel input[type=number]{background:#111827;border:1px solid #4b5563;color:#f9fafb;border-radius:6px;padding:6px 8px;font:inherit;width:100%;}
+.panel .check{flex-direction:row;align-items:center;gap:8px;min-width:0;}
+.panel small{color:#9ca3af;}
+.panel .grp{display:flex;gap:8px;}
+.panel .grp label{min-width:0;flex:1;}
+
+/* ================= Page ================= */
+.page{max-width:1160px;margin:0 auto;padding:16px 16px 56px;}
+h2[contenteditable]{border-radius:6px;}
+h2[contenteditable]:hover,td[contenteditable]:hover{outline:2px dashed var(--line);outline-offset:2px;}
+
+/* ================= KV ================= */
+.kv{position:relative;overflow:hidden;border-radius:var(--kv-r);display:flex;flex-direction:column;min-height:clamp(430px,60vw,690px);padding:clamp(18px,3vw,38px) clamp(12px,3vw,40px) clamp(14px,2.4vw,28px);isolation:isolate;--ph:clamp(180px,25vw,270px);}
+.kv::before,.kv::after{content:none;position:absolute;z-index:0;}
+.kv-deco{position:absolute;inset:0;z-index:1;pointer-events:none;}
+.kv-deco span{position:absolute;display:block;}
+.kv-deco svg{width:100%;height:auto;display:block;}
+.kv-center{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:clamp(4px,1.5vw,18px) 0 clamp(10px,2vw,24px);}
+.kv-title{margin:0;order:1;display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;column-gap:.08em;font-weight:900;line-height:1.08;}
+.kv-title .t1{flex-basis:100%;text-align:center;}
+.kv-ribbon{display:none;font-weight:900;}
+.join-badge{display:none;position:absolute;z-index:2;left:clamp(8px,17%,240px);top:8%;width:clamp(76px,12.5vw,150px);aspect-ratio:1;border-radius:50%;place-items:center;color:#fff;font-weight:900;font-size:clamp(17px,3vw,34px);transform:rotate(-4deg);}
+
+.kv-people{position:absolute;z-index:1;left:0;right:0;bottom:clamp(80px,10vw,120px);display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none;}
+.pg{display:flex;align-items:flex-end;}
+.kv-people{padding:0 clamp(12px,3vw,40px);}
+.person{height:var(--ph);width:auto;flex:none;display:block;}
+.pg .person:first-child{margin-right:-17%;transform:scale(.9) translateY(-4%);transform-origin:50% 100%;}
+
+.kv-cards{position:relative;z-index:3;display:flex;gap:clamp(8px,2vw,24px);margin-top:auto;}
+.rc{flex:1;min-width:0;text-align:center;}
+.rc-icon{display:none;}
+.rc-label{font-weight:900;line-height:1.25;}
+.rc-value{font-weight:900;line-height:1.15;}
+
+/* ---- sunny（陽光放射） ---- */
+[data-theme="sunny"] .kv{background:repeating-conic-gradient(from 0deg at 50% 30%,#ffd75e 0 9deg,#ffc61a 9deg 18deg);}
+[data-theme="sunny"] .kv::before{content:"";right:1%;top:-6%;width:27%;height:82%;background:#d2406f;clip-path:polygon(0 0,22% 0,50% 36%,78% 0,100% 0,64% 50%,100% 100%,78% 100%,50% 64%,22% 100%,0 100%,36% 50%);}
+[data-theme="sunny"] .kv::after{content:"";left:0;right:0;bottom:0;height:clamp(90px,16vw,190px);background:#134361;}
+[data-theme="sunny"] .join-badge{display:grid;background:#0f8b8d;}
+[data-theme="sunny"] .kv-title{color:#134361;text-shadow:.04em .05em 0 rgba(255,255,255,.7);}
+[data-theme="sunny"] .t1,[data-theme="sunny"] .t3{font-size:clamp(46px,9vw,108px);}
+[data-theme="sunny"] .t2{font-size:clamp(56px,11vw,132px);color:#0f8b8d;}
+[data-theme="sunny"] .rc{background:#0f8b8d;color:#fff;border-radius:clamp(10px,1.6vw,18px);padding:clamp(8px,1.4vw,16px) clamp(6px,1.2vw,14px) clamp(10px,1.8vw,20px);box-shadow:0 0 0 3px rgba(255,255,255,.3);}
+[data-theme="sunny"] .rc-label{font-size:clamp(13px,2.6vw,31px);}
+[data-theme="sunny"] .rc-value{background:#fff;color:#134361;border-radius:6px;margin-top:clamp(6px,1vw,12px);font-size:clamp(26px,5.4vw,64px);}
+
+/* ---- gold（暖金募集） ---- */
+[data-theme="gold"] .kv{background:radial-gradient(circle at 50% 0,#fffdf4 0,#fbefd0 70%);}
+[data-theme="gold"] .kv-people{display:none;}
+[data-theme="gold"] .kv-ribbon{display:block;order:0;background:#c4541c;color:#fff;font-size:clamp(16px,2.6vw,28px);padding:.35em 2.6em;margin-bottom:clamp(8px,1.6vw,18px);clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%);}
+[data-theme="gold"] .kv-title{color:#4a3a33;align-items:center;}
+[data-theme="gold"] .t1{font-size:clamp(30px,5.2vw,58px);}
+[data-theme="gold"] .t2{font-size:clamp(84px,16vw,176px);font-style:italic;color:#c4541c;text-shadow:.03em .04em 0 #f3c677;}
+[data-theme="gold"] .t3{font-size:clamp(26px,4.6vw,50px);}
+[data-theme="gold"] .rc{color:#4a3a33;}
+[data-theme="gold"] .rc-icon{display:grid;place-items:center;width:clamp(62px,11vw,124px);aspect-ratio:1;margin:0 auto clamp(6px,1vw,12px);border-radius:50%;background:#c49a5a;box-shadow:0 0 0 5px #fbf0d6,0 0 0 7px #c49a5a;}
+[data-theme="gold"] .rc-icon svg{width:52%;}
+[data-theme="gold"] .rc-label{font-size:clamp(13px,2vw,22px);}
+[data-theme="gold"] .rc-value{font-size:clamp(24px,4.2vw,50px);color:#c4541c;font-style:italic;}
+
+/* ---- sky（藍天歡迎禮） ---- */
+[data-theme="sky"] .kv{background:radial-gradient(ellipse 36% 14% at 18% 78%,rgba(255,255,255,.55),transparent),radial-gradient(ellipse 30% 12% at 84% 70%,rgba(255,255,255,.5),transparent),linear-gradient(180deg,#2f6fb3 0%,#5c9bd6 58%,#a9cdee 100%);}
+[data-theme="sky"] .kv-people{bottom:auto;top:3%;align-items:flex-start;--ph:clamp(200px,30vw,330px);-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent);}
+[data-theme="sky"] .kv-ribbon{display:block;order:2;color:#d8322a;background:linear-gradient(#ffd84a,#f2b705);font-size:clamp(18px,3.4vw,38px);padding:.3em 2.2em;margin-top:clamp(8px,1.6vw,18px);clip-path:polygon(0 0,100% 0,95% 50%,100% 100%,0 100%,5% 50%);filter:drop-shadow(0 4px 0 rgba(0,0,0,.2));}
+[data-theme="sky"] .kv-title{color:#111;text-shadow:-3px -3px 0 #fff,3px -3px 0 #fff,-3px 3px 0 #fff,3px 3px 0 #fff,0 7px 0 rgba(0,0,0,.2);}
+[data-theme="sky"] .t1,[data-theme="sky"] .t3{font-size:clamp(46px,9vw,108px);}
+[data-theme="sky"] .t2{font-size:clamp(56px,11vw,132px);color:#d8322a;}
+[data-theme="sky"] .rc{background:#fff;color:#0f2a44;border-radius:16px;padding:clamp(8px,1.4vw,16px) clamp(6px,1.2vw,14px) clamp(10px,1.6vw,18px);box-shadow:0 5px 0 rgba(15,42,68,.28);}
+[data-theme="sky"] .rc-label{font-size:clamp(13px,2.4vw,28px);}
+[data-theme="sky"] .rc-value{color:#d8322a;font-size:clamp(28px,5.4vw,66px);}
+
+/* ---- pastel（粉彩書店） ---- */
+[data-theme="pastel"] .kv{background:radial-gradient(circle at 12% 18%,#ffd6ea 0,transparent 38%),radial-gradient(circle at 88% 28%,#dcd2ff 0,transparent 42%),radial-gradient(circle,rgba(122,77,255,.12) 2px,transparent 2.5px) 0 0/22px 22px,#f8f1ff;}
+[data-theme="pastel"] .join-badge{display:grid;background:#ff5f9e;}
+[data-theme="pastel"] .kv-title{color:#3b2a66;text-shadow:.04em .05em 0 #fff;}
+[data-theme="pastel"] .t1,[data-theme="pastel"] .t3{font-size:clamp(46px,9vw,108px);}
+[data-theme="pastel"] .t2{font-size:clamp(56px,11vw,132px);color:#ff5f9e;}
+[data-theme="pastel"] .rc{background:#fff;color:#3b2a66;border:3px solid #ff5f9e;border-radius:24px;padding:clamp(8px,1.4vw,16px) clamp(6px,1.2vw,14px) clamp(10px,1.6vw,18px);box-shadow:0 5px 0 #ffb3d1;}
+[data-theme="pastel"] .rc-label{font-size:clamp(13px,2.5vw,29px);}
+[data-theme="pastel"] .rc-value{color:#ff5f9e;font-size:clamp(28px,5.4vw,64px);}
+
+/* ================= Sections ================= */
+.section{margin-top:52px;}
+.sec-head{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:24px;}
+.sec-head::before,.sec-head::after{content:"";height:3px;border-radius:2px;flex:0 1 clamp(16px,8vw,90px);background:var(--deco);}
+.sec-head h2{margin:0;font-size:clamp(26px,3.8vw,40px);font-weight:900;text-align:center;padding:2px 8px;}
+.sec-sub{text-align:center;color:var(--muted);margin:-14px 0 22px;font-size:15px;}
+
+.guide{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.guide-card{text-align:left;background:var(--surface);border:3px solid var(--line);border-radius:var(--r);padding:18px 18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px;min-height:230px;transition:transform .15s;}
+.guide-card:hover{transform:translateY(-4px);}
+.gc-top{display:flex;align-items:center;gap:10px;}
+.gc-ico{width:42px;height:42px;border-radius:50%;background:var(--accent2);display:grid;place-items:center;font-size:22px;flex:none;}
+.gc-tag{font-size:13px;font-weight:700;color:var(--muted);}
+.reward{font-weight:900;font-size:clamp(36px,4.6vw,48px);color:var(--accent);line-height:1.1;margin-top:8px;}
+.reward small{font-size:.38em;color:var(--ink);margin-left:6px;}
+.gc-name{font-weight:900;font-size:18px;}
+.gc-desc{color:var(--muted);font-size:14px;flex:1;}
+.gc-go{margin-top:8px;align-self:flex-start;background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:6px 18px;font-weight:700;font-size:14px;}
+
+/* Carousel */
+.viewport{overflow:hidden;border-radius:var(--r);}
+.track{display:flex;transition:transform .5s cubic-bezier(.3,.7,.2,1);}
+.slide{flex:0 0 100%;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,auto);gap:14px;padding:6px;}
+.item{background:var(--surface);border:3px solid var(--line);border-radius:calc(var(--r) - 6px);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;text-decoration:none;}
+.thumb{aspect-ratio:1/.82;display:grid;place-items:center;font-size:54px;position:relative;}
+.rank{position:absolute;left:8px;top:8px;font-size:12px;font-weight:700;background:var(--accent);color:var(--accent-ink);padding:1px 10px;border-radius:999px;}
+.info{padding:10px 12px 14px;}
+.info small{color:var(--muted);font-size:12px;}
+.info h3{margin:2px 0 4px;font-size:15px;font-weight:700;line-height:1.35;}
+.price{font-weight:900;color:var(--accent);font-size:16px;}
+.ctrl{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px;}
+.arrow{width:42px;height:42px;border-radius:50%;border:3px solid var(--line);background:var(--surface);display:grid;place-items:center;font-size:20px;box-shadow:var(--shadow);}
+.dots{display:flex;gap:8px;}
+.dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--accent);background:transparent;padding:0;}
+.dot[aria-current="true"]{background:var(--accent);width:28px;border-radius:999px;}
+.note-count{text-align:center;color:var(--muted);font-size:13px;margin-top:10px;}
+
+/* ================= Usage guide（購物金使用說明） ================= */
+.usage{margin-top:56px;background:var(--usage-bg);border-radius:clamp(28px,6vw,64px) clamp(28px,6vw,64px) var(--r) var(--r);border:3px solid var(--line);padding:clamp(24px,4vw,44px) clamp(12px,3vw,32px) clamp(32px,5vw,52px);}
+.usage-head{display:flex;align-items:center;justify-content:center;gap:clamp(8px,2vw,22px);}
+.usage-head svg{width:clamp(56px,10vw,100px);height:auto;flex:none;}
+.usage-head h2{margin:0;font-size:clamp(30px,5vw,50px);font-weight:900;color:var(--usage-title);text-shadow:-3px -3px 0 #fff,3px -3px 0 #fff,-3px 3px 0 #fff,3px 3px 0 #fff,0 5px 0 rgba(0,0,0,.15);padding:2px 8px;}
+.step{margin-top:clamp(28px,5vw,52px);}
+.phone-wrap{position:relative;width:min(760px,100%);margin:0 auto;display:flex;justify-content:center;}
+.phone{--pw:min(260px,64vw);width:var(--pw);aspect-ratio:9/17;font-size:calc(var(--pw) / 26);background:#1c1c24;border-radius:3.4em;padding:1.1em;box-shadow:0 18px 30px rgba(0,0,0,.25),inset 0 0 0 .25em #3a3a46;position:relative;z-index:1;}
+.screen{background:#fff;color:#222;border-radius:2.4em;height:100%;overflow:hidden;padding:0 1.2em 1.2em;display:flex;flex-direction:column;gap:.7em;line-height:1.35;}
+.app-bar{display:flex;justify-content:space-between;align-items:center;background:#eceef2;margin:0 -1.2em .4em;padding:1.5em 1.2em .8em;font-weight:900;font-size:1.1em;}
+.sbtn{border-radius:.5em;padding:.85em .6em;font-size:1.02em;text-align:center;font-weight:700;color:#fff;}
+.fb{background:#3b5998;}.ln{background:#2fb344;}
+.or{text-align:center;color:#999;font-size:.9em;}
+.lbl{font-size:.85em;color:#555;margin-bottom:-.4em;}
+.inp{border:.12em solid #cfd3da;border-radius:.4em;height:2.6em;background:#fff;color:#aaa;font-size:.85em;padding:.7em .6em;}
+.sbtn.dark{background:#222;}
+.sbtn.line{background:#fff;color:#222;border:.14em solid #222;}
+.mark{outline:.24em solid #d8322a;outline-offset:.35em;}
+.cart-item{display:flex;gap:.8em;align-items:center;border-bottom:.1em solid #e5e7eb;padding-bottom:.8em;}
+.cart-thumb{width:4.6em;height:4.6em;flex:none;border-radius:.5em;background:#fde9c8;display:grid;place-items:center;}.cart-thumb span{font-size:2.4em;line-height:1;}
+.cn{font-weight:700;font-size:.95em;}.cp{color:#777;font-size:.85em;}
+.tot{display:flex;justify-content:space-between;font-size:.88em;color:#555;}
+.coupon-row{display:flex;gap:.5em;align-items:stretch;}
+.coupon-row .inp{flex:1;height:auto;padding:.8em .5em;}
+.coupon-row .go{background:#2b9aa0;color:#fff;font-size:.8em;font-weight:700;padding:.5em .7em;border-radius:.4em;display:grid;place-items:center;}
+.chip{align-self:flex-start;background:#eef1f5;border:.1em solid #cfd3da;border-radius:.4em;padding:.55em .9em;font-size:.88em;font-weight:700;}
+.next{margin-top:auto;background:#2b9aa0;color:#fff;text-align:center;font-weight:700;padding:.9em;border-radius:.5em;font-size:1em;}
+
+.note{position:absolute;width:28%;font-weight:900;color:var(--ink);line-height:1.4;font-size:clamp(16px,2.2vw,22px);}
+.note .hl{background:linear-gradient(transparent 62%,var(--hl) 62%);}
+.note .sub{display:block;font-weight:700;}
+.n-r{right:0;text-align:left;}.n-l{left:0;text-align:right;}
+.note::before{content:"";position:absolute;top:.8em;height:2px;width:36px;background:var(--ink);}
+.n-r::before{left:-38px;}.n-l::before{right:-38px;}
+.p1 .n-r{top:44%;}
+.p2 .n-r{top:49%;}.p2 .n-l{top:58%;}
+
+.tbl-wrap{max-width:760px;margin:clamp(32px,5vw,52px) auto 0;overflow-x:auto;}
+.tbl{width:100%;min-width:520px;border-collapse:separate;border-spacing:0;border:3px solid var(--tbl);border-radius:12px;overflow:hidden;text-align:center;font-weight:700;}
+.tbl th,.tbl td{padding:12px 8px;border:1px solid rgba(255,255,255,.45);}
+.tbl th{background:var(--tbl);color:var(--tbl-ink);font-weight:900;}
+.tbl th span{display:block;font-size:1.25em;}
+.tbl td{background:#fff;color:var(--ink);border-color:#e8ecf1;}
+.tbl-note{max-width:760px;margin:12px auto 0;color:var(--muted);font-size:13px;text-align:center;}
+.reg-wrap{text-align:center;margin-top:clamp(24px,4vw,40px);}
+.cta-reg{display:inline-block;text-decoration:none;background:var(--accent);color:var(--accent-ink);font-weight:900;font-size:clamp(22px,3.4vw,32px);padding:.45em 2.2em;border-radius:999px;box-shadow:0 6px 0 rgba(0,0,0,.2);transition:transform .15s;}
+.cta-reg:hover{transform:translateY(-2px);}
+
+footer{margin-top:40px;color:var(--muted);font-size:13px;text-align:center;}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:100;padding:16px;}
+.modal.open{display:grid;}
+.dialog{background:var(--surface);color:var(--ink);border:3px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:28px;max-width:420px;width:100%;}
+.dialog h3{font-size:24px;margin:0 0 4px;font-weight:900;}
+.dialog .reward{margin:0 0 10px;}
+.dialog p{color:var(--muted);margin:0 0 20px;}
+.dialog .row{display:flex;gap:10px;}
+.btn2{flex:1;text-align:center;padding:11px;border-radius:999px;border:3px solid var(--line);background:var(--surface);font-weight:700;text-decoration:none;}
+.btn2.main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+
+
+/* ================= Visual upgrade ================= */
+body{background-image:var(--bg-img,none);background-size:var(--bg-size,auto);}
+[data-theme="sunny"]{--bg-img:repeating-linear-gradient(135deg,rgba(255,198,26,.14) 0 18px,transparent 18px 36px);}
+[data-theme="gold"]{--bg-img:radial-gradient(rgba(196,154,90,.22) 1.5px,transparent 2px);--bg-size:24px 24px;}
+[data-theme="sky"]{--bg-img:linear-gradient(180deg,#bcd9f2 0,#e4f1fb 100%);}
+[data-theme="pastel"]{--bg-img:radial-gradient(rgba(122,77,255,.12) 2px,transparent 2.5px);--bg-size:22px 22px;}
+
+/* guide cards: each theme gets its own character */
+[data-theme="sunny"] .guide-card{overflow:hidden;border-color:#0f8b8d;}
+[data-theme="sunny"] .gc-top{background:#0f8b8d;margin:-18px -18px 8px;padding:12px 18px;}
+[data-theme="sunny"] .gc-tag{color:#fff;}
+[data-theme="sunny"] .gc-go{border-radius:8px;}
+[data-theme="gold"] .guide-card{text-align:center;align-items:center;outline:2px dashed #c49a5a;outline-offset:-10px;}
+[data-theme="gold"] .gc-top{flex-direction:column;gap:6px;}
+[data-theme="gold"] .gc-ico{width:56px;height:56px;font-size:28px;background:#c49a5a;box-shadow:0 0 0 4px #fffaf0,0 0 0 6px #c49a5a;}
+[data-theme="gold"] .gc-go{align-self:center;}
+[data-theme="sky"] .guide-card{border-color:#0f2a44;}
+[data-theme="sky"] .guide-card:nth-child(odd){transform:rotate(-1.2deg);}
+[data-theme="sky"] .guide-card:nth-child(even){transform:rotate(1.2deg);}
+[data-theme="sky"] .guide-card:hover{transform:rotate(0) translateY(-4px);}
+[data-theme="sky"] .reward{text-shadow:2px 2px 0 #ffe27a;}
+[data-theme="sky"] .gc-ico{background:#f5c518;}
+[data-theme="pastel"] .guide-card{border:4px solid #fff;box-shadow:0 0 0 3px #ff5f9e,6px 9px 0 3px #dccaf7;}
+[data-theme="pastel"] .guide-card:nth-child(odd){transform:rotate(-1.5deg);}
+[data-theme="pastel"] .guide-card:nth-child(even){transform:rotate(1.5deg);}
+[data-theme="pastel"] .guide-card:hover{transform:rotate(0) translateY(-4px);}
+
+/* product thumbs: soft spotlight + drop shadow instead of flat emoji */
+.thumb::before{content:"";position:absolute;width:60%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.6);}
+.thumb span:not(.rank){position:relative;filter:drop-shadow(0 4px 3px rgba(0,0,0,.2));}
+.rank{z-index:1;}
+
+
+/* ================= 活動攻略：各風格專屬版型 ================= */
+.guide[class*="guide--"]{display:flex;flex-direction:column;gap:22px;grid-template-columns:none;}
+.guide button{font:inherit;cursor:pointer;}
+
+/* sunny：藍綠大卡 + 合計條 */
+.gs-row{display:grid;grid-template-columns:repeat(3,1fr);gap:34px;padding-top:14px;}
+.gs-card{position:relative;text-align:left;background:#0f8b8d;color:#fff;border:0;border-radius:20px;padding:24px 20px 20px;display:flex;flex-direction:column;gap:8px;box-shadow:0 0 0 4px rgba(255,255,255,.5),0 7px 0 #0b6567;transition:transform .15s;}
+.gs-card:hover{transform:translateY(-4px);}
+.gs-card+.gs-card::before{content:"+";position:absolute;left:-34px;top:50%;width:34px;height:34px;margin-top:-17px;border-radius:50%;background:#ffc61a;color:#134361;font-weight:900;font-size:24px;line-height:34px;text-align:center;z-index:2;}
+.gs-ico{position:absolute;right:14px;top:-20px;width:52px;height:52px;border-radius:50%;background:#ffc61a;display:grid;place-items:center;font-size:26px;transform:rotate(8deg);box-shadow:0 3px 0 rgba(0,0,0,.2);}
+.gs-tag{align-self:flex-start;background:#ffe27a;color:#134361;font-size:13px;font-weight:700;border-radius:999px;padding:2px 12px;}
+.gs-name{font-size:clamp(20px,2.4vw,26px);font-weight:900;}
+.gs-val{background:#fff;color:#134361;border-radius:8px;padding:6px 10px;display:flex;align-items:baseline;justify-content:center;gap:6px;}
+.gs-val b{font-size:clamp(40px,5vw,58px);font-weight:900;line-height:1.1;}
+.gs-val small{font-size:16px;font-weight:700;color:#0f8b8d;}
+.gs-desc{font-size:14px;opacity:.9;flex:1;}
+.gs-go{align-self:flex-start;background:#ffc61a;color:#134361;font-weight:900;font-size:14px;padding:6px 18px;border-radius:999px;}
+.gs-total{background:#134361;color:#ffe27a;border-radius:16px;padding:12px 18px;display:flex;justify-content:center;align-items:baseline;gap:10px;font-weight:900;font-size:clamp(16px,2.4vw,22px);flex-wrap:wrap;}
+.gs-total b{font-size:clamp(34px,5vw,56px);color:#fff;line-height:1;}
+.gs-wide{display:flex;align-items:center;gap:16px;text-align:left;background:#fff;border:3px dashed #0f8b8d;border-radius:20px;padding:14px 20px;color:#134361;}
+.gs-wide .gs-ico{position:static;transform:none;flex:none;aspect-ratio:1;}
+.gs-wide .gs-go{align-self:center;}
+.gs-wide .mid{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:200px;}
+.gs-wide .gs-desc{color:#4f6f84;opacity:1;flex:none;}
+.w-val{font-size:clamp(28px,4vw,44px);font-weight:900;color:#0f8b8d;}
+
+/* gold：金色圓章 */
+.gg-row{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;position:relative;}
+.gg-row::before{content:"";position:absolute;left:16%;right:16%;top:clamp(80px,10vw,100px);border-top:3px dotted #c49a5a;}
+.gg-item{position:relative;background:none;border:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:0 6px;color:var(--ink);}
+.gg-circle{position:relative;width:clamp(150px,20vw,200px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 35% 30%,#dcb67a,#b98a48);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 6px #fbf0d6,0 0 0 9px #c49a5a,0 12px 20px rgba(120,80,30,.25);transition:transform .2s;}
+.gg-item:hover .gg-circle{transform:scale(1.04);}
+.gg-circle::after{content:"";position:absolute;inset:12px;border-radius:50%;border:2px dashed rgba(255,255,255,.7);}
+.gg-svg{width:34px;height:34px;display:block;}
+.gg-svg svg{width:100%;height:100%;}
+.gg-val{font-size:clamp(38px,5vw,56px);font-weight:900;font-style:italic;line-height:1.05;}
+.gg-unit{font-size:15px;font-weight:700;}
+.gg-name{background:#c4541c;color:#fff;font-weight:900;padding:4px 26px;margin-top:10px;font-size:17px;clip-path:polygon(0 0,100% 0,94% 50%,100% 100%,0 100%,6% 50%);}
+.gg-desc{color:var(--muted);font-size:14px;max-width:16em;}
+.gg-go{color:#c4541c;font-weight:900;font-size:14px;text-decoration:underline;text-underline-offset:4px;}
+.gg-ribbon{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:#c4541c;color:#fff;border:0;padding:14px 44px;font-size:clamp(16px,2.4vw,22px);clip-path:polygon(0 0,100% 0,98% 50%,100% 100%,0 100%,2% 50%);}
+.gg-ribbon .gg-go{color:#fff;}
+
+/* sky：搶金攻略面板 */
+.guide.guide--sky{display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:stretch;padding-top:14px;}
+.gk-panel{position:relative;background:#fff;border-radius:18px;padding:34px 12px 16px;border:3px solid #0f2a44;box-shadow:0 6px 0 rgba(15,42,68,.22);}
+.gk-tab{position:absolute;left:50%;top:-20px;transform:translateX(-50%);background:#f5c518;color:#0f2a44;font-weight:900;padding:4px 26px;border-radius:12px;border:3px solid #0f2a44;white-space:nowrap;}
+.gk-cols{display:grid;grid-template-columns:repeat(3,1fr);}
+.gk-col{background:none;border:0;text-align:center;padding:4px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;height:100%;color:#0f2a44;}
+.gk-cols .gk-col+.gk-col{border-left:3px dashed #9ec4e6;}
+.gk-lab{color:#d8322a;font-weight:900;font-size:clamp(17px,2vw,22px);}
+.gk-num{font-size:clamp(44px,6vw,72px);font-weight:900;color:#d8322a;line-height:1.05;text-shadow:3px 3px 0 #ffe27a;}
+.gk-unit{font-weight:900;font-size:15px;}
+.gk-desc{color:#48667f;font-size:13px;margin-top:4px;}
+.gk-more{margin-top:8px;color:#2b78c2;font-weight:900;font-size:14px;}
+
+/* pastel：撕線優惠券 */
+.guide.guide--pastel{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;}
+.gp-wrap{filter:drop-shadow(0 6px 0 #dccaf7);}
+.gp-wrap:nth-child(odd){transform:rotate(-1deg);}
+.gp-wrap:nth-child(even){transform:rotate(1deg);}
+.gp{width:100%;display:flex;text-align:left;border:0;padding:0;background:var(--tk-bg);color:#3b2a66;border-radius:20px;-webkit-mask:radial-gradient(circle 12px at 30% 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 12px at 30% 100%,#0000 98%,#000) bottom/100% 51% no-repeat;mask:radial-gradient(circle 12px at 30% 0,#0000 98%,#000) top/100% 51% no-repeat,radial-gradient(circle 12px at 30% 100%,#0000 98%,#000) bottom/100% 51% no-repeat;}
+.gp-stub{flex:0 0 30%;background:var(--tk-stub);color:var(--tk-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 6px;border-radius:20px 0 0 20px;}
+.gp-emoji{font-size:38px;line-height:1;filter:drop-shadow(0 3px 0 rgba(0,0,0,.18));}
+.gp-tag{font-size:13px;font-weight:900;text-align:center;}
+.gp-body{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:4px;border-left:3px dashed rgba(59,42,102,.25);}
+.gp-val b{font-size:clamp(34px,4.6vw,48px);font-weight:900;color:var(--tk-stub);line-height:1.1;}
+.gp-val small{font-size:15px;font-weight:900;margin-left:6px;}
+.gp-name{font-weight:900;font-size:18px;}
+.gp-desc{font-size:14px;color:#75659c;}
+.gp-go{margin-top:6px;align-self:flex-start;background:#3b2a66;color:#fff;font-weight:700;font-size:14px;padding:5px 16px;border-radius:999px;}
+
+@media (max-width:900px){
+  .guide.guide--sky{grid-template-columns:1fr;gap:36px;}
+}
+@media (max-width:760px){
+  .gs-row{grid-template-columns:1fr;gap:38px;}
+  .gs-card+.gs-card::before{left:50%;top:-38px;margin-left:-17px;margin-top:0;}
+  .gg-row{grid-template-columns:1fr;gap:34px;}
+  .gg-row::before{display:none;}
+  .guide.guide--pastel{grid-template-columns:1fr;}
+}
+@media (max-width:560px){
+  .gk-cols{grid-template-columns:1fr;gap:10px;}
+  .gk-cols .gk-col+.gk-col{border-left:0;border-top:3px dashed #9ec4e6;padding-top:14px;}
+  .gs-wide{flex-wrap:wrap;}
+  .gg-ribbon{padding:14px 30px;}
+}
+
+
+/* ================= 使用說明：橫向排列 ================= */
+.step-no{display:none;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:900;font-size:20px;place-items:center;margin:0 auto 14px;box-shadow:0 4px 0 rgba(0,0,0,.18);}
+.usage--row .step-no{display:grid;}
+.usage--row .steps{display:grid;grid-template-columns:1fr 1fr;gap:clamp(8px,2vw,32px);align-items:start;margin-top:clamp(28px,5vw,52px);}
+.usage--row .step{margin-top:0;min-width:0;}
+.usage--row .phone-wrap{width:100%;}
+.usage--row .phone{--pw:min(200px,19vw);}
+.usage--row .note{width:30%;font-size:clamp(14px,1.3vw,17px);}
+.usage--row .note::before{width:22px;}
+.usage--row .n-r::before{left:-24px;}
+.usage--row .n-l::before{right:-24px;}
+@media (max-width:999px){
+  .usage--row .phone-wrap{flex-direction:column;align-items:center;gap:12px;}
+  .usage--row .note{position:static;width:auto;order:2;text-align:center!important;font-size:15px;}
+  .usage--row .note::before{display:none;}
+}
+@media (max-width:640px){
+  .usage--row .steps{grid-template-columns:1fr;gap:36px;}
+  .usage--row .phone{--pw:min(260px,64vw);}
+  .usage--row .note{font-size:18px;}
+}
+
+/* ================= Responsive ================= */
+@media (max-width:900px){
+  .guide{grid-template-columns:repeat(2,1fr);}
+  .thumb{font-size:44px;}
+  .kv{--ph:clamp(150px,23vw,210px);min-height:clamp(430px,72vw,600px);}
+  .kv-people{bottom:clamp(60px,10vw,90px);}
+  [data-theme="sky"] .kv-people{--ph:clamp(170px,26vw,260px);}
+}
+@media (max-width:760px){
+  .phone-wrap{flex-direction:column;align-items:center;gap:14px;}
+  .note{position:static;width:auto;text-align:center!important;font-size:18px;}
+  .note::before{display:none;}
+}
+@media (max-width:640px){
+  .kv{--ph:150px;}
+  .kv-people{position:relative;order:2;bottom:auto;margin-bottom:-34px;}
+  .kv-cards{order:3;}
+  .pg .person:first-child{display:none;}
+  [data-theme="sky"] .kv-people{top:auto;--ph:150px;align-items:flex-end;}
+  .join-badge{width:64px;font-size:15px;top:2%;left:3%;}
+  .kv-center{flex:none;padding-top:clamp(34px,10vw,52px);}
+  .rc-label{min-height:2.5em;display:grid;place-items:center;}
+  .slide{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(4,auto);}
+  .tbl{min-width:0;font-size:13px;}
+  .tbl th,.tbl td{padding:8px 3px;}
+  .toolbar{font-size:13px;}
+  .toolbar-row:not(.panel){flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;}
+  .toolbar-row:not(.panel)>*{flex:none;}
+  .toolbar-row:not(.panel)>b,.spacer{display:none;}
+  .theme-btn,.panel-toggle{padding:4px 8px;font-size:12px;}
+}
+@media (max-width:480px){
+  .guide{grid-template-columns:1fr;}
+  .guide-card{min-height:0;}
+  .usage-head svg:last-child{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  .track,.guide-card,.cta-reg{transition:none;}
+}
+</style>
+</head>
+<body data-theme="sunny">
+
+<div class="toolbar">
+  <div class="toolbar-row">
+    <b>視覺風格</b>
+    <button class="theme-btn" data-theme-btn="sunny" aria-pressed="true">陽光放射</button>
+    <button class="theme-btn" data-theme-btn="gold" aria-pressed="false">暖金募集</button>
+    <button class="theme-btn" data-theme-btn="sky" aria-pressed="false">藍天歡迎禮</button>
+    <button class="theme-btn" data-theme-btn="pastel" aria-pressed="false">粉彩書店</button>
+    <span class="spacer"></span>
+    <button class="panel-toggle" id="panelToggle" aria-expanded="false" aria-controls="panel">設定</button>
+  </div>
+  <div class="toolbar-row panel" id="panel">
+    <div class="grp" style="flex:1 1 360px">
+      <label>主標第一段<input type="text" id="t1In" value="新會員"></label>
+      <label>金額<input type="text" id="t2In" value="$200"></label>
+      <label>主標後段<input type="text" id="t3In" value="大禮包"></label>
+    </div>
+    <label>活動攻略區名稱<input type="text" id="guideTitleInput" value="新會員活動攻略"><small>也可直接點頁面標題修改</small></label>
+    <label>新會員商品區名稱<input type="text" id="shopTitleInput" value="新會員都在買什麼？"></label>
+    <label>輪播組數（每組 8 張卡）<input type="number" id="groupInput" min="1" max="8" value="2"></label>
+    <label class="check"><input type="checkbox" id="autoplay" checked> 自動輪播</label>
+    <label class="check"><input type="checkbox" id="usageRow" checked> 使用說明橫向排列</label>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- 主視覺 KV -->
+  <section class="kv" aria-label="主視覺">
+    <div class="kv-deco" id="kvDeco" aria-hidden="true"></div>
+    <div class="join-badge" aria-hidden="true">join us!</div>
+    <div class="kv-people" aria-hidden="true"><div class="pg left" id="pgL"></div><div class="pg right" id="pgR"></div></div>
+    <div class="kv-center">
+      <div class="kv-ribbon" id="kvRibbon"></div>
+      <h1 class="kv-title"><span class="t1" id="t1">新會員</span><span class="t2" id="t2">$200</span><span class="t3" id="t3">大禮包</span></h1>
+    </div>
+    <div class="kv-cards" id="kvCards"></div>
+  </section>
+
+  <!-- 活動攻略區 -->
+  <section class="section" id="guide">
+    <div class="sec-head"><h2 id="guideTitle" contenteditable="true" spellcheck="false">新會員活動攻略</h2></div>
+    <p class="sec-sub">點選任一活動，查看領取方式</p>
+    <div class="guide" id="guideGrid"></div>
+  </section>
+
+  <!-- 新會員都在買什麼 -->
+  <section class="section" id="shop">
+    <div class="sec-head"><h2 id="shopTitle" contenteditable="true" spellcheck="false">新會員都在買什麼？</h2></div>
+    <div class="carousel" aria-roledescription="carousel" aria-label="新會員熱銷商品">
+      <div class="viewport" id="viewport"><div class="track" id="track"></div></div>
+      <div class="ctrl">
+        <button class="arrow" id="prev" aria-label="上一組">‹</button>
+        <div class="dots" id="dots"></div>
+        <button class="arrow" id="next" aria-label="下一組">›</button>
+      </div>
+      <div class="note-count" id="countNote"></div>
+    </div>
+  </section>
+
+  <!-- 購物金使用說明 -->
+  <section class="usage usage--row" id="usage">
+    <div class="usage-head">
+      <svg viewBox="0 0 90 90" aria-hidden="true"><rect x="2" y="50" width="44" height="30" rx="4" fill="#e9e4c8" transform="rotate(-8 24 65)"/><circle cx="44" cy="40" r="26" fill="#bfe3f7" stroke="#2b78c2" stroke-width="7"/><path d="M26 30a22 22 0 0 1 14-10" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M64 60l20 22" stroke="#2b78c2" stroke-width="11" stroke-linecap="round"/></svg>
+      <h2 id="usageTitle" contenteditable="true" spellcheck="false">購物金使用說明</h2>
+      <svg viewBox="0 0 90 90" aria-hidden="true"><circle cx="34" cy="50" r="26" fill="#f5b81c" stroke="#c98a05" stroke-width="4"/><circle cx="34" cy="50" r="19" fill="none" stroke="#fde38a" stroke-width="2"/><text x="34" y="60" text-anchor="middle" font-size="28" font-weight="900" fill="#b36f00" font-family="Noto Sans TC,sans-serif">$</text><circle cx="64" cy="30" r="20" fill="#ffd24d" stroke="#c98a05" stroke-width="4"/><text x="64" y="38" text-anchor="middle" font-size="22" font-weight="900" fill="#b36f00" font-family="Noto Sans TC,sans-serif">$</text></svg>
+    </div>
+
+    <div class="steps">
+    <!-- Step 1：登入 -->
+    <div class="step p1"><div class="step-no">1</div>
+      <div class="phone-wrap">
+        <div class="note n-r"><span class="hl">登入帳號</span><span class="sub">購買才能使用！</span></div>
+        <div class="phone" aria-label="登入畫面示意">
+          <div class="screen">
+            <div class="app-bar"><span>≡</span><span>LOGO</span><span>🛒</span></div>
+            <div class="sbtn fb">使用 Facebook 帳號登入</div>
+            <div class="sbtn ln">使用 LINE 帳號登入</div>
+            <div class="or">或</div>
+            <div class="lbl">手機號碼 / 會員 E-mail</div><div class="inp"></div>
+            <div class="lbl">密碼</div><div class="inp"></div>
+            <div class="sbtn dark mark">會員登入</div>
+            <div class="sbtn line">我要註冊新會員 ›</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2：結帳折抵 -->
+    <div class="step p2"><div class="step-no">2</div>
+      <div class="phone-wrap">
+        <div class="note n-l"><span>於購物車結帳中</span><span class="sub">點開「<span class="hl">我的優惠券</span>」</span><span class="sub">即可使用優惠折抵！</span></div>
+        <div class="note n-r"><span class="hl">於欄位直接</span><span class="sub">輸入優惠券序號</span><span class="sub">方可折抵</span></div>
+        <div class="phone" aria-label="購物車畫面示意">
+          <div class="screen">
+            <div class="app-bar"><span>≡</span><span>購物車內容</span><span>🛒</span></div>
+            <div class="cart-item"><div class="cart-thumb"><span>📚</span></div><div><div class="cn">暢銷小說精選</div><div class="cp">NT$380 × 1</div></div></div>
+            <div class="tot"><span>商品小計</span><span>NT$380</span></div>
+            <div class="coupon-row mark"><div class="inp">輸入優惠券序號</div><div class="go">使用優惠券</div></div>
+            <div class="chip mark">我的優惠券</div>
+            <div class="tot"><span>優惠折抵</span><span>- NT$0</span></div>
+            <div class="tot"><span>應付金額</span><span>NT$380</span></div>
+            <div class="next">下一步 ｜ 計算運費</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div>
+
+    <div class="tbl-wrap"><table class="tbl" id="tbl"></table></div>
+    <p class="tbl-note">表格內容可直接點擊修改。折抵門檻為示意，請替換為正式活動辦法。</p>
+    <div class="reg-wrap"><a class="cta-reg" href="#" onclick="return false">立即註冊</a></div>
+  </section>
+
+  <footer>此為活動頁版型示意，商品、價格與活動辦法請以實際公告為準。</footer>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="dialog">
+    <h3 id="mTitle"></h3>
+    <div class="reward" id="mReward"></div>
+    <p id="mDesc"></p>
+    <div class="row">
+      <button class="btn2" id="mClose">關閉</button>
+      <a class="btn2 main" href="#" id="mGo">前往活動</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ---------- 可自行修改的資料 ---------- */
+  var ACTIVITIES = [
+    {tag:"註冊即領", name:"入會禮", kv:"入會禮", reward:"$50", unit:"購物金", ico:"🎁", icon:"ticket", thr:"滿 $500", desc:"完成會員註冊，購物金直接入帳，結帳可折抵。"},
+    {tag:"登入 APP 即領", name:"APP下載禮", kv:"APP下載禮", reward:"$100", unit:"購物金", ico:"📱", icon:"phone", thr:"滿 $1,000", desc:"下載 APP 並登入會員，再領一份購物金。"},
+    {tag:"每月領取", name:"月月樂讀", kv:"月月樂讀購書金", reward:"$50", unit:"購書金", ico:"📖", icon:"book", thr:"滿 $500", desc:"每月一份購書金，買書、雜誌都能用。"},
+    {tag:"首購限定", name:"首購圖書", kv:"", reward:"5 倍", unit:"誠品點", ico:"✨", icon:"", thr:"", desc:"第一次購買圖書，誠品點 5 倍送。"}
+  ];
+  var KV_ORDER = [1,0,2];
+  var RIBBON = {gold:"新註冊會員 送", sky:"最高享 $200 購物金"};
+  var ITEMS = [
+    ["📚","圖書","年度暢銷小說精選","NT$380"],["✏️","文具","手帳筆記本組","NT$320"],
+    ["☕","生活","手沖咖啡濾杯組","NT$680"],["🎧","3C","藍牙降噪耳機","NT$1,290"],
+    ["🧴","美妝","保濕護手霜禮盒","NT$450"],["🎒","文創","帆布托特包","NT$590"],
+    ["🕯️","香氛","香氛蠟燭","NT$520"],["🍵","食品","日式茶禮盒","NT$480"],
+    ["📖","圖書","設計美學選書","NT$450"],["🖊️","文具","鋼珠筆禮盒","NT$390"],
+    ["🧸","親子","繪本玩偶組","NT$620"],["🎵","音樂","經典黑膠唱片","NT$980"],
+    ["👕","服飾","純棉長袖上衣","NT$790"],["🍪","食品","手工餅乾禮盒","NT$420"],
+    ["🌿","居家","療癒小植栽","NT$350"],["🎨","文創","水彩顏料組","NT$560"]
+  ];
+  var PER_GROUP = 8;
+  var TINTS = {
+    sunny:["#fff0b8","#d8f1f0","#ffe3d2","#e5f0d9"],
+    gold:["#f6e4bd","#f9d9c3","#efe2cf","#f3e9c9"],
+    sky:["#d7ebfb","#ffe6a8","#ffd5d1","#dbf0e4"],
+    pastel:["#ffd9ea","#e4dcff","#fff0c2","#d6f1ec"]
+  };
+
+  /* ---------- 插畫人物（純 SVG） ---------- */
+  function mix(hex,f){
+    var n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;
+    function c(v){return Math.max(0,Math.min(255,Math.round(f<0?v*(1+f):v+(255-v)*f)));}
+    return "#"+((1<<24)+(c(r)<<16)+(c(g)<<8)+c(b)).toString(16).slice(1);
+  }
+  function person(o){
+    var sk=o.skin, sk2=mix(sk,-.16), hr=o.hair, br=mix(hr,-.3), tp=o.top, tp2=mix(tp,-.2), ac=o.accent||"#fff", tie=o.tie||"#ff6fa5", s="";
+    var armCol = o.outfit==="tank" ? sk : tp;
+    // back hair
+    if(o.style==="bob") s+='<path d="M46 116C38 54 72 38 100 38C128 38 162 54 154 116L160 168L40 168Z" fill="'+hr+'"/>';
+    if(o.style==="buns") s+='<circle cx="60" cy="50" r="17" fill="'+hr+'"/><circle cx="140" cy="50" r="17" fill="'+hr+'"/>';
+    if(o.style==="beanie") s+='<path d="M52 96C46 130 58 142 66 140L68 100ZM148 96C154 130 142 142 134 140L132 100Z" fill="'+hr+'"/>';
+    // torso
+    s+='<path d="M8 262C8 198 42 172 100 172C158 172 192 198 192 262Z" fill="'+tp+'"/>';
+    if(o.outfit==="tank") s+='<path d="M8 262C8 214 24 192 44 182L56 262Z" fill="'+sk+'"/><path d="M192 262C192 214 176 192 156 182L144 262Z" fill="'+sk+'"/>';
+    // waving arm
+    if(o.wave){
+      var fingers=[-26,-9,9,26].map(function(a){return '<rect x="-3" y="-27" width="6" height="17" rx="3" fill="'+sk+'" transform="rotate('+a+')"/>';}).join("");
+      var arm='<path d="M148 206C168 196 178 176 177 154" fill="none" stroke="'+armCol+'" stroke-width="30" stroke-linecap="round"/>'+
+              '<path d="M177 154L175 122" fill="none" stroke="'+sk+'" stroke-width="20" stroke-linecap="round"/>'+
+              '<g transform="translate(175 108)"><circle r="12" fill="'+sk+'"/>'+fingers+'<ellipse cx="-12" cy="3" rx="4" ry="8" fill="'+sk+'" transform="rotate(-30 -12 3)"/></g>';
+      s+= o.wave==="l" ? '<g transform="translate(200 0) scale(-1 1)">'+arm+'</g>' : arm;
+    }
+    // neck + chin shadow
+    s+='<rect x="88" y="132" width="24" height="46" rx="11" fill="'+sk+'"/><ellipse cx="100" cy="150" rx="17" ry="8" fill="'+sk2+'" opacity=".55"/>';
+    // outfit details
+    if(o.outfit==="tee") s+='<path d="M78 171Q100 204 122 171Z" fill="'+sk+'"/><path d="M78 171Q100 204 122 171" fill="none" stroke="'+ac+'" stroke-width="5" stroke-linecap="round"/>';
+    if(o.outfit==="shirt") s+='<path d="M80 170L100 208L120 170Z" fill="'+sk+'"/><path d="M76 168L100 212L92 166Z" fill="'+ac+'"/><path d="M124 168L100 212L108 166Z" fill="'+ac+'"/><path d="M100 212V262" stroke="'+tp2+'" stroke-width="3"/>';
+    if(o.outfit==="jacket") s+='<path d="M72 176L100 262L128 176Z" fill="'+ac+'"/><path d="M72 176L97 262M128 176L103 262" stroke="'+tp2+'" stroke-width="4" stroke-linecap="round"/><path d="M80 170L100 196L120 170Z" fill="'+sk+'"/>';
+    if(o.outfit==="tank") s+='<path d="M74 176Q100 232 126 176Z" fill="'+sk+'"/>';
+    // head
+    s+='<circle cx="59" cy="110" r="8" fill="'+sk+'"/><circle cx="141" cy="110" r="8" fill="'+sk+'"/><circle cx="59" cy="110" r="4" fill="'+sk2+'" opacity=".5"/><circle cx="141" cy="110" r="4" fill="'+sk2+'" opacity=".5"/>';
+    s+='<ellipse cx="100" cy="102" rx="41" ry="46" fill="'+sk+'"/>';
+    // front hair
+    var hi='';
+    if(o.style==="short"){ s+='<path d="M58 102C50 54 82 40 104 42C130 44 148 66 142 102C134 84 122 74 104 72C84 72 68 82 58 102Z" fill="'+hr+'"/>'; hi='M70 58C82 47 98 45 112 49C98 50 84 54 70 58Z'; }
+    if(o.style==="quiff"){ s+='<path d="M54 102C42 52 84 30 116 38C142 44 150 72 142 102C134 82 120 70 104 68C82 66 66 80 54 102Z" fill="'+hr+'"/>'; hi='M66 52C80 38 102 34 122 40C102 40 82 46 66 52Z'; }
+    if(o.style==="bob"){ s+='<path d="M56 104C54 60 78 46 102 46C128 46 148 62 144 104C132 80 118 72 98 74C80 76 66 86 56 104Z" fill="'+hr+'"/>'; hi='M70 58C82 50 98 48 112 52C98 52 84 56 70 58Z'; }
+    if(o.style==="buns"){ s+='<path d="M58 102C56 60 80 48 100 48C122 48 146 60 142 102C130 84 116 74 100 74C84 74 70 84 58 102Z" fill="'+hr+'"/><ellipse cx="70" cy="60" rx="8" ry="4" fill="'+tie+'" transform="rotate(-35 70 60)"/><ellipse cx="130" cy="60" rx="8" ry="4" fill="'+tie+'" transform="rotate(35 130 60)"/>'; hi='M72 60C84 52 98 50 110 53C98 54 86 57 72 60Z'; }
+    if(o.style==="beanie"){
+      s+='<path d="M52 94C48 42 76 28 100 28C126 28 152 42 148 94Z" fill="'+o.cap+'"/><rect x="48" y="84" width="104" height="20" rx="10" fill="'+o.band+'"/>';
+      for(var i=0;i<7;i++) s+='<path d="M'+(62+i*13)+' 86V102" stroke="'+mix(o.band,-.25)+'" stroke-width="2" opacity=".35"/>';
+    }
+    if(hi) s+='<path d="'+hi+'" fill="#fff" opacity=".2"/>';
+    // face
+    s+='<path d="M73 97Q84 90 95 96M105 96Q116 90 127 97" fill="none" stroke="'+br+'" stroke-width="3.6" stroke-linecap="round"/>';
+    if(o.eyes==="happy") s+='<path d="M77 112Q84 103 91 112M109 112Q116 103 123 112" fill="none" stroke="#1b2a41" stroke-width="3.8" stroke-linecap="round"/>';
+    else s+='<ellipse cx="84" cy="110" rx="4.6" ry="5.4" fill="#1b2a41"/><ellipse cx="116" cy="110" rx="4.6" ry="5.4" fill="#1b2a41"/><circle cx="85.8" cy="107.6" r="1.7" fill="#fff"/><circle cx="117.8" cy="107.6" r="1.7" fill="#fff"/>';
+    s+='<path d="M98 120Q101 123 104 120" fill="none" stroke="'+sk2+'" stroke-width="2.6" stroke-linecap="round"/>';
+    s+='<circle cx="72" cy="125" r="8" fill="#ff7f9a" opacity=".5"/><circle cx="128" cy="125" r="8" fill="#ff7f9a" opacity=".5"/>';
+    s+='<path d="M86 128Q100 148 114 128Z" fill="#8e2a3a"/><path d="M89 128.6H111Q100 136 89 128.6Z" fill="#fff"/>';
+    if(o.glasses) s+='<circle cx="84" cy="110" r="12" fill="#fff" fill-opacity=".18" stroke="#e8b23a" stroke-width="3"/><circle cx="116" cy="110" r="12" fill="#fff" fill-opacity=".18" stroke="#e8b23a" stroke-width="3"/><path d="M96 110h8" stroke="#e8b23a" stroke-width="3"/>';
+    return '<svg class="person" viewBox="0 0 200 262" xmlns="http://www.w3.org/2000/svg">'+s+'</svg>';
+  }
+  var PEOPLE = {
+    sunny:[
+      {skin:"#f0b08a",hair:"#3a2a22",style:"quiff",top:"#4c7f3d",accent:"#f3efe0",outfit:"shirt"},
+      {skin:"#f3a886",hair:"#d9a23f",style:"bob",top:"#ffffff",outfit:"tank",wave:"l",eyes:"happy"},
+      {skin:"#f7c9a8",hair:"#1c2f52",style:"buns",glasses:1,top:"#4c7f3d",accent:"#ffffff",outfit:"tee",tie:"#d2406f"},
+      {skin:"#f0b08a",hair:"#1c2f52",style:"beanie",cap:"#1f4f7a",band:"#34a0a4",top:"#26456b",accent:"#ffffff",outfit:"jacket",wave:"r"}
+    ],
+    sky:[
+      {skin:"#f6c7a5",hair:"#111111",style:"short",top:"#d8322a",accent:"#ffffff",outfit:"tee"},
+      {skin:"#8d5a3b",hair:"#1a1a1a",style:"buns",glasses:1,top:"#f5c518",accent:"#ffffff",outfit:"tee",tie:"#d8322a",eyes:"happy"},
+      {skin:"#f1b48e",hair:"#6b3b1e",style:"bob",top:"#2f6fb3",accent:"#ffffff",outfit:"shirt",wave:"l"},
+      {skin:"#f6c7a5",hair:"#222222",style:"beanie",cap:"#ff8a3d",band:"#ffffff",top:"#43a047",accent:"#ffffff",outfit:"jacket",wave:"r"}
+    ],
+    pastel:[
+      {skin:"#f3b08e",hair:"#4b2e83",style:"quiff",top:"#ff6fa5",accent:"#ffffff",outfit:"shirt"},
+      {skin:"#8d5a3b",hair:"#2a1a40",style:"bob",top:"#7a4dff",accent:"#ffffff",outfit:"tee",wave:"l",eyes:"happy"},
+      {skin:"#f7c9a8",hair:"#d98c3f",style:"buns",glasses:1,top:"#5fd0c4",accent:"#ffffff",outfit:"tee",tie:"#7a4dff"},
+      {skin:"#e8a47c",hair:"#2a1a40",style:"beanie",cap:"#ffd86b",band:"#ff6fa5",top:"#4b2e83",accent:"#ffffff",outfit:"jacket",wave:"r"}
+    ]
+  };
+  PEOPLE.gold = PEOPLE.sunny;
+
+  /* ---------- 裝飾小物 ---------- */
+  var ICON = {
+    coin:'<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="27" fill="#f5b81c" stroke="#c98a05" stroke-width="3"/><circle cx="30" cy="30" r="20" fill="none" stroke="#fde38a" stroke-width="2"/><text x="30" y="39" text-anchor="middle" font-size="26" font-weight="900" fill="#b36f00" font-family="Noto Sans TC,sans-serif">$</text></svg>',
+    gift:'<svg viewBox="0 0 60 60"><rect x="8" y="24" width="44" height="30" rx="4" fill="#ff5f6d"/><rect x="5" y="16" width="50" height="12" rx="3" fill="#ff8a94"/><rect x="26" y="16" width="8" height="38" fill="#ffe08a"/><path d="M30 16C20 2 8 14 22 16ZM30 16C40 2 52 14 38 16Z" fill="#ffe08a"/></svg>',
+    book:'<svg viewBox="0 0 60 60"><rect x="10" y="8" width="38" height="46" rx="4" fill="#3d8fcf"/><rect x="14" y="8" width="34" height="46" rx="3" fill="#7cc4f0"/><rect x="20" y="18" width="22" height="4" rx="2" fill="#fff"/><rect x="20" y="26" width="16" height="4" rx="2" fill="#fff"/></svg>',
+    sparkle:'<svg viewBox="0 0 40 40"><path d="M20 2C22 14 26 18 38 20C26 22 22 26 20 38C18 26 14 22 2 20C14 18 18 14 20 2Z" fill="#e0b25c"/></svg>',
+    star:'<svg viewBox="0 0 40 40"><path d="M20 2C22 14 26 18 38 20C26 22 22 26 20 38C18 26 14 22 2 20C14 18 18 14 20 2Z" fill="#ffffff" opacity=".9"/></svg>'
+  };
+  var DECO = {
+    gold:[{t:"sparkle",x:10,y:10,s:46},{t:"sparkle",x:86,y:14,s:34},{t:"sparkle",x:20,y:44,s:26},{t:"coin",x:79,y:34,s:72,r:-10},{t:"coin",x:88,y:48,s:48,r:14},{t:"coin",x:8,y:30,s:56,r:10}],
+    sky:[{t:"coin",x:32,y:6,s:52,r:-12},{t:"gift",x:66,y:8,s:66,r:12},{t:"book",x:40,y:50,s:58,r:-8},{t:"coin",x:60,y:56,s:44,r:16}],
+    pastel:[{t:"sparkle",x:30,y:8,s:38},{t:"book",x:72,y:10,s:54,r:10},{t:"coin",x:26,y:52,s:46,r:-10},{t:"sparkle",x:66,y:56,s:30},{t:"gift",x:42,y:16,s:48,r:-8}],
+    sunny:[{t:"star",x:4,y:14,s:30},{t:"star",x:47,y:4,s:22},{t:"star",x:36,y:50,s:18},{t:"star",x:92,y:62,s:24}]
+  };
+
+  var state = {groups:2, index:0, timer:null, theme:"sunny"};
+  var $ = function(id){return document.getElementById(id);};
+
+  /* ---------- KV ---------- */
+  var KV_ICONS = {
+    phone:'<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="5" width="20" height="38" rx="4"/><path d="M21 37h6M24 14v10M19 20l5 5 5-5"/></svg>',
+    ticket:'<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14h36v7a3 3 0 0 0 0 6v7H6v-7a3 3 0 0 0 0-6z"/><path d="M30 14v20" stroke-dasharray="3 3"/></svg>',
+    book:'<svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10C14 8 20 9 24 13C28 9 34 8 40 10V36C34 34 28 35 24 39C20 35 14 34 8 36Z"/><path d="M24 13V39"/></svg>'
+  };
+  function renderKVCards(){
+    $("kvCards").innerHTML = KV_ORDER.map(function(i){
+      var a = ACTIVITIES[i];
+      return '<div class="rc"><div class="rc-icon">'+KV_ICONS[a.icon]+'</div><div class="rc-label">'+a.kv+'</div><div class="rc-value">'+a.reward+'</div></div>';
+    }).join("");
+  }
+  function renderKV(){
+    var th = state.theme, P = PEOPLE[th];
+    $("pgL").innerHTML = person(P[0]) + person(P[1]);
+    $("pgR").innerHTML = person(P[2]) + person(P[3]);
+    $("kvDeco").innerHTML = (DECO[th]||[]).map(function(d){
+      return '<span style="left:'+d.x+'%;top:'+d.y+'%;width:'+d.s+'px;transform:rotate('+(d.r||0)+'deg)">'+ICON[d.t]+'</span>';
+    }).join("");
+    $("kvRibbon").textContent = RIBBON[th] || "";
+  }
+
+  /* ---------- 活動攻略 ---------- */
+  function renderGuide(){
+    var th=state.theme, A=ACTIVITIES, h="", g=$("guideGrid");
+    g.className="guide guide--"+th;
+    var d=A[3];
+    if(th==="sunny"){
+      h+='<div class="gs-row">'+[1,0,2].map(function(i){var a=A[i];
+        return '<button class="gs-card" data-i="'+i+'"><span class="gs-ico">'+a.ico+'</span><span class="gs-tag">'+a.tag+'</span><span class="gs-name">'+a.name+'</span>'+
+          '<span class="gs-val"><b>'+a.reward+'</b><small>'+a.unit+'</small></span><span class="gs-desc">'+a.desc+'</span><span class="gs-go">查看領取方式</span></button>';}).join("")+'</div>';
+      h+='<div class="gs-total"><span>三份見面禮合計</span><b>'+$("t2").textContent+'</b><span>購物金</span></div>';
+      h+='<button class="gs-wide" data-i="3"><span class="gs-ico">'+d.ico+'</span><span class="mid"><span class="gs-tag">'+d.tag+'</span><span class="gs-name">'+d.name+'・'+d.unit+'</span><span class="gs-desc">'+d.desc+'</span></span><span class="w-val">'+d.reward+'送</span><span class="gs-go">查看領取方式</span></button>';
+    }
+    if(th==="gold"){
+      h+='<div class="gg-row">'+[1,0,2].map(function(i){var a=A[i];
+        return '<button class="gg-item" data-i="'+i+'"><span class="gg-circle"><span class="gg-svg">'+KV_ICONS[a.icon]+'</span><span class="gg-val">'+a.reward+'</span><span class="gg-unit">'+a.unit+'</span></span>'+
+          '<span class="gg-name">'+a.name+'</span><span class="gg-desc">'+a.desc+'</span><span class="gg-go">查看領取方式</span></button>';}).join("")+'</div>';
+      h+='<button class="gg-ribbon" data-i="3"><span>'+d.tag+'</span><b>'+d.name+'　'+d.unit+' '+d.reward+'送</b><span class="gg-go">查看領取方式</span></button>';
+    }
+    if(th==="sky"){
+      function col(i){var a=A[i];return '<button class="gk-col" data-i="'+i+'"><span class="gk-lab">'+a.name+'</span><span class="gk-num">'+a.reward+'</span><span class="gk-unit">'+a.unit+'</span><span class="gk-desc">'+a.desc+'</span><span class="gk-more">更多詳情&gt;&gt; 👆</span></button>';}
+      h+='<div class="gk-panel"><span class="gk-tab">新會員見面禮</span><div class="gk-cols">'+[1,0,2].map(col).join("")+'</div></div>';
+      h+='<div class="gk-panel"><span class="gk-tab">首購限定</span>'+col(3)+'</div>';
+    }
+    if(th==="pastel"){
+      var bg=["#ffd9ea","#e4dcff","#fff0c2","#d3f0ea"], st=["#ff5f9e","#7a4dff","#f5b700","#1f9d8f"], ink=["#fff","#fff","#3b2a66","#fff"];
+      h+=[0,1,2,3].map(function(i){var a=A[i];
+        return '<div class="gp-wrap" style="--tk-bg:'+bg[i]+';--tk-stub:'+st[i]+';--tk-ink:'+ink[i]+'"><button class="gp" data-i="'+i+'"><span class="gp-stub"><span class="gp-emoji">'+a.ico+'</span><span class="gp-tag">'+a.tag+'</span></span>'+
+          '<span class="gp-body"><span class="gp-val"><b>'+a.reward+'</b><small>'+a.unit+'</small></span><span class="gp-name">'+a.name+'</span><span class="gp-desc">'+a.desc+'</span><span class="gp-go">查看領取方式</span></span></button></div>';}).join("");
+    }
+    g.innerHTML=h;
+  }
+  $("guideGrid").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-i]"); if(!btn) return;
+    var a = ACTIVITIES[+btn.dataset.i];
+    $("mTitle").textContent = a.name;
+    $("mReward").innerHTML = '<span class="reward">'+a.reward+'<small>'+a.unit+'</small></span>';
+    $("mDesc").textContent = a.desc + "（示意文案，請替換為正式活動辦法與連結。）";
+    $("modal").classList.add("open");
+    $("mClose").focus();
+  });
+  function closeModal(){ $("modal").classList.remove("open"); }
+  $("mClose").addEventListener("click", closeModal);
+  $("mGo").addEventListener("click", function(e){ e.preventDefault(); closeModal(); });
+  $("modal").addEventListener("click", function(e){ if(e.target===this) closeModal(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeModal(); });
+
+  /* ---------- 輪播 ---------- */
+  function renderCarousel(){
+    var tints = TINTS[state.theme], total = state.groups*PER_GROUP, slides = "";
+    for(var g=0; g<state.groups; g++){
+      var cards = "";
+      for(var k=0; k<PER_GROUP; k++){
+        var n = g*PER_GROUP+k, it = ITEMS[n % ITEMS.length];
+        var rank = n<3 ? '<span class="rank">熱銷 No.'+(n+1)+'</span>' : '';
+        cards += '<a class="item" href="#" onclick="return false"><div class="thumb" style="background:'+tints[n%4]+'">'+rank+'<span>'+it[0]+'</span></div>'+
+                 '<div class="info"><small>'+it[1]+'</small><h3>'+it[2]+'</h3><div class="price">'+it[3]+'</div></div></a>';
+      }
+      slides += '<div class="slide" role="group" aria-label="第 '+(g+1)+' 組，共 '+state.groups+' 組">'+cards+'</div>';
+    }
+    $("track").innerHTML = slides;
+    $("dots").innerHTML = Array.apply(null,{length:state.groups}).map(function(_,i){
+      return '<button class="dot" data-i="'+i+'" aria-label="第 '+(i+1)+' 組"></button>';
+    }).join("");
+    $("countNote").textContent = "共 "+total+" 張卡，"+state.groups+" 組輪播"+(total>ITEMS.length?"（商品循環帶入示意）":"");
+    var vis = state.groups>1 ? "visible" : "hidden";
+    $("prev").style.visibility = $("next").style.visibility = $("dots").style.visibility = vis;
+    if(state.index>=state.groups) state.index = 0;
+    go(state.index);
+  }
+  function go(i){
+    state.index = (i+state.groups) % state.groups;
+    $("track").style.transform = "translateX(-"+(state.index*100)+"%)";
+    var dots = $("dots").children;
+    for(var d=0; d<dots.length; d++){
+      if(d===state.index) dots[d].setAttribute("aria-current","true"); else dots[d].removeAttribute("aria-current");
+    }
+  }
+  $("prev").onclick = function(){ go(state.index-1); restart(); };
+  $("next").onclick = function(){ go(state.index+1); restart(); };
+  $("dots").addEventListener("click", function(e){ var d=e.target.closest(".dot"); if(d){ go(+d.dataset.i); restart(); } });
+  var sx = null;
+  $("viewport").addEventListener("touchstart", function(e){ sx = e.touches[0].clientX; }, {passive:true});
+  $("viewport").addEventListener("touchend", function(e){
+    if(sx===null) return;
+    var dx = e.changedTouches[0].clientX - sx;
+    if(Math.abs(dx)>40){ go(state.index+(dx<0?1:-1)); restart(); }
+    sx = null;
+  });
+  function restart(){
+    clearInterval(state.timer);
+    if($("autoplay").checked && state.groups>1){ state.timer = setInterval(function(){ go(state.index+1); }, 5000); }
+  }
+  $("autoplay").addEventListener("change", restart);
+  $("usageRow").addEventListener("change", function(){ $("usage").classList.toggle("usage--row", this.checked); });
+  $("viewport").addEventListener("mouseenter", function(){ clearInterval(state.timer); });
+  $("viewport").addEventListener("mouseleave", restart);
+
+  /* ---------- 使用說明表格 ---------- */
+  function renderTable(){
+    var rows = ACTIVITIES.filter(function(a){ return a.thr; });
+    var head = '<tr><th>購物金</th>'+rows.map(function(a){ return '<th>'+a.name+'<span>'+a.reward+'</span></th>'; }).join("")+'</tr>';
+    var body = '<tr><th>滿額折抵</th>'+rows.map(function(a){ return '<td contenteditable="true" spellcheck="false">'+a.thr+'</td>'; }).join("")+'</tr>';
+    $("tbl").innerHTML = '<thead>'+head+'</thead><tbody>'+body+'</tbody>';
+  }
+
+  /* ---------- 設定 ---------- */
+  $("panelToggle").onclick = function(){
+    var open = $("panel").classList.toggle("open");
+    this.setAttribute("aria-expanded", open);
+  };
+  $("groupInput").addEventListener("input", function(){
+    state.groups = Math.max(1, Math.min(8, parseInt(this.value,10)||1));
+    renderCarousel(); restart();
+  });
+  function bindText(inputId, targetId){
+    var inp=$(inputId), t=$(targetId);
+    inp.addEventListener("input", function(){ t.textContent = this.value; });
+    t.addEventListener("input", function(){ inp.value = t.textContent; });
+    t.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); t.blur(); } });
+  }
+  bindText("guideTitleInput","guideTitle");
+  bindText("shopTitleInput","shopTitle");
+  bindText("t1In","t1"); bindText("t2In","t2"); bindText("t3In","t3");
+  $("t2In").addEventListener("input", renderGuide);
+  $("usageTitle").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); this.blur(); } });
+
+  /* ---------- 風格切換 ---------- */
+  function setTheme(t){
+    state.theme = t;
+    document.body.setAttribute("data-theme", t);
+    document.querySelectorAll("[data-theme-btn]").forEach(function(b){
+      b.setAttribute("aria-pressed", b.dataset.themeBtn===t ? "true" : "false");
+    });
+    renderKV(); renderGuide(); renderCarousel();
+  }
+  document.querySelectorAll("[data-theme-btn]").forEach(function(b){
+    b.addEventListener("click", function(){ setTheme(b.dataset.themeBtn); });
+  });
+
+  renderKVCards(); renderGuide(); renderTable(); renderKV(); renderCarousel(); restart();
+})();
+</script>
+</body>
+</html>
