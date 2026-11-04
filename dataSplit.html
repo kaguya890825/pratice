@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>名單拆包工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#18222E; --muted:#5D6B7A; --line:#D3DAE2;
+  --accent:#1F5F8B; --accent-ink:#FFFFFF; --accent-soft:#DCE9F3; --warn:#9A5B00; --warn-soft:#FBEFD9;
+  --ok:#2E6B3F; --cell:#1F5F8B;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#9AA8B6; --line:#2C3743;
+    --accent:#6FB0DE; --accent-ink:#0E1A24; --accent-soft:#1F3344; --warn:#F0B860; --warn-soft:#3A2E1A;
+    --ok:#7CC38E; --cell:#6FB0DE; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12181F; --surface:#1A222C; --ink:#E6ECF2; --muted:#9AA8B6; --line:#2C3743;
+  --accent:#6FB0DE; --accent-ink:#0E1A24; --accent-soft:#1F3344; --warn:#F0B860; --warn-soft:#3A2E1A;
+  --ok:#7CC38E; --cell:#6FB0DE; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:15px;line-height:1.6}
+main{max-width:980px;margin:0 auto;padding:28px 18px 64px}
+h1{font-size:26px;font-weight:700;margin:0 0 4px;letter-spacing:.02em}
+.lede{color:var(--muted);margin:0 0 28px;max-width:62ch}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+.step[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.step h2{font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px}
+.num{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:14px;font-weight:700}
+.hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:26px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{display:block;font-size:16px}
+.fileinfo{margin-top:12px;font-size:14px}
+label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+select,input[type=text],input[type=number]{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:0}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{font:inherit;font-size:14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700;padding:9px 18px}
+button.small{padding:2px 8px;font-size:13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.row>div{display:flex;flex-direction:column}
+.dim{border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px}
+.dimhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}
+.dimhead .t{font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:5px 10px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.scroll{overflow-x:auto;max-height:340px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:13px;position:sticky;top:0;background:var(--surface)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+td input[type=text]{width:140px}
+td input[type=number]{width:110px}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 12px;font-size:13px;margin-top:10px}
+.opts{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:14px}
+.opts label{display:flex;gap:6px;align-items:center}
+.presetbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.grid{display:grid;gap:4px;margin:6px 0 18px}
+.grid .h{font-size:13px;color:var(--muted);display:flex;align-items:center;justify-content:center;text-align:center;padding:4px}
+.grid .h.r{justify-content:flex-end;text-align:right}
+.cellbtn{border:0;border-radius:6px;padding:12px 8px;text-align:center;color:var(--ink);min-height:74px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.cellbtn .l{font-size:13px;font-weight:700}
+.cellbtn .c{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.cellbtn .p{font-size:12px;color:var(--muted)}
+.stats{font-size:14px;color:var(--muted);margin:0 0 12px}
+.dlbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 6px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+.busy{color:var(--accent);font-size:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1>名單拆包工具</h1>
+  <p class="lede">上傳會員名單，選好分群欄位和條件，一次拆成多包名單並下載。檔案只在你的瀏覽器裡處理，不會上傳到任何地方。</p>
+
+  <section class="step" id="s1">
+    <h2><span class="num">1</span>上傳檔案</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇檔案">
+      <strong>把 CSV 或 Excel 檔拖到這裡</strong>
+      <span class="hint">或點一下選擇檔案（.csv、.xlsx、.xls）</span>
+    </div>
+    <input type="file" id="file" accept=".csv,.xlsx,.xls,.txt" hidden>
+    <div class="fileinfo" id="fileinfo"></div>
+  </section>
+
+  <section class="step" id="s2" aria-disabled="true">
+    <h2><span class="num">2</span>設定拆分條件</h2>
+    <div class="presetbar">
+      <label class="f" style="margin:0">套用設定</label>
+      <select id="presetSel"></select>
+      <button id="presetApply" class="small">套用</button>
+      <button id="presetSave" class="small">把目前設定存成…</button>
+      <button id="presetDel" class="small">刪除所選</button>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div><label class="f" for="idCol">會員編號欄位</label><select id="idCol"></select></div>
+      <div><label class="f" for="sep">名稱連接符號</label><input type="text" id="sep" style="width:80px" placeholder="不加"></div>
+      <div><label class="f" for="prefix">下載檔名</label><input type="text" id="prefix" style="width:280px"></div>
+    </div>
+    <div id="dims"></div>
+    <div style="margin-top:12px"><button id="addDim">＋ 加一個分群欄位</button></div>
+    <div class="opts">
+      <label><input type="checkbox" id="dedupe" checked>同一包內去除重複會員編號</label>
+      <label><input type="checkbox" id="keepCols">輸出時保留原始所有欄位</label>
+    </div>
+    <div style="margin-top:18px"><button class="primary" id="run">拆分名單</button> <span class="busy" id="busy"></span></div>
+  </section>
+
+  <section class="step" id="s3" aria-disabled="true">
+    <h2><span class="num">3</span>結果與下載</h2>
+    <p class="stats" id="stats"></p>
+    <div id="gridWrap"></div>
+    <div class="scroll" style="max-height:none"><table id="sumTable"></table></div>
+    <div class="dlbar">
+      <button class="primary" id="dlXlsx">下載 Excel（每包一個分頁）</button>
+      <button id="dlZip">下載 ZIP（每包一個 CSV）</button>
+    </div>
+    <p class="hint">Excel 第一頁是總覽，會員數用公式計算；會員編號一律存成文字，不會變成科學記號。</p>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const S={fileBase:'',headers:[],rows:[],dims:[],result:null};
+const PKEY='list-splitter-presets-v1';
+const BUILTIN=[{
+  name:'九宮格（消費級距 × 消費天數）',builtin:true,
+  idCol:'會員編號',sep:'',dedupe:true,keepCols:false,
+  dims:[
+    {col:'消費級距',mode:'value',values:[{v:'TOP30%',label:'高消費',on:true},{v:'TOP30~60%',label:'中消費',on:true},{v:'TOP60~100%',label:'低消費',on:true}]},
+    {col:'消費天數',mode:'value',values:[{v:'4天以上',label:'高頻次',on:true},{v:'2~3天',label:'中頻次',on:true},{v:'1天',label:'低頻次',on:true}]}
+  ]
+}];
+const MAXVAL=300;
+
+/* ---------- toast & downloads ---------- */
+let toastT;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
+let dlP=null;
+try{ if(window.claude&&window.claude.use) dlP=window.claude.use('downloads'); }catch(e){}
+async function saveFile(name,blob){
+  let dl=null;
+  if(!dlP){try{if(window.claude&&window.claude.use) dlP=window.claude.use('downloads')}catch(e){}}
+  if(dlP){try{dl=await dlP}catch(e){dl=null}}
+  if(dl){
+    try{await dl.save({filename:name,data:blob});toast('已下載 '+name)}
+    catch(e){
+      const c=e&&e.code;
+      if(c==='declined')toast('已取消下載');
+      else if(c==='rate_limited')toast('還有一個下載確認視窗沒處理，請先完成它');
+      else if(c==='too_large')toast('檔案太大，請改下載 ZIP 或拆少一點欄位');
+      else toast('這個檢視無法下載檔案（'+(c||'unknown')+'）');
+    }
+    return;
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),8000);
+}
+
+/* ---------- presets ---------- */
+function loadPresets(){try{return JSON.parse(localStorage.getItem(PKEY)||'[]')}catch(e){return[]}}
+function storePresets(p){try{localStorage.setItem(PKEY,JSON.stringify(p));return true}catch(e){toast('這個瀏覽器無法儲存設定');return false}}
+function allPresets(){return BUILTIN.concat(loadPresets())}
+function renderPresetSel(sel){
+  const s=$('#presetSel');s.innerHTML='';
+  allPresets().forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=p.name+(p.builtin?'（內建）':'');s.appendChild(o)});
+  if(sel!=null)s.value=sel;
+}
+function currentConfig(){
+  return{idCol:S.headers[+$('#idCol').value],sep:$('#sep').value,dedupe:$('#dedupe').checked,keepCols:$('#keepCols').checked,
+    dims:S.dims.map(d=>({col:S.headers[d.ci],mode:d.mode,values:d.values.map(x=>({v:x.v,label:x.label,on:x.on})),bins:d.bins.map(b=>({min:b.min,max:b.max,label:b.label})),keepOther:d.keepOther}))};
+}
+function applyPreset(p,silent){
+  const miss=[];
+  const idi=S.headers.indexOf(p.idCol);
+  if(idi>=0)$('#idCol').value=idi;else miss.push(p.idCol);
+  $('#sep').value=p.sep||'';$('#dedupe').checked=p.dedupe!==false;$('#keepCols').checked=!!p.keepCols;
+  S.dims=[];
+  (p.dims||[]).forEach(pd=>{
+    const ci=S.headers.indexOf(pd.col);
+    if(ci<0){miss.push(pd.col);return}
+    const d=newDim(ci);d.mode=pd.mode||'value';
+    if(pd.values&&pd.values.length){
+      const have=new Map(d.values.map(x=>[x.v,x]));const out=[];
+      pd.values.forEach(pv=>{if(have.has(pv.v)){const x=have.get(pv.v);x.label=pv.label;x.on=pv.on!==false;out.push(x);have.delete(pv.v)}});
+      have.forEach(x=>out.push(x));d.values=out;
+    }
+    if(pd.bins&&pd.bins.length)d.bins=pd.bins.map(b=>({min:b.min,max:b.max,label:b.label}));
+    d.keepOther=!!pd.keepOther;
+    S.dims.push(d);
+  });
+  renderDims();
+  if(!silent){miss.length?toast('這個檔案找不到欄位：'+miss.join('、')):toast('已套用「'+p.name+'」')}
+  return miss.length===0;
+}
+$('#presetApply').onclick=()=>{const p=allPresets()[+$('#presetSel').value];if(p)applyPreset(p)};
+$('#presetSave').onclick=()=>{
+  const n=(prompt('設定名稱（之後可從清單直接套用）')||'').trim();if(!n)return;
+  const list=loadPresets().filter(p=>p.name!==n);const c=currentConfig();c.name=n;list.push(c);
+  if(storePresets(list)){renderPresetSel(BUILTIN.length+list.length-1);toast('已儲存「'+n+'」')}
+};
+$('#presetDel').onclick=()=>{
+  const i=+$('#presetSel').value;if(i<BUILTIN.length){toast('內建設定不能刪除');return}
+  const list=loadPresets();const p=list[i-BUILTIN.length];if(!p)return;
+  if(!confirm('刪除「'+p.name+'」？'))return;list.splice(i-BUILTIN.length,1);storePresets(list);renderPresetSel(0);toast('已刪除');
+};
+
+/* ---------- file reading ---------- */
+const drop=$('#drop'),fin=$('#file');
+drop.onclick=()=>fin.click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fin.click()}};
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0])};
+fin.onchange=()=>{if(fin.files[0])readFile(fin.files[0]);fin.value=''};
+
+function cellStr(v){
+  if(v==null)return'';
+  if(v instanceof Date){const p=n=>String(n).padStart(2,'0');return v.getFullYear()+'-'+p(v.getMonth()+1)+'-'+p(v.getDate())}
+  if(typeof v==='number'){return Number.isInteger(v)?v.toFixed(0):String(v)}
+  return String(v).trim();
+}
+async function readFile(f){
+  $('#fileinfo').textContent='讀取中…';
+  try{
+    const buf=await f.arrayBuffer();let aoa;
+    const ext=(f.name.split('.').pop()||'').toLowerCase();
+    if(ext==='xlsx'||ext==='xls'){
+      const wb=XLSX.read(buf,{type:'array',cellDates:true});
+      let sn=wb.SheetNames[0];
+      if(wb.SheetNames.length>1){
+        const pick=prompt('這個檔案有多個工作表，要用哪一個？\n'+wb.SheetNames.map((n,i)=>(i+1)+'. '+n).join('\n'),'1');
+        const k=parseInt(pick,10);if(k>=1&&k<=wb.SheetNames.length)sn=wb.SheetNames[k-1];
+      }
+      aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''}).map(r=>r.map(cellStr));
+    }else{
+      let text;
+      try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){text=new TextDecoder('big5').decode(buf)}
+      if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+      aoa=Papa.parse(text,{skipEmptyLines:true}).data.map(r=>r.map(x=>String(x).trim()));
+    }
+    while(aoa.length&&aoa[0].every(x=>x===''))aoa.shift();
+    if(aoa.length<2){$('#fileinfo').textContent='這個檔案沒有資料列，請確認第一列是欄位名稱、下面有資料。';return}
+    S.headers=aoa[0].map((h,i)=>h||('欄位'+(i+1)));S.rows=aoa.slice(1);
+    S.fileBase=f.name.replace(/\.[^.]+$/,'').replace(/[_\s]*\(\d+\)$/,'');
+    $('#fileinfo').innerHTML='';
+    const b=document.createElement('strong');b.textContent=f.name;
+    $('#fileinfo').append(b,document.createTextNode('　共 '+S.rows.length.toLocaleString()+' 筆、'+S.headers.length+' 個欄位：'+S.headers.join('、')));
+    setupConfig();
+  }catch(err){console.error(err);$('#fileinfo').textContent='讀不到這個檔案：'+(err.message||err)+'。請確認是 CSV 或 Excel 格式。'}
+}
+
+/* ---------- config ---------- */
+function natCmp(a,b){return a.localeCompare(b,'zh-Hant',{numeric:true})}
+function newDim(ci){
+  const cnt=new Map();
+  for(const r of S.rows){const v=(r[ci]||'').trim();cnt.set(v,(cnt.get(v)||0)+1)}
+  const vals=[...cnt.keys()].sort(natCmp);
+  return{ci,mode:'value',uniq:vals.length,
+    values:vals.slice(0,MAXVAL).map(v=>({v,label:v===''?'空白':v,on:true,n:cnt.get(v)})),
+    counts:cnt,bins:[{min:'',max:'',label:'第1組'}],keepOther:false};
+}
+function setupConfig(){
+  const sel=$('#idCol');sel.innerHTML='';
+  S.headers.forEach((h,i)=>{const o=document.createElement('option');o.value=i;o.textContent=h;sel.appendChild(o)});
+  let gi=S.headers.findIndex(h=>/會員編號|會員卡號|member.?id|^id$/i.test(h));
+  if(gi<0)gi=S.headers.findIndex(h=>/編號|卡號|id/i.test(h));
+  sel.value=gi>=0?gi:0;
+  $('#prefix').value=S.fileBase;
+  $('#s2').removeAttribute('aria-disabled');$('#s3').setAttribute('aria-disabled','true');S.result=null;
+  renderPresetSel(0);
+  // try presets, first full match wins
+  const ps=allPresets();let applied=false;
+  for(let i=ps.length-1;i>=0;i--){
+    const p=ps[i];if(p.dims.every(d=>S.headers.includes(d.col))&&S.headers.includes(p.idCol)){applyPreset(p,true);renderPresetSel(i);toast('已自動套用「'+p.name+'」，可再調整');applied=true;break}
+  }
+  if(!applied){S.dims=[];renderDims()}
+}
+$('#addDim').onclick=()=>{
+  const used=new Set(S.dims.map(d=>d.ci));const idc=+$('#idCol').value;
+  let ci=S.headers.findIndex((h,i)=>!used.has(i)&&i!==idc);if(ci<0)ci=0;
+  S.dims.push(newDim(ci));renderDims();
+};
+
+function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const k in attrs){if(k==='on')for(const ev in attrs.on)e.addEventListener(ev,attrs.on[ev]);else if(k in e&&k!=='list')e[k]=attrs[k];else e.setAttribute(k,attrs[k])}kids.forEach(k=>e.append(k));return e}
+
+function renderDims(){
+  const box=$('#dims');box.innerHTML='';
+  if(!S.dims.length){box.append(el('p',{className:'hint'},'還沒有分群欄位。按下方「加一個分群欄位」選擇要用哪個欄位來拆，例如消費級距、消費天數、性別、地區。'))}
+  S.dims.forEach((d,di)=>{
+    const colSel=el('select',{on:{change:()=>{const keep=d.mode;S.dims[di]=newDim(+colSel.value);S.dims[di].mode=keep;renderDims()}}});
+    S.headers.forEach((h,i)=>colSel.append(el('option',{value:i,textContent:h})));colSel.value=d.ci;
+    const seg=el('span',{className:'seg'},
+      el('button',{textContent:'依欄位原值',on:{click:()=>{d.mode='value';renderDims()}}}),
+      el('button',{textContent:'依數值區間',on:{click:()=>{d.mode='range';renderDims()}}}));
+    seg.children[0].setAttribute('aria-pressed',d.mode==='value');seg.children[1].setAttribute('aria-pressed',d.mode==='range');
+    const head=el('div',{className:'dimhead'},el('span',{className:'t'},'分群 '+(di+1)),colSel,seg,
+      el('button',{className:'small',textContent:'移除',on:{click:()=>{S.dims.splice(di,1);renderDims()}}}));
+    const wrap=el('div',{className:'dim'},head);
+    if(d.mode==='value')wrap.append(valueTable(d));else wrap.append(rangeTable(d));
+    box.append(wrap);
+  });
+  const n=S.dims.reduce((a,d)=>a*(d.mode==='value'?Math.max(1,d.values.filter(v=>v.on).length):(d.bins.length+(d.keepOther?1:0))),S.dims.length?1:0);
+  if(n>0)box.append(el('p',{className:'hint'},'依目前設定最多會拆成 '+n+' 包名單（沒有人的組合不會產生檔案）。'));
+  if(n>250)box.append(el('div',{className:'warn'},'組合數超過 250 包，Excel 分頁會很多。建議減少分群欄位，或改用數值區間合併。'));
+}
+function valueTable(d){
+  const frag=document.createDocumentFragment();
+  if(d.uniq>MAXVAL){frag.append(el('div',{className:'warn'},'這個欄位有 '+d.uniq.toLocaleString()+' 種不同的值，只列出前 '+MAXVAL+' 種，其餘值不會被納入。數字類欄位（金額、次數）建議改用「依數值區間」。'))}
+  const tb=el('tbody');
+  d.values.forEach((x,i)=>{
+    const lab=el('input',{type:'text',value:x.label,on:{input:()=>{x.label=lab.value}}});
+    const chk=el('input',{type:'checkbox',checked:x.on,on:{change:()=>{x.on=chk.checked;renderDims()}}});
+    const up=el('button',{className:'small',textContent:'↑',title:'往前',disabled:i===0,on:{click:()=>{d.values.splice(i-1,0,d.values.splice(i,1)[0]);renderDims()}}});
+    const dn=el('button',{className:'small',textContent:'↓',title:'往後',disabled:i===d.values.length-1,on:{click:()=>{d.values.splice(i+1,0,d.values.splice(i,1)[0]);renderDims()}}});
+    tb.append(el('tr',null,el('td',null,chk),el('td',null,x.v===''?'（空白）':x.v),el('td',{className:'n'},(x.n||d.counts.get(x.v)||0).toLocaleString()),el('td',null,lab),el('td',null,up,' ',dn)));
+  });
+  const t=el('table',null,el('thead',null,el('tr',null,el('th',null,'納入'),el('th',null,'欄位值'),el('th',{className:'n'},'筆數'),el('th',null,'名單名稱'),el('th',null,'順序'))),tb);
+  frag.append(el('div',{className:'scroll'},t));
+  frag.append(el('p',{className:'hint'},'取消勾選的值不會進任何一包。順序會決定名單的排列順序。'));
+  return frag;
+}
+function toNum(s){if(s==null)return NaN;const t=String(s).replace(/[,\s$%元]|NT\$?/gi,'');if(t==='')return NaN;return Number(t)}
+function rangeTable(d){
+  const frag=document.createDocumentFragment();
+  const tb=el('tbody');
+  d.bins.forEach((b,i)=>{
+    const mn=el('input',{type:'number',value:b.min,placeholder:'不限',on:{input:()=>{b.min=mn.value}}});
+    const mx=el('input',{type:'number',value:b.max,placeholder:'不限',on:{input:()=>{b.max=mx.value}}});
+    const lb=el('input',{type:'text',value:b.label,on:{input:()=>{b.label=lb.value}}});
+    tb.append(el('tr',null,el('td',null,mn),el('td',null,mx),el('td',null,lb),el('td',null,el('button',{className:'small',textContent:'刪除',disabled:d.bins.length===1,on:{click:()=>{d.bins.splice(i,1);renderDims()}}}))));
+  });
+  frag.append(el('div',{className:'scroll'},el('table',null,el('thead',null,el('tr',null,el('th',null,'大於等於（≥）'),el('th',null,'小於（<）'),el('th',null,'名單名稱'),el('th',null,''))),tb)));
+  const pct=el('input',{type:'text',value:'30,60',style:'width:90px'});
+  const lbls=el('input',{type:'text',value:'高,中,低',style:'width:110px'});
+  frag.append(el('div',{className:'row',style:'margin-top:10px;align-items:center;gap:8px'},
+    el('button',{className:'small',textContent:'＋ 加一組區間',on:{click:()=>{d.bins.push({min:'',max:'',label:'第'+(d.bins.length+1)+'組'});renderDims()}}}),
+    el('span',{className:'hint',style:'margin:0 0 0 10px'},'或依排名切：前'),pct,el('span',{className:'hint',style:'margin:0'},'% 為分界，名稱'),lbls,
+    el('button',{className:'small',textContent:'自動產生區間',on:{click:()=>autoBins(d,pct.value,lbls.value)}})));
+  const oth=el('input',{type:'checkbox',checked:d.keepOther,on:{change:()=>{d.keepOther=oth.checked;renderDims()}}});
+  frag.append(el('label',{style:'display:flex;gap:6px;align-items:center;margin-top:10px;font-size:14px'},oth,'不在任何區間的資料另外成一組「未分類」（不勾就排除）'));
+  const nums=[];let bad=0;for(const r of S.rows){const n=toNum(r[d.ci]);if(isNaN(n))bad++;else nums.push(n)}
+  if(!nums.length)frag.append(el('div',{className:'warn'},'這個欄位沒有可辨識的數字，請改用「依欄位原值」。'));
+  else{let lo=Infinity,hi=-Infinity;for(const n of nums){if(n<lo)lo=n;if(n>hi)hi=n}frag.append(el('p',{className:'hint'},'這個欄位最小 '+lo.toLocaleString()+'、最大 '+hi.toLocaleString()+(bad?'；有 '+bad.toLocaleString()+' 筆不是數字':'')+'。下限包含、上限不包含。'))}
+  return frag;
+}
+function autoBins(d,pctStr,lblStr){
+  const cuts=pctStr.split(/[,，\s]+/).map(Number).filter(x=>x>0&&x<100).sort((a,b)=>a-b);
+  const nums=[];for(const r of S.rows){const n=toNum(r[d.ci]);if(!isNaN(n))nums.push(n)}
+  if(!nums.length){toast('這個欄位沒有數字');return}
+  nums.sort((a,b)=>b-a);
+  const th=cuts.map(c=>nums[Math.min(nums.length-1,Math.ceil(nums.length*c/100)-1)]);
+  const names=lblStr.split(/[,，]+/).map(s=>s.trim());
+  const bins=[];let upper='';
+  th.forEach((t,i)=>{bins.push({min:String(t),max:upper,label:names[i]||('前'+cuts[i]+'%')});upper=String(t)});
+  bins.push({min:'',max:upper,label:names[th.length]||'其餘'});
+  d.bins=bins;renderDims();toast('已依排名產生 '+bins.length+' 組區間（同分會歸在同一組）');
+}
+
+/* ---------- split ---------- */
+$('#run').onclick=()=>{
+  if(!S.dims.length){toast('請先加入至少一個分群欄位');return}
+  const idc=+$('#idCol').value;
+  if(S.dims.some(d=>d.ci===idc)){toast('分群欄位不能和會員編號是同一欄');return}
+  $('#busy').textContent='拆分中…';$('#run').disabled=true;
+  setTimeout(()=>{try{split()}catch(e){console.error(e);toast('拆分失敗：'+e.message)}$('#busy').textContent='';$('#run').disabled=false},30);
+};
+function split(){
+  const idc=+$('#idCol').value,sep=$('#sep').value,dedupe=$('#dedupe').checked;
+  const dims=S.dims.map(d=>{
+    if(d.mode==='value'){
+      const on=d.values.filter(v=>v.on);const m=new Map(on.map((v,i)=>[v.v,i]));
+      return{labels:on.map(v=>v.label||v.v||'空白'),key:r=>{const i=m.get((r[d.ci]||'').trim());return i===undefined?-1:i},col:S.headers[d.ci],vals:on.map(v=>v.v)};
+    }
+    const bins=d.bins.map(b=>({lo:b.min===''?-Infinity:Number(b.min),hi:b.max===''?Infinity:Number(b.max),label:b.label}));
+    const labels=bins.map(b=>b.label||'');if(d.keepOther)labels.push('未分類');
+    return{labels,col:S.headers[d.ci],vals:bins.map(b=>(b.lo===-Infinity?'':'≥'+b.lo)+(b.hi===Infinity?'':(b.lo===-Infinity?'':' 且 ')+'<'+b.hi)).concat(d.keepOther?['其他']:[]),
+      key:r=>{const n=toNum(r[d.ci]);if(!isNaN(n))for(let i=0;i<bins.length;i++){if(n>=bins[i].lo&&n<bins[i].hi)return i}return d.keepOther?bins.length:-1}};
+  });
+  // cartesian order
+  let combos=[[]];dims.forEach(d=>{const nx=[];combos.forEach(c=>d.labels.forEach((_,i)=>nx.push(c.concat(i))));combos=nx});
+  const packs=new Map();
+  combos.forEach(c=>packs.set(c.join('|'),{idx:c,name:c.map((i,k)=>dims[k].labels[i]).join(sep),rows:[],seen:dedupe?new Set():null}));
+  let blank=0,excl=0,dup=0,used=0;const where=new Map();
+  for(const r of S.rows){
+    const id=(r[idc]||'').trim();if(!id){blank++;continue}
+    const ks=[];let ok=true;for(const d of dims){const k=d.key(r);if(k<0){ok=false;break}ks.push(k)}
+    if(!ok){excl++;continue}
+    const p=packs.get(ks.join('|'));
+    if(p.seen){if(p.seen.has(id)){dup++;continue}p.seen.add(id)}
+    p.rows.push(r);used++;
+    const w=where.get(id);if(w===undefined)where.set(id,p.name);else if(w!==p.name&&w!==true)where.set(id,true);
+  }
+  let multi=0;where.forEach(v=>{if(v===true)multi++});
+  // make unique names
+  const nameCount=new Map();
+  packs.forEach(p=>{let n=p.name||'未命名';const c=nameCount.get(n)||0;nameCount.set(n,c+1);if(c)n=n+'_'+(c+1);p.name=n});
+  S.result={dims,packs:[...packs.values()],used,blank,excl,dup,multi,idc,keepCols:$('#keepCols').checked,prefix:($('#prefix').value.trim()||S.fileBase||'名單')};
+  renderResult();
+}
+
+function renderResult(){
+  const R=S.result;$('#s3').removeAttribute('aria-disabled');
+  const parts=['共 '+S.rows.length.toLocaleString()+' 筆，納入 '+R.used.toLocaleString()+' 筆'];
+  if(R.excl)parts.push('不符合任何條件 '+R.excl.toLocaleString()+' 筆');
+  if(R.blank)parts.push('會員編號空白 '+R.blank.toLocaleString()+' 筆');
+  if(R.dup)parts.push('包內重複移除 '+R.dup.toLocaleString()+' 筆');
+  $('#stats').textContent=parts.join('；')+'。';
+  if(R.multi)$('#stats').append(el('span',{style:'color:var(--warn);display:block'},'注意：有 '+R.multi.toLocaleString()+' 個會員編號同時出現在不只一包，代表原始資料同一人有多列。'));
+  // grid
+  const gw=$('#gridWrap');gw.innerHTML='';
+  if(R.dims.length===2&&R.dims[0].labels.length<=8&&R.dims[1].labels.length<=8){
+    const a=R.dims[0],b=R.dims[1];const g=el('div',{className:'grid'});
+    g.style.gridTemplateColumns='minmax(70px,auto) repeat('+b.labels.length+',minmax(0,1fr))';
+    g.append(el('div',{className:'h'}));b.labels.forEach(l=>g.append(el('div',{className:'h'},l)));
+    const max=Math.max(1,...R.packs.map(p=>p.rows.length));
+    a.labels.forEach((la,i)=>{
+      g.append(el('div',{className:'h r'},la));
+      b.labels.forEach((lb,j)=>{
+        const p=R.packs.find(p=>p.idx[0]===i&&p.idx[1]===j);const n=p.rows.length;
+        const s=Math.round(8+Math.sqrt(n/max)*42);
+        const btn=el('button',{className:'cellbtn',title:n?'下載這包 CSV':'這包沒有人',disabled:!n,on:{click:()=>dlOne(p)}},
+          el('span',{className:'l'},p.name),el('span',{className:'c'},n.toLocaleString()),el('span',{className:'p'},R.used?(n/R.used*100).toFixed(1)+'%':''));
+        btn.style.background='color-mix(in srgb, var(--cell) '+s+'%, var(--surface))';
+        g.append(btn);
+      });
+    });
+    gw.append(g,el('p',{className:'hint',style:'margin:-8px 0 14px'},'顏色越深人數越多，點格子可單獨下載該包 CSV。'));
+  }
+  // table
+  const t=$('#sumTable');t.innerHTML='';
+  const hr=el('tr',null,el('th',null,'名單名稱'));R.dims.forEach(d=>hr.append(el('th',null,d.col)));
+  hr.append(el('th',{className:'n'},'會員數'),el('th',{className:'n'},'占比'),el('th',null,''));
+  const tb=el('tbody');
+  R.packs.forEach(p=>{
+    const tr=el('tr',null,el('td',null,p.name));p.idx.forEach((i,k)=>tr.append(el('td',null,R.dims[k].vals[i])));
+    tr.append(el('td',{className:'n'},p.rows.length.toLocaleString()),el('td',{className:'n'},R.used?(p.rows.length/R.used*100).toFixed(1)+'%':'-'),
+      el('td',null,el('button',{className:'small',textContent:'下載 CSV',disabled:!p.rows.length,on:{click:()=>dlOne(p)}})));
+    tb.append(tr);
+  });
+  const tf=el('tr',null,el('td',null,el('strong',null,'合計')));R.dims.forEach(()=>tf.append(el('td')));
+  tf.append(el('td',{className:'n'},el('strong',null,R.used.toLocaleString())),el('td',{className:'n'},'100%'),el('td'));tb.append(tf);
+  t.append(el('thead',null,hr),tb);
+  $('#s3').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+}
+
+/* ---------- export ---------- */
+function csvField(s){s=s==null?'':String(s);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function packRows(p){
+  const R=S.result;
+  if(R.keepCols){const ord=[R.idc].concat(S.headers.map((_,i)=>i).filter(i=>i!==R.idc));return{head:ord.map(i=>S.headers[i]),rows:p.rows.map(r=>ord.map(i=>r[i]==null?'':r[i]))}}
+  return{head:[S.headers[R.idc]],rows:p.rows.map(r=>[(r[R.idc]||'').trim()])};
+}
+function toCsv(p){const{head,rows}=packRows(p);const out=[head.map(csvField).join(',')];for(const r of rows)out.push(r.map(csvField).join(','));return'\ufeff'+out.join('\r\n')+'\r\n'}
+function safeFile(s){return s.replace(/[\\/:*?"<>|]/g,'_').trim()||'名單'}
+function dlOne(p){saveFile(safeFile(S.result.prefix+'_'+p.name)+'.csv',new Blob([toCsv(p)],{type:'text/csv'}))}
+
+$('#dlZip').onclick=async()=>{
+  const R=S.result;if(!R)return;const btn=$('#dlZip');btn.disabled=true;const old=btn.textContent;btn.textContent='打包中…';
+  try{
+    const zip=new JSZip();let k=0;
+    R.packs.forEach(p=>{if(!p.rows.length)return;k++;zip.file(String(k).padStart(2,'0')+'_'+safeFile(p.name)+'.csv',toCsv(p))});
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    await saveFile(safeFile(R.prefix)+'_拆包CSV.zip',blob);
+  }catch(e){toast('打包失敗：'+e.message)}
+  btn.disabled=false;btn.textContent=old;
+};
+$('#dlXlsx').onclick=()=>{
+  const R=S.result;if(!R)return;const btn=$('#dlXlsx');btn.disabled=true;const old=btn.textContent;btn.textContent='產生中…';
+  setTimeout(async()=>{
+    try{await buildXlsx()}catch(e){console.error(e);toast('產生 Excel 失敗：'+e.message)}
+    btn.disabled=false;btn.textContent=old;
+  },30);
+};
+async function buildXlsx(){
+  const R=S.result;const wb=XLSX.utils.book_new();const LIMIT=1048575;
+  const usedNames=new Set(['總覽']);
+  function sheetName(base){let n=base.replace(/[\[\]:*?\/\\']/g,'_').slice(0,31)||'名單';let s=n,i=2;while(usedNames.has(s)){const suf='_'+i++;s=n.slice(0,31-suf.length)+suf}usedNames.add(s);return s}
+  const sheetsOf=[];
+  R.packs.forEach(p=>{
+    if(!p.rows.length){sheetsOf.push([]);return}
+    const{head,rows}=packRows(p);const names=[];
+    for(let off=0,part=1;off<rows.length;off+=LIMIT,part++){
+      const sn=sheetName(rows.length>LIMIT?p.name+'_'+part:p.name);names.push(sn);
+      const ws=XLSX.utils.aoa_to_sheet([head].concat(rows.slice(off,off+LIMIT)));
+      ws['!cols']=head.map((_,i)=>({wch:i===0?16:14}));names.ws=names.ws||[];names.ws.push(ws);
+    }
+    sheetsOf.push(names);
+  });
+  // summary
+  const head=['名單名稱'].concat(R.dims.map(d=>d.col),['會員數','占比']);
+  const aoa=[head];R.packs.forEach(p=>aoa.push([p.name].concat(p.idx.map((i,k)=>R.dims[k].vals[i]),[p.rows.length,0])));
+  aoa.push(['合計'].concat(R.dims.map(()=>''),[R.used,1]));
+  aoa.push([]);aoa.push(['來源檔案：'+S.fileBase+'；共 '+S.rows.length+' 筆，納入 '+R.used+' 筆'+(R.excl?'，不符合條件 '+R.excl+' 筆':'')+(R.blank?'，編號空白 '+R.blank+' 筆':'')+(R.dup?'，包內重複移除 '+R.dup+' 筆':'')]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  const cc=1+R.dims.length,pc=cc+1,totRow=R.packs.length+1;
+  const C=(r,c)=>XLSX.utils.encode_cell({r,c});const colL=XLSX.utils.encode_col(cc);
+  R.packs.forEach((p,i)=>{
+    const r=i+1,names=sheetsOf[i];
+    ws[C(r,cc)]=names.length?{t:'n',v:p.rows.length,f:names.map(n=>"(COUNTA('"+n+"'!A:A)-1)").join('+'),z:'#,##0'}:{t:'n',v:0,z:'#,##0'};
+    ws[C(r,pc)]={t:'n',v:R.used?p.rows.length/R.used:0,f:'IF('+colL+(totRow+1)+'=0,0,'+colL+(r+1)+'/'+colL+(totRow+1)+')',z:'0.0%'};
+  });
+  ws[C(totRow,cc)]={t:'n',v:R.used,f:'SUM('+colL+'2:'+colL+totRow+')',z:'#,##0'};
+  ws[C(totRow,pc)]={t:'n',v:R.used?1:0,f:'SUM('+XLSX.utils.encode_col(pc)+'2:'+XLSX.utils.encode_col(pc)+totRow+')',z:'0.0%'};
+  ws['!cols']=[{wch:20}].concat(R.dims.map(()=>({wch:14})),[{wch:12},{wch:9}]);
+  XLSX.utils.book_append_sheet(wb,ws,'總覽');
+  sheetsOf.forEach(names=>{if(names.ws)names.forEach((n,i)=>XLSX.utils.book_append_sheet(wb,names.ws[i],n))});
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array',compression:true});
+  await saveFile(safeFile(R.prefix)+'_拆包.xlsx',new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+}
+
+renderPresetSel(0);
+})();
+</script>
+</body>
+</html>
