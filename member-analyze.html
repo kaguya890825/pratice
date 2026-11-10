@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2027 會員健檢</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --ink:#1c2230; --muted:#6b7385; --line:#e3e6ec;
+  --accent:#2f5fd0; --accent-soft:#e8eefc; --side:#ffffff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#111418; --panel:#1a1e25; --ink:#e8ebf0; --muted:#98a1b3; --line:#2a303a;
+    --accent:#7aa2ff; --accent-soft:#1f2a45; --side:#161a20;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111418; --panel:#1a1e25; --ink:#e8ebf0; --muted:#98a1b3; --line:#2a303a;
+  --accent:#7aa2ff; --accent-soft:#1f2a45; --side:#161a20;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 72px);height:auto}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;line-height:1.7}
+a{color:var(--accent);text-decoration:none}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--side);
+  border-right:1px solid var(--line);padding:24px 16px 32px}
+.brand{font-weight:700;font-size:17px;padding:0 10px 18px}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.grp{margin-top:14px}
+.grp>a.g{display:block;padding:6px 10px;font-size:13px;font-weight:700;color:var(--muted)}
+.grp a.s{display:block;padding:6px 10px 6px 22px;border-radius:6px;font-size:14px;color:var(--ink)}
+.grp a.s:hover{background:var(--accent-soft)}
+.grp a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+main{padding:40px clamp(20px,5vw,64px) 96px;max-width:980px;width:100%}
+.hero h1{margin:0 0 6px;font-size:28px;letter-spacing:.02em}
+.hero p{margin:0 0 24px;color:var(--muted)}
+table.idx{width:100%;border-collapse:collapse;background:var(--panel);
+  border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:14px}
+.idx th,.idx td{padding:12px 16px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.idx tr:last-child th,.idx tr:last-child td{border-bottom:0}
+.idx th{width:110px;white-space:nowrap;background:var(--bg);font-weight:600}
+.idx td a{display:inline-block;margin:0 14px 0 0}
+
+.div{margin-top:64px}
+.div>h2{margin:0 0 4px;font-size:22px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
+.div>p.lead{margin:8px 0 0;color:var(--muted);font-size:14px}
+.cat{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px 28px}
+.cat h3{margin:0 0 4px;font-size:18px}
+.cat .path{font-size:13px;color:var(--muted);margin-bottom:16px}
+.ph{border:1px dashed var(--line);border-radius:8px;padding:28px;text-align:center;color:var(--muted);font-size:14px}
+.top{float:right;font-size:13px;color:var(--muted)}
+
+:root{--pos:#1b7f4b;--neg:#c0392b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--pos:#5fcf94;--neg:#ff8a7a}}
+:root[data-theme="dark"]{--pos:#5fcf94;--neg:#ff8a7a}
+.p{color:var(--pos)}.n{color:var(--neg)}
+.tw{overflow-x:auto;margin:12px 0}
+table.dt{width:100%;min-width:640px;border-collapse:collapse;font-size:13px}
+.dt th,.dt td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.dt th{background:var(--bg);font-weight:600;white-space:nowrap}
+.kpi{margin:0 0 16px;font-size:14px}
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pc>div{border:1px solid var(--line);border-radius:8px;padding:14px 18px}
+.pc h4{margin:0 0 6px;font-size:14px}
+.pc ul{margin:0;padding-left:18px;font-size:14px}
+.note{font-size:13px;color:var(--muted);margin:8px 0 0}
+.sub{margin:28px 0 0;font-size:15px}
+@media (max-width:640px){.pc{grid-template-columns:1fr}}
+.menu-btn{display:none}
+@media (max-width:860px){
+  .layout{display:block}
+  .side{position:fixed;inset:0 auto 0 0;width:260px;z-index:20;transform:translateX(-100%);
+    transition:transform .2s;padding-top:calc(env(safe-area-inset-top,0px) + 24px)}
+  .side.open{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+  .menu-btn{display:block;position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;z-index:10;
+    background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;font-size:14px}
+  main{padding-top:72px}
+  .idx th{width:84px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.side{transition:none}}
+</style>
+</head>
+<body>
+<button class="menu-btn" id="mb" aria-expanded="false" aria-controls="side">選單</button>
+<div class="layout">
+  <nav class="side" id="side" aria-label="品類導覽"></nav>
+  <main id="main"></main>
+</div>
+<script>
+var DATA=[
+ {id:"overview",name:"總覽",lead:"全站表現與整體健檢。",cats:[["checkup","健檢總覽"],["site","全站"]]},
+ {id:"m1",name:"營銷一處",lead:"親子用品、文具潮藝。",cats:[["kids","親子用品"],["stationery","文具潮藝"]]},
+ {id:"m2",name:"營銷二處",lead:"服飾鞋包、美妝保養、樂活家居、食品保健、3C家電。",cats:[["fashion","服飾鞋包"],["beauty","美妝保養"],["home","樂活家居"],["food","食品保健"],["3c","3C家電"]]},
+ {id:"m3",name:"營銷三處",lead:"中文書、日文書、外文書、雜誌、影音、童書、電子書。",cats:[["zh-books","中文書"],["jp-books","日文書"],["foreign-books","外文書"],["magazine","雜誌"],["media","影音"],["children-books","童書"],["ebook","電子書"]]},
+ {id:"appendix",name:"附錄",lead:"跨品類的長期趨勢。",cats:[["trend","三年趨勢與新客來源"]]}
+];
+var OV=["全站|+9.8|+6.9/+11.7|+1.3/+0.1|+3.4/-0.9|+2.9/-1.8|+28.6","中文書|+14.7|+5.8/+10.8|+1.4/+0.2|+3.4/-0.9|+11.8/+2.3|+33.7","日文書|+37.1|+34.5/+29.9|+1.2/-0.6|+1.1/-2.2|+6.7/+3.8|+23.5","外文書|+19.8|+20.1/+22.9|+0.4/-0.7|-0.7/-1.2|+0.9/-3.0|+23.3","雜誌|-0.3|-31.2/-12.8|-1.2/-1.2|+8.4/+1.7|+50.7/+12.5|+6.8","影音|+2.4|-1.5/+2.0|-2.6/-4.9|-2.7/-5.1|-3.3/+4.2|0.0","童書|+21.0|+16.6/+13.6|+1.2/+0.3|+2.0/-0.6|+9.8/+4.8|+23.1","親子用品|+33.8|+58.5/+29.0|+2.3/-0.2|+3.7/-0.3|-13.3/+2.3|+11.4","文具潮藝|-4.6|-0.7/+5.3|-1.2/-2.2|-2.8/-7.4|-10.2/-7.4|+14.1","服飾鞋包|-7.2|-22.4/-13.3|-0.7/-1.2|+4.4/-1.8|+8.0/+11.6|+46.1","美妝保養|+28.4|+40.6/+20.8|+0.4/-2.0|-1.1/-5.2|+9.2/-2.0|+28.3","樂活家居|+7.8|+7.8/+8.7|+0.2/-1.9|+1.5/-3.8|+2.9/-1.9|+32.2","食品保健|-2.5|-3.0/+3.0|-1.1/-0.8|-3.9/-3.2|-16.3/-0.8|+22.4","3C家電|-5.3|-16.7/-9.1|+0.5/-1.4|+2.2/-1.2|+12.5/+5.0|+33.7","電子書|+97.0|+55.2/+76.6|+2.7/+6.7|+6.8/+20.8|+12.0/+19.6|+128.9"];
+var C={
+"zh-books":["356.6|409.0|+14.7%|547,000|+33.7%|72%","新客客單價 +11.8%（訂單價 +8.1%）;新客回購率 +1.4pt;舊客人數 +10.8%，營收 +14.7%","舊客回購率僅 +0.2pt;舊客回購會員平均筆次 3.86 → 3.79;目標需成長 +33.7%，約為目前速度的兩倍多"],
+"jp-books":["7.1|9.7|+37.1%|12,000|+23.5%|73%","人數 +31.4%，營收 +37.1%;訂單價 +5.8%;新客回購率 +1.2pt","舊客回購率 -0.6pt、平均筆次 -2.2%;每單件數 -4.1%;合計回購率僅 11.6%，偏低"],
+"foreign-books":["30.1|36.1|+19.8%|44,500|+23.3%|72%","人數 +22.0%;營收 +19.8%;新客回購率 +0.4pt、訂單價 +1.7%","舊客客單價 -3.0%、訂單價 -1.8%;新客回購會員平均筆次 2.52 → 2.37;每單件數 -3.4%，舊客回購率 -0.7pt"],
+"magazine":["27.3|27.2|-0.3%|29,000|+6.8%|70%","客單價 +24.4%;舊客回購會員平均筆次 3.17 → 3.40;件單價 +29.3%，營收大致持平","人數 -19.9%（新客 -31.2%），主因是去年同期基期異常偏高;新、舊客回購率都 -1.2pt;每單件數 -8.2%"],
+"media":["61.9|63.4|+2.4%|63,420|0.0%|67%","舊客訂單價 +9.8%;舊客回購會員平均筆次 3.65 → 3.85;本期營收已等於 2027 目標","舊客回購率 -4.9pt，全站跌最多;合計平均筆次 -4.0%;新客人數 -1.5%、客單價 -3.3%"],
+"children-books":["55.0|66.6|+21.0%|82,000|+23.1%|77%","人數 +14.4%，營收 +21.0%;新、舊客回購率都上升（+1.2pt／+0.3pt）;每單件數 +2.5%、件單價 +3.3%，件數與價格同步成長","舊客回購會員平均筆次 3.24 → 3.18;舊客貢獻 77% 營收，依賴度高;目標 +23.1%，略高於目前的 +21.0%"],
+"kids":["57.1|76.4|+33.8%|85,050|+11.4%|64%","新客 +58.5%;新客回購率 +2.3pt;營收 +33.8%，離目標只差 +11.4%","新客訂單價 -16.4%;合計客單價 -3.9%;每單件數 -3.7%，舊客回購率 -0.2pt"],
+"stationery":["88.5|84.4|-4.6%|96,338|+14.1%|76%","舊客人數 +5.3%;舊客訂單價持平（839 → 838）;離目標只差 +14.1%，相對小","合計客單價 -7.8%，營收 -4.6%;舊客平均筆次 -7.4%、回購率 -2.2pt;新客訂單價 -7.6%，新客營收 -10.9%"],
+"fashion":["66.6|61.8|-7.2%|90,300|+46.1%|73%","舊客訂單價 +13.6%;每單件數 +7.5%;新客回購會員平均筆次 2.46 → 3.36","人數 -16.4%（新客 -22.4%）;合計回購率僅 12.3%，舊客 -1.2pt;目標需成長 +46.1%，但營收 -7.2%"],
+"beauty":["63.8|81.9|+28.4%|105,000|+28.3%|66%","新客 +40.6%;新客訂單價 +10.4%;營收 +28.4%，與目標所需成長（+28.3%）相當","舊客回購率 -2.0pt;舊客平均筆次 -5.2%、客單價 -2.0%;新客回購會員平均筆次 2.54 → 2.36"],
+"home":["95.8|103.3|+7.8%|136,500|+32.2%|72%","人數 +8.4%;件單價 +6.1%、訂單價 +1.8%;新客回購會員平均筆次 2.44 → 2.60","舊客回購率 -1.9pt;每單件數 -4.1%;目標需成長 +32.2%，但目前只有 +7.8%"],
+"food":["39.6|38.6|-2.5%|47,250|+22.4%|81%","舊客訂單價 +2.5%、營收 +2.2%;每單件數 +5.5%;舊客回購率 24.8%，在各品類中排前段","新客營收 -18.8%（訂單價 -12.9%）;新客回購率 -1.1pt;件單價 -6.0%，合計平均筆次 -3.1%"],
+"3c":["165.9|157.1|-5.3%|210,000|+33.7%|59%","訂單價 +7.5%;新客回購率 +0.5pt，回購會員平均筆次 2.28 → 2.61;每單件數 +5.2%","人數 -12.1%;合計回購率 9.3%，全站最低，舊客 -1.4pt;目標需成長 +33.7%，但營收 -5.3%"],
+"ebook":["12.2|24.0|+97.0%|55,000|+128.9%|67%","營收 +97.0%;舊客回購率 +6.7pt;舊客平均筆次 +20.8%","訂單價約 360 元，件單價 -5.8%;目標需成長 +128.9%;去年基數偏低，高成長能否延續仍待驗證"]};
+var SITE=["銷售金額（K）|1,135,180 → 1,246,348（+9.8%）|337,685 → 371,699（+10.1%）|797,495 → 874,648（+9.7%）","有購人數|440,544 → 483,129（+9.7%）|189,738 → 202,877（+6.9%）|250,806 → 280,252（+11.7%）","人均訂單筆次|1.89 → 1.91（+0.9%）|1.35 → 1.40（+3.4%）|2.30 → 2.28（-0.9%）","客單價（元）|2,577 → 2,580（+0.1%）|1,780 → 1,832（+2.9%）|3,180 → 3,121（-1.8%）","回購率（買 2 次以上）|32.7% → 33.5%（+0.8pt）|19.6% → 20.9%（+1.3pt）|42.5% → 42.6%（+0.1pt）"];
+var TR=["newnew（新註冊）|104,838 → 98,247 → 106,051|16.7% → 17.8% → 19.4%|1.31 → 1.32 → 1.38","oldnew（既有會員首購）|92,756 → 91,491 → 96,826|22.0% → 21.5% → 22.5%|1.39 → 1.39 → 1.42","oldold（舊客）|226,768 → 250,806 → 280,252|43.1% → 42.5% → 42.6%|2.35 → 2.30 → 2.28"];
+function sg(s){return s.replace(/（([+-])([^）]*)）/g,function(m,a,b){return "（<span class=\""+(a=="-"?"n":"p")+"\">"+a+b+"</span>）"})}
+function pn(v){return v.split("/").map(function(p){return "<span class=\""+(p[0]=="-"?"n":p[0]=="+"?"p":"")+"\">"+p+"</span>"}).join(" ／ ")}
+function tbl(h,rows,f){return '<div class="tw"><table class="dt"><tr>'+h.map(function(x){return "<th>"+x+"</th>"}).join("")+"</tr>"+rows.map(function(r){return "<tr>"+r.split("|").map(function(c,i){return "<td>"+f(c,i)+"</td>"}).join("")+"</tr>"}).join("")+"</table></div>"}
+function li(s){return s.split(";").map(function(x){return "<li>"+x+"</li>"}).join("")}
+var DET={
+"kids":[["銷售金額（K）|57,067 → 76,380（+33.8%）|19,775 → 27,168（+37.4%）|37,291 → 49,212（+32.0%）","有購人數|29,577 → 41,173（+39.2%）|10,240 → 16,230（+58.5%）|19,337 → 24,943（+29.0%）","人均訂單筆次|1.33 → 1.33（+0.5%）|1.21 → 1.25（+3.7%）|1.39 → 1.38（-0.3%）","訂單價（元）|1,456 → 1,393（-4.3%）|1,600 → 1,338（-16.4%）|1,390 → 1,426（+2.6%）","客單價（元）|1,929 → 1,855（-3.9%）|1,931 → 1,674（-13.3%）|1,928 → 1,973（+2.3%）","回購率|16.7% → 17.1%（+0.3pt）|11.0% → 13.3%（+2.3pt）|19.7% → 19.5%（-0.2pt）","回購會員人均筆次|2.94 → 2.94（-0.1%）|2.87 → 2.89（+0.5%）|2.97 → 2.97（+0.0%）"],
+["新客有購人數 10,240 → 16,230（+58.5%）|約四成增量來自 BEYBLADE 戰鬥陀螺；扣掉後新客 +34.3%。兒童玩具新客 51 → 2,885 人次。|陀螺熱潮退燒後新客能否維持？陀螺新客會不會買童書、文具等其他品類？","舊客回購率 19.7% → 19.5%；回購會員平均筆次持平 2.97|回購會員從買嬰幼兒用品轉為買玩具收集，最常買的變成 BEYBLADE 和 PTCG 卡牌。|嬰幼兒消耗型用品的回購客流失到哪裡？","訂單價 1,456 → 1,393（-4.3%）；新客 -16.4%；舊客 +2.6%|新客被低價陀螺拉低（扣掉後 -3.8%）；舊客靠 PTCG 高級包撐起來（扣掉後 +0.7%）。|排除陀螺後新客訂單價仍 -3.8%，還有哪些品項拉低？","客單價 1,929 → 1,855（-3.9%）|嬰幼兒用品人次下滑：防曬防蚊 696 → 391、安撫巾 560 → 412、生活收納 487 → 306。|是否真的找不到想買的東西？哪些子類 SKU 減少或缺貨？"],
+"拉新活動（低門檻商品、首購優惠）帶入大量新客，新客訂單價因而下降;舊客以耗材補貨為主，回購穩定但未成長;新客多為單次體驗，尚未養成回購",
+["新客訂單價|1,338 → 回到 1,450|首購後推升級商品（體驗組 → 正貨、單品 → 組合）、滿額加價購|🟡 中：可用購後 N 天提醒推升級，但要先確認首購商品結構","舊客回購率|19.5% → 21%|依月齡做消耗品補貨提醒（尿布、副食品）、推薦下一個成長階段的商品|🟡 中：補貨提醒可用購後 N 天，但 CDP 不能做訂閱、也無法預測下次購買","新客人數|16,230 → 守住本期水準（+0～5%）|延續有效的拉新管道；oldnew 轉首購|🟢 高：2027 目標只要 +11.4%，本期已大幅成長"]],
+"stationery":[["銷售金額（K）|88,509 → 84,415（-4.6%）|22,362 → 19,928（-10.9%）|66,148 → 64,486（-2.5%）","有購人數|71,811 → 74,249（+3.4%）|22,916 → 22,746（-0.7%）|48,895 → 51,503（+5.3%）","人均訂單筆次|1.47 → 1.39（-5.9%）|1.18 → 1.15（-2.8%）|1.61 → 1.49（-7.4%）","訂單價（元）|836 → 820（-2.0%）|828 → 765（-7.6%）|839 → 838（-0.1%）","客單價（元）|1,233 → 1,137（-7.8%）|976 → 876（-10.2%）|1,353 → 1,252（-7.4%）","回購率|20.4% → 18.7%（-1.7pt）|10.5% → 9.3%（-1.2pt）|25.1% → 22.9%（-2.2pt）","回購會員人均筆次|3.32 → 3.07（-7.7%）|2.70 → 2.56（-5.1%）|3.44 → 3.16（-8.4%）"],
+["舊客有購人數 48,895 → 51,503（+5.3%）|舊客增加主要來自動漫周邊（1,658 → 3,232 人次）和 SuperCard 造型悠遊卡（FUJIFILM 0 → 583 人、吉伊卡哇 0 → 554 人）。|限量票卡買家是否只為單一商品而來？能否轉成常態買文具的會員？","新客訂單價 828 → 765（-7.6%）|新客買潮玩（POP MART、盲盒、設計師公仔）的訂單 2,252 → 1,085 筆；扣掉後新客訂單價 746 → 754（+1.0%）。|潮玩退燒是品牌週期還是貨源問題？有沒有可替代的高單價新客入口品？","舊客回購率 25.1% → 22.9%；合計 20.4% → 18.7%|約六成跌幅來自票卡和事務文具的買家；兩者都扣掉，舊客回購率只跌 0.9pt。剪刀美工人次 1,760 → 979。|事務文具客群是否被量販／其他電商以價格分流？","舊客人均筆次 1.61 → 1.49（-7.4%）|舊客回購會員貢獻的營收占比 60.7% → 56.1%，可能與加價購、湊單商品不足有關。|加價購／湊單商品是否不足以帶出多一筆？跨品類加價購有沒有機會？"],
+"小額文具、低單價潮流小物比重增加;手帳、文具需求集中在年末旺季，平時缺少回購誘因;與實體通路、其他電商比價競爭",
+["舊客人均筆次|1.49 → 止跌，回到 1.55|每月新品／IP 聯名上市通知、手帳季（9～12 月）提前喚回|🟡 中：CDP 定期未購、分層喚醒可做；但新品通知無法依喜好個人化","舊客回購率|22.9% → 24%|重度舊客（年購 5 次以上）專屬活動、購後 60 天再購券|🟡 中：連兩年下滑，要先找出流失原因，才知道提醒有沒有用","新客人數|22,746 → 止跌持平|手帳季、開學季拉新；從中文書、童書舊客交叉導購|🟡 中：跨品類導購可用瀏覽未購提醒；但在連兩年衰退下，+14.1% 的營收目標偏高"]]};
+function det(id){var d=DET[id];if(!d)return "";var b=function(c,i){return i==0?"<b>"+c+"</b>":c};
+return '<h4 class="sub">各指標（去年同期 → 本期）</h4>'+tbl(["指標","合計","新客","舊客"],d[0],function(c,i){return i==0?"<b>"+c+"</b>":sg(c)})+'<h4 class="sub">觀察到的指標</h4>'+tbl(["Insight","已有分析線索","可能衍生的問題"],d[1],b)+'<h4 class="sub">可能的原因</h4><ul>'+li(d[2])+'</ul><h4 class="sub">2027 建議注重指標</h4>'+tbl(["注重指標","目前 → 2027 方向","策略方法","執行可行性"],d[3],b)}
+function body(id){
+ if(id=="checkup")return '<p class="note">數字皆為本期對去年同期的變化；人數、回購率、筆次、客單價為「新客 ／ 舊客」。營收、人數、筆次、客單價單位為 %，回購率單位為 pt。</p>'+tbl(["品類","營收 YoY","人數 YoY","回購率 Δ","平均筆次 YoY","客單價 YoY","2027 目標 vs 本期"],OV,function(c,i){return i==0?"<b>"+c+"</b>":pn(c)});
+ if(id=="site")return tbl(["指標（去年同期 → 本期）","合計","新客","舊客"],SITE,function(c,i){return i==0?"<b>"+c+"</b>":sg(c)})+'<p class="note">合計客單價只有 +0.1%，成長全靠人數；舊客客單價 -1.8%，2027 目標需再成長 +28.6%。</p>';
+ if(id=="trend")return tbl(["會員群","有購人數（三年）","回購率","人均筆次"],TR,function(c,i){return i==0?"<b>"+c+"</b>":c})+'<ul><li>新註冊會員品質連兩年變好（回購率 16.7% → 19.4%），首購後經營有效。</li><li>舊客深度連兩年下滑（筆次 2.35 → 2.28、客單價 3,325 → 3,121），屬結構性趨勢。</li><li>oldnew 的回購率（22.5%）與客單價高於 newnew（19.4%），喚醒已註冊但未購會員的品質不輸拉新。</li><li>舊客回購率連兩年下滑的品類有 8 個：日文書、外文書、影音、文具潮藝、美妝保養、樂活家居、食品保健、3C家電。</li></ul>';
+ var c=C[id]; if(!c)return '<div class="ph">此區內容待補</div>';
+ var r=c[0].split("|");
+ return '<p class="kpi">營收 '+r[0]+' → '+r[1]+' 百萬元（'+sg("（"+r[2]+"）").slice(1,-1)+'）｜2027 含稅目標 '+r[3]+' 千元（較本期 '+r[4]+'）｜舊客營收占比 '+r[5]+'</p><div class="pc"><div><h4>優點</h4><ul>'+li(c[1])+'</ul></div><div><h4>缺點</h4><ul>'+li(c[2])+'</ul></div></div>'+det(id);
+}
+var side=document.getElementById("side"),main=document.getElementById("main");
+var s='<div class="brand">2027 會員健檢<small>全站與各品類</small></div>';
+var m='<header class="hero"><h1>2027 會員健檢</h1><p>本期＝2025/11–2026/10，去年同期＝2024/11–2025/10。點選品類即可跳至對應段落。</p>'+
+ '<table class="idx"><tr><th>分類</th><th>品類</th></tr>';
+DATA.forEach(function(d){
+  s+='<div class="grp"><a class="g" href="#'+d.id+'">'+d.name+'</a>';
+  m+='<tr><th>'+d.name+'</th><td>';
+  d.cats.forEach(function(c){
+    s+='<a class="s" href="#'+c[0]+'">'+c[1]+'</a>';
+    m+='<a href="#'+c[0]+'">'+c[1]+'</a>';
+  });
+  s+='</div>'; m+='</td></tr>';
+});
+m+='</table></header>';
+DATA.forEach(function(d){
+  m+='<section class="div" id="'+d.id+'"><h2>'+d.name+'</h2><p class="lead">'+d.lead+'</p>';
+  d.cats.forEach(function(c){
+    m+='<article class="cat" id="'+c[0]+'"><a class="top" href="#">回到頂端</a><h3>'+c[1]+'</h3>'+
+       '<div class="path">'+d.name+' ／ '+c[1]+'</div>'+body(c[0])+'</article>';
+  });
+  m+='</section>';
+});
+side.innerHTML=s; main.innerHTML=m;
+
+/* 目前位置標示 */
+var links=[].slice.call(side.querySelectorAll("a.s"));
+var map={}; links.forEach(function(a){map[a.getAttribute("href").slice(1)]=a});
+function mark(id){links.forEach(function(a){a.classList.remove("on")}); if(map[id])map[id].classList.add("on")}
+if("IntersectionObserver" in window){
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){if(e.isIntersecting)mark(e.target.id)});
+  },{rootMargin:"-20% 0px -70% 0px"});
+  [].forEach.call(document.querySelectorAll("article.cat"),function(el){io.observe(el)});
+}
+/* 手機選單 */
+var mb=document.getElementById("mb");
+function tog(o){side.classList.toggle("open",o);mb.setAttribute("aria-expanded",o)}
+mb.addEventListener("click",function(){tog(!side.classList.contains("open"))});
+side.addEventListener("click",function(e){if(e.target.tagName==="A")tog(false)});
+</script>
+</body>
+</html>
