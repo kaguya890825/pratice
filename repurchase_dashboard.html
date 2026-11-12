@@ -271,7 +271,7 @@ table.sum.mn td:first-child{font-weight:500}
 <body>
 <div class="wrap">
   <header class="top">
-    <h1>回購／再購分析儀表板<span class="ver">v6.0</span><small>上傳訂單明細，依全站與各品類拆出跨年度回購、當年度回購、再回購會員</small></h1>
+    <h1>回購／再購分析儀表板<span class="ver">v6.1</span><small>上傳訂單明細，依全站與各品類拆出跨年度回購、當年度回購、再回購會員</small></h1>
     <div class="actions">
       <label class="btn file">上傳訂單明細<input id="fileIn" type="file" multiple accept=".xlsx,.xls,.csv,.tsv,.txt"></label>
       <button class="btn ghost" id="demoBtn" type="button">用示範資料試跑</button>
@@ -523,6 +523,18 @@ table.sum.mn td:first-child{font-weight:500}
           <div class="cwsum" id="cwSum"></div>
           <div class="def" id="cwDef" style="margin:0 0 10px"></div>
           <div class="tablewrap"><table class="sum rp" id="cwTable"></table></div>
+        </div>
+      </div>
+      </section>
+      <section data-block="pv">
+      <div class="panel fold" id="pPv">
+        <div class="phead"><h2 id="pvTitle">有購會員的前次消費年</h2>
+          <div class="ptools"><button class="btn ghost small" type="button" data-copy="pv">複製到 Google Sheets</button><button class="btn ghost small ownonly" type="button" data-dl="pv" data-lb="下載會員編號">下載會員編號</button></div>
+        </div>
+        <div class="pbody">
+          <div class="mstrip" id="pvSum" style="margin-top:0"></div>
+          <div class="def" id="pvDef" style="margin:6px 0 10px"></div>
+          <div class="tablewrap"><table class="sum rp" id="pvTable"></table></div>
         </div>
       </div>
       </section>
@@ -953,7 +965,7 @@ function buildPeriod(D,P){
   const dense=N*KK<=40e6?new Int32Array(N*KK).fill(-1):null,mp=dense?null:new Map();
   const recMap=dense?denseGetter(dense):mp;
   const recMem=[],recScope=[],mY=[],mY1=[],mY1c=[],mY2=[],e1=[],e2=[],aY=[],aY1=[],aY1s=[],qY=[],qY1=[],qY1s=[],lastY=[];
-  const mLast=new Int32Array(N),mFirst0=new Int32Array(N).fill(99999999);
+  const mLast=new Int32Array(N),mFirst0=new Int32Array(N).fill(99999999),mPrev=new Int32Array(N);
   const rid=(m,s)=>{const k=m*KK+s+1;let r=dense?dense[k]:mp.get(k);
     if(r===undefined||r<0){r=recMem.length;if(dense)dense[k]=r;else mp.set(k,r);recMem.push(m);recScope.push(s);mY.push(0);mY1.push(0);mY1c.push(0);mY2.push(0);e1.push(0);e2.push(0);aY.push(0);aY1.push(0);aY1s.push(0);qY.push(0);qY1.push(0);qY1s.push(0);lastY.push(0);}return r;};
   const per=new Int8Array(D.n).fill(-9),slot=new Int8Array(D.n);
@@ -962,6 +974,7 @@ function buildPeriod(D,P){
     const dk=D.dk[i];if(dk>e0)continue;
     const m=D.mem[i],c=D.cat[i],a=D.amt[i],q=D.qty[i],y=(dk/10000)|0;
     if(dk>mLast[m])mLast[m]=dk;
+    if(dk<s0&&dk>mPrev[m])mPrev[m]=dk;
     let p=-1;if(dk>=s0)p=0;else if(dk>=s1&&dk<=e1d)p=1;else if(dk>=s2&&dk<=e2d)p=2;
     per[i]=p;
     if(p===0&&dk<mFirst0[m])mFirst0[m]=dk;
@@ -987,7 +1000,7 @@ function buildPeriod(D,P){
   return {key:P.key,P,K,KK,L:P.L,n:nrec,recMap,recMem:Int32Array.from(recMem),recScope:Int16Array.from(recScope),
     mY:Uint16Array.from(mY),mY1:Uint16Array.from(mY1),mY1c:Uint16Array.from(mY1c),mY2:Uint8Array.from(mY2),e1:Uint8Array.from(e1),e2:Uint8Array.from(e2),
     aY:Float64Array.from(aY),aY1:Float64Array.from(aY1),aY1s:Float64Array.from(aY1s),qY:Float64Array.from(qY),qY1:Float64Array.from(qY1),qY1s:Float64Array.from(qY1s),
-    lastY:Int16Array.from(lastY),cnt,o1c,mLast,mFirst0};
+    lastY:Int16Array.from(lastY),cnt,o1c,mLast,mFirst0,mPrev};
 }
 /* calendar-year shortcut kept for tests and older callers */
 function buildYear(D,Y,same){return buildPeriod(D,makePeriod(D,{type:'year',Y},same===undefined?true:same));}
@@ -1183,6 +1196,16 @@ function monthlyNo(D,B,A){
     row.push([Array.from(nn.subarray(b,b+12)),Array.from(oo.subarray(b,b+12)),Array.from(aa.subarray(b,b+12),Math.round)]);}out.push(row);}
   return out;
 }
+/* buyers of the period by their previous purchase anywhere on the site (before the period starts):
+   rows[scope] = [buyers, bought earlier in the same calendar year, never bought before, ...one count per earlier year] */
+function prevYears(D,B){
+  const P=B.P,KK=B.K+1,Y0=Math.floor(P.s0/10000);
+  const ys=[...D.years].filter(y=>y<Y0).sort((a,b)=>b-a),W=3+ys.length,col=new Map(ys.map((y,i)=>[y,3+i]));
+  const rows=[];for(let s=0;s<KK;s++)rows.push(new Array(W).fill(0));
+  for(let r=0;r<B.n;r++){if(!B.mY[r])continue;const t=rows[B.recScope[r]+1],pd=B.mPrev[B.recMem[r]];t[0]++;
+    if(!pd)t[2]++;else{const y=Math.floor(pd/10000);if(y>=Y0)t[1]++;else{const c=col.get(y);if(c!==undefined)t[c]++;else t[2]++;}}}
+  return {Y0,early:P.s0%10000!==101?dkPrevDay(P.s0):0,years:ys,rows};
+}
 /* member lists as CSV text (built in the background worker so a big list does not freeze the page).
    X = {B,R,A} of one period. q.kind: 'seg' one segment, 'tag' status of every member, 'lm' last purchase year, 'oo' OLDOLD pool of one year */
 function listParts(D,X,q){
@@ -1206,12 +1229,13 @@ function listParts(D,X,q){
     const bl=any?'以前在全站買過':sc<0?'以前在全站買過':'以前買過這個品類';
     for(let m=0;m<N;m++)if(pre[m])push([D.ids[m],sn(sc),Y,bl,ret[m]?'回流':'未回流',...mc(m)]);}
   else{const ML=q.months||null;
-    head=['會員編號','範圍','過去有購','今年有購',(W.rep||'跨年度回購')+'狀態',(W.multi||'當年度回購')+'狀態',(W.again||'再回購')+'狀態','流失客','今年訂單筆次','購買次數分群','今年金額','今年購買數量','去年金額','範圍最後消費年',...MH,'分析期間',...(ML?ML.map(l=>l+' 訂單筆次'):[])];
+    head=['會員編號','範圍','過去有購','今年有購',(W.rep||'跨年度回購')+'狀態',(W.multi||'當年度回購')+'狀態',(W.again||'再回購')+'狀態','流失客','今年訂單筆次','購買次數分群','今年金額','今年購買數量','去年金額','範圍最後消費年',...MH,'分析期間',...(ML?ML.map(l=>l+' 訂單筆次'):[]),...(q.prev?['全站前次消費日','前次消費分類']:[])];
     for(let r=0;r<B.n;r++){const f=R.flags[r];if(!all&&B.recScope[r]!==sc)continue;if(q.mask?!(f&q.mask):!B.mY[r])continue;
       const m=B.recMem[r],o=r*24;let oc=0;if(B.mY[r]){for(let k=0;k<12;k++)oc+=B.cnt[o+k];oc=Math.max(1,oc);}
       const row=[D.ids[m],sn(B.recScope[r]),f&3?1:0,B.mY[r]?1:0,f&1?W.rep:f&2?W.lost:f&4?W.neu:'',f&256?W.multi:f&32?W.f1:'',f&8?W.again:f&16?W.once:'',f&512?'流失客':'',
         oc,f&128?'3次以上':f&64?'2次':f&32?'僅1次':'',Math.round(B.aY[r]),Math.round(B.qY[r]),Math.round(B.aY1[r]),B.lastY[r],...mc(m),q.period||''];
       if(ML)for(let k=0;k<ML.length;k++)row.push(B.mY[r]&(1<<k)?(B.cnt[o+k]||1):0);
+      if(q.prev){const pd=B.mPrev[m],y=Math.floor(pd/10000);row.push(fd(pd),!pd?'過去從未購買':y>=q.prev.Y0?q.prev.early:'前次消費 '+y);}
       push(row);}}
   if(buf.length)parts.push(buf.join('\n')+'\n');
   parts[0]='\uFEFF'+head.map(cell).join(',')+'\n';
@@ -1225,7 +1249,7 @@ function buildEntry(D,key,spec,o){
   const slotEnds=P.slots.slice(1).map(d=>Math.min(dkPrevDay(d),P.e0));
   const entry={s:{key,type:P.type,Y:P.Y,M,mode:'split',cond:o.cond,look:o.look,same:o.same,basis:o.basis,L:B.L,Lfull:P.Lfull,
       s0:P.s0,e0:P.e0,s1:P.s1,e1:P.e1,end:P.end,cut:P.cut,c1:P.c1,slots:P.slots,slotEnds,hasP1:R.T[0].A>0||R.T[0].Yc1>0,hasP2:R.T[0].C>0},
-    T:R.T,P:fullProfiles(D,B,R,A),MN:monthlyNo(D,B,A),useDates:A.useDates,mm:A.cover};
+    T:R.T,P:fullProfiles(D,B,R,A),MN:monthlyNo(D,B,A),PV:prevYears(D,B),useDates:A.useDates,mm:A.cover};
   return {entry,B,R,A};
 }
 /*ENDCORE*/
@@ -1277,7 +1301,7 @@ const condOf=s=>COND[s&&s.cond]||COND.any;
 const r2=v=>v==null||!isFinite(v)?null:Math.round(v*100)/100,rd=v=>v==null||!isFinite(v)?null:Math.round(v);
 /* ---- custom layout: which blocks show, and in what order (kept in this browser) ---- */
 const BLOCKS=[['set','分析設定',''],['kpi','重點指標',''],['flow','會員流向','流向'],['all','全體有購會員輪廓','全體輪廓'],['nbc','新舊客購買次數','新舊客次數'],['mon','舊客／新客各月購買','各月新舊客'],['prof','分群輪廓','分群輪廓'],
-  ['freq','消費指標與購買次數','消費指標'],['rep','跨年度回購','跨年度回購'],['rb','當年度回購','當年度回購'],['ag','再回購','再回購'],['cw','流失客與喚醒客','流失／喚醒'],['oo','OLDOLD 回流表現','OLDOLD 回流'],['lm','最後消費年','最後消費年'],['def','定義說明','']];
+  ['freq','消費指標與購買次數','消費指標'],['rep','跨年度回購','跨年度回購'],['rb','當年度回購','當年度回購'],['ag','再回購','再回購'],['cw','流失客與喚醒客','流失／喚醒'],['pv','前次消費年（區間內首次購買）','前次消費年'],['oo','OLDOLD 回流表現','OLDOLD 回流'],['lm','最後消費年','最後消費年'],['def','定義說明','']];
 const IS_OWNER=!!document.getElementById('fileIn');
 const LAY_KEY='rp_layout';
 let LAY=null,LAY_DRAG=0;
@@ -1451,9 +1475,9 @@ function viewRender(){
   ss.onchange=()=>{VS.scope=+ss.value;viewRender();};
   /* hidden blocks are skipped, so turning blocks off also makes clicks faster */
   if(live('flow'))vFlow(E,SI);if(live('rep'))vRep(E);if(live('rb'))vRb(E);if(live('ag'))vAg(E);if(live('freq'))vFreq(E,SI);
-  if(live('all'))vAll(E);if(live('nbc'))vNbc(E);if(live('mon'))vMon(E);if(live('prof'))vProfile(E,SI);if(live('cw'))vCw(E,SI);if(live('lm'))vLastMatrix();if(live('oo'))vOO();
+  if(live('all'))vAll(E);if(live('nbc'))vNbc(E);if(live('mon'))vMon(E);if(live('prof'))vProfile(E,SI);if(live('cw'))vCw(E,SI);if(live('pv'))vPv(E);if(live('lm'))vLastMatrix();if(live('oo'))vOO();
   /* panels with nothing to show stay hidden even while folded */
-  {const pm=$('pMon'),pc=$('pCw'),pl=$('pLM'),po=$('pOO'),pn=$('pNbc');if(pm)pm.hidden=!monHas(E);if(pc)pc.hidden=E.T[0].LA==null;if(pl)pl.hidden=!SNAP.LM;if(po)po.hidden=!SNAP.OO;if(pn)pn.hidden=!nbHas(E);}
+  {const pm=$('pMon'),pc=$('pCw'),pl=$('pLM'),po=$('pOO'),pn=$('pNbc');if(pm)pm.hidden=!monHas(E);if(pc)pc.hidden=E.T[0].LA==null;{const pp=$('pPv');if(pp)pp.hidden=!E.PV;}if(pl)pl.hidden=!SNAP.LM;if(po)po.hidden=!SNAP.OO;if(pn)pn.hidden=!nbHas(E);}
   {const sn=vScopeName(VS.scope);document.querySelectorAll('[data-dl]').forEach(b=>{if(!b.classList.contains('busy'))b.textContent=b.dataset.fixed?b.dataset.lb:`${b.dataset.lb}（${sn}）`;});}
   vFoldInit();vJump();
 }
@@ -1754,6 +1778,35 @@ function vCwAoa(E){
     a.push([sName(idx),t.PA,t.LA,P_(pct(t.LA,t.PA)),...ys.map(y=>lm.get(y)||0),t.Yc,t.f1,P_(pct(t.f1,t.Yc)),wo,wn]);}
   return a;
 }
+/* ---- 前次消費年: buyers of this period, by when they last bought anywhere on the site before it ---- */
+function pvLab(E){const V=E.PV,s=E.s;return {early:V.early?`${V.Y0} 年稍早已買過`:'',earlyRange:V.early?`${V.Y0}/01/01–${fdk(V.early)}`:'',first:V.early?`${V.Y0} 年首次購買`:'有購會員'};}
+function pvRow(V,idx){const t=V.rows[idx],first=t[0]-t[1],back=first-t[2];return {n:t[0],early:t[1],first,never:t[2],back,ys:t.slice(3)};}
+function vPv(E){
+  const V=E.PV,sec=$('pPv');sec.hidden=!V;if(!V)return;
+  const lb=LB(E),L=pvLab(E),sn=vScopeName(VS.scope),x=pvRow(V,VS.scope+1);
+  $('pvTitle').replaceChildren('有購會員的前次消費年',el('span',{class:'h2sub',text:V.early?`${lb.A}有購的人裡，誰是 ${V.Y0} 年第一次買、上一次買是哪一年`:`${lb.A}有購的人，上一次買是哪一年`}));
+  const it=(l,v,pc)=>el('div',{class:'mi'},el('span',{text:l}),el('b',{text:fmt(v)}),pc==null?null:el('span',{text:fp(pc)}));
+  $('pvSum').replaceChildren(el('div',{class:'mcap',text:`${sn}｜${lb.range}`}),it(`${lb.A}有購`,x.n),
+    ...(V.early?[it(L.early,x.early,pct(x.early,x.n)),it(L.first,x.first,pct(x.first,x.n))]:[]),
+    it('其中過去買過（回流）',x.back,pct(x.back,x.first)),it('其中過去從未購買',x.never,pct(x.never,x.first)));
+  $('pvDef').textContent=(V.early?`${L.first}＝${lb.A}有購，而且 ${L.earlyRange} 在全站都沒有購買；${L.early}＝這段時間在全站買過任何品類。`:'')+
+    `前次消費年＝這位會員在 ${fdk(E.s.s0)} 以前，最後一次在全站（任何品類）購買的年份；資料內找不到更早購買的算「過去從未購買」（資料從 ${SNAP.dataYears[0]} 年開始）。品類列的人數是${lb.A}有買這個品類的會員，但「稍早已買過」和「前次消費年」一律看全站，不是看這個品類。年份欄的百分比是占${V.early?L.first:'有購會員'}人數。`;
+  const tb=$('pvTable');tb.replaceChildren();
+  vHead(tb,'類別',[[`${lb.a} 有購<br>A`,'gc',null],...(V.early?[[`${V.Y0} 年是否買過`,'gc',['稍早<br>已買過',`${V.Y0} 年首次<br>B`,'首次占比<br>B/A']]]:[]),
+    [`${V.early?'首次購買會員':'有購會員'}的全站前次消費年`,'gp',[...V.years.map(String),'過去<br>從未購買']],['過去買過<br>（回流）','gd',null],['回流占比','gd',null]]);
+  const body=el('tbody'),cell=(v,b,c)=>el('td',{class:c||''},fmt(v),el('span',{class:'pc',text:fp(pct(v,b))}));
+  for(const idx of ROWS()){const r=pvRow(V,idx);if(idx&&!r.n)continue;
+    body.append(vRow(idx,[tdN(r.n,'gap'),...(V.early?[tdN(r.early,'gap'),tdN(r.first),tdP(pct(r.first,r.n))]:[]),
+      ...r.ys.map((v,i)=>cell(v,r.first,i?'':'gap')),cell(r.never,r.first,r.ys.length?'':'gap'),el('td',{class:'d',text:fmt(r.back)}),el('td',{class:'d',text:fp(pct(r.back,r.first))})]));}
+  tb.append(body);
+}
+function vPvAoa(E){
+  const V=E.PV;if(!V)return [];const lb=LB(E),L=pvLab(E);
+  const a=[['類別',`${lb.a}有購人數 A`,...(V.early?[`${L.early}（${L.earlyRange}）`,`${L.first}人數 B`,'首次占比 B/A']:[]),...V.years.map(y=>`前次消費 ${y}`),'過去從未購買','過去買過(回流)人數','回流占比']];
+  for(const idx of ROWS()){const r=pvRow(V,idx);if(idx&&!r.n)continue;
+    a.push([sName(idx),r.n,...(V.early?[r.early,r.first,P_(pct(r.first,r.n))]:[]),...r.ys,r.never,r.back,P_(pct(r.back,r.first))]);}
+  return a;
+}
 function vNb(p,lb){
   const tb=$('nbTable');tb.replaceChildren();
   $('nbBox').hidden=!p.nb;if(!p.nb)return;
@@ -1957,9 +2010,9 @@ function vLMAoa(){
 const cellText=c=>c==null?'':typeof c==='object'?(c.p*100).toFixed(1)+'%':String(c);
 const escH=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function vCopy(kind,btn){
-  const E=E_(),a=kind==='rep'?vRepAoa(E):kind==='rb'?vRbAoa(E):kind==='ag'?vAgAoa(E):kind==='prof'?vProfileAoa(E):kind==='freq'?vFreqAoa(E):kind==='all'?vAllAoa(E):kind==='oo'?vOOAoa():kind==='nbc'?vNbcAoa(E,true):kind==='mon'?vMonAoa(E):kind==='cw'?vCwAoa(E):vLMAoa();
+  const E=E_(),a=kind==='rep'?vRepAoa(E):kind==='rb'?vRbAoa(E):kind==='ag'?vAgAoa(E):kind==='prof'?vProfileAoa(E):kind==='freq'?vFreqAoa(E):kind==='all'?vAllAoa(E):kind==='oo'?vOOAoa():kind==='nbc'?vNbcAoa(E,true):kind==='mon'?vMonAoa(E):kind==='cw'?vCwAoa(E):kind==='pv'?vPvAoa(E):vLMAoa();
   const tsv=a.map(r=>r.map(c=>cellText(c).replace(/[\t\n]/g,' ')).join('\t')).join('\n');
-  const html='<table>'+a.map((r,i)=>'<tr>'+r.map(c=>{const t=escH(cellText(c));return i===0||(r.length<=3&&typeof r[1]==='string'&&kind!=='mon'&&kind!=='cw')?`<th style="font-weight:bold">${t}</th>`:`<td>${t}</td>`;}).join('')+'</tr>').join('')+'</table>';
+  const html='<table>'+a.map((r,i)=>'<tr>'+r.map(c=>{const t=escH(cellText(c));return i===0||(r.length<=3&&typeof r[1]==='string'&&kind!=='mon'&&kind!=='cw'&&kind!=='pv')?`<th style="font-weight:bold">${t}</th>`:`<td>${t}</td>`;}).join('')+'</tr>').join('')+'</table>';
   let ok=false;
   const h=e=>{e.clipboardData.setData('text/plain',tsv);e.clipboardData.setData('text/html',html);e.preventDefault();ok=true;};
   document.addEventListener('copy',h);try{document.execCommand('copy');}catch(e){}document.removeEventListener('copy',h);
@@ -2418,6 +2471,8 @@ function sheetTables(withYearSheets){
     /* the 最後消費 year columns differ by period, so each period keeps its own header row */
     a.forEach((r,i)=>h.push([i?periodLabel(y):'分析期間',...r]));h.push([]);}
     if(h.length)t['流失客與喚醒客']=plain(h);}
+  {const h=[];for(const y of SNAP.years){const E=SNAP.byYear[y];if(!E||!E.PV)continue;vPvAoa(E).forEach((r,i)=>h.push([i?periodLabel(y):'分析期間',...r]));h.push([]);}
+    if(h.length)t['前次消費年']=plain(h);}
   t['設定']=settingsAoa();
   return t;
 }
@@ -2441,14 +2496,15 @@ $('xlsBtn').addEventListener('click',async()=>{
   {const nb=vNbcAoa(E,true);if(nb.length>1)XLSX.utils.book_append_sheet(wb,toSheet(nb,[16,24,10,10,8,10,10,10,10,10,10]),'新舊客購買次數');}
   {const mn=vMonAoa(E);if(mn.length>1)XLSX.utils.book_append_sheet(wb,toSheet(mn,[16,12,...new Array(18).fill(14)]),'新舊客各月購買');}
   {const cw=vCwAoa(E);if(cw.length>1)XLSX.utils.book_append_sheet(wb,toSheet(cw,[16,...new Array(16).fill(13)]),'流失客與喚醒客');}
+  {const pv=vPvAoa(E);if(pv.length>1)XLSX.utils.book_append_sheet(wb,toSheet(pv,[16,...new Array(14).fill(14)]),'前次消費年');}
   if(SNAP.OO)XLSX.utils.book_append_sheet(wb,toSheet(vOOAoa(['cat','any']),[8,22,16,16,12,12,10,14,12,10,10,10,10,10,12]),'OLDOLD回流');
   XLSX.utils.book_append_sheet(wb,toSheet(settingsAoa(),[18,70]),'定義與設定');
   XLSX.writeFile(wb,`回購再購分析_${stamp()}.xlsx`);
   }finally{CAT_ALL=false;}
-  status(`Excel 已下載：各年份總表（跨年度回購、當年度回購、再回購）、消費指標、${periodLabel(S.Y)} 目前選取的分群輪廓、新舊客各月購買、流失客與喚醒客、最後消費年總覽、OLDOLD 回流。`);
+  status(`Excel 已下載：各年份總表（跨年度回購、當年度回購、再回購）、消費指標、${periodLabel(S.Y)} 目前選取的分群輪廓、新舊客各月購買、流失客與喚醒客、前次消費年、最後消費年總覽、OLDOLD 回流。`);
 });
 /* which members each block's 下載會員編號 gives (for the scope picked on screen) */
-const DL_TAG={flow:[511,'會員流向'],all:[0,'有購會員'],nbc:[0,'新舊客購買次數'],freq:[0,'消費指標'],rb:[0,'當年度回購'],mon:[0,'新舊客各月購買'],rep:[7,'跨年度回購'],ag:[24,'再回購']};
+const DL_TAG={flow:[511,'會員流向'],all:[0,'有購會員'],nbc:[0,'新舊客購買次數'],freq:[0,'消費指標'],rb:[0,'當年度回購'],mon:[0,'新舊客各月購買'],pv:[0,'前次消費年'],rep:[7,'跨年度回購'],ag:[24,'再回購']};
 async function dlMembers(kind,btn){
   if(!RAW||!SNAP||btn.classList.contains('busy'))return;const E=E_();if(!E)return;
   const SI=vSeg(E),sc=VS.scope,sn=vScopeName(sc),per=periodLabel(S.Y);
@@ -2460,7 +2516,7 @@ async function dlMembers(kind,btn){
   else if(kind==='lm'){key=Math.max(...RAW.years);q={kind:'lm',scope:sc};name=`最後消費年_${sn}_截至${key}`;what=`${sn}全體會員（含最後消費年）`;}
   else if(kind==='oo'){const st=ooState();if(!st)return;key=OO.Y;q={kind:'oo',scope:sc,Y:OO.Y,base:OO.base,win:st.win,winMD:st.O.winMD};name=`${OO.Y}_OLDOLD回流_${sn}`;what=`${OO.Y} 年${sn} OLDOLD（含是否回流）`;}
   else if(kind==='tagall'){q={kind:'tag',scope:null,mask:0xFFFF,period:String(per),w:W};name=`會員標籤表_${per}`;what='會員標籤表（每位會員在全站與各品類各一列）';}
-  else{const d=DL_TAG[kind];if(!d)return;q={kind:'tag',scope:sc,mask:d[0],period:String(per),w:W,months:kind==='mon'?monLabels(E):null};name=`${per}_${sn}_${d[1]}會員`;what=`${sn}${d[1]}的會員`;}
+  else{const d=DL_TAG[kind];if(!d)return;q={kind:'tag',scope:sc,mask:d[0],period:String(per),w:W,months:kind==='mon'?monLabels(E):null,prev:kind==='pv'&&E.PV?{Y0:E.PV.Y0,early:pvLab(E).early}:null};name=`${per}_${sn}_${d[1]}會員`;what=`${sn}${d[1]}的會員`;}
   const old=btn.textContent;btn.classList.add('busy');btn.textContent='準備中…';status(`準備會員名單：${what}…`);
   try{const r=await listAsync(key,q);
     if(!r){status('資料剛更新，請再按一次。',true);return;}
@@ -2483,7 +2539,7 @@ function viewerHTML(embed){
   if(LAY){const bx=dash.querySelector('#blocks');for(const k of LAY.order){const x=bx.querySelector(`:scope>[data-block="${k}"]`);if(x){if(LAY.hidden.has(k))x.remove();else bx.append(x);}}}
   dash.querySelectorAll('[data-ready]').forEach(x=>x.removeAttribute('data-ready'));
   dash.querySelectorAll('.panel.closed').forEach(x=>x.classList.remove('closed'));
-  dash.querySelectorAll('#repTable,#rbTable,#agTable,#catTable,#bar1,#barR,#bar2,#extra,#defList,#lmTable,#ooTrend,#ooTable,#nbcTable,#monTable,#cwTable,#cwSum,#kpis,#yearTabs,#freqTable,#profMetrics,#nbTable,#layList,#jumpNav').forEach(x=>x.replaceChildren());
+  dash.querySelectorAll('#repTable,#rbTable,#agTable,#catTable,#bar1,#barR,#bar2,#extra,#defList,#lmTable,#ooTrend,#ooTable,#nbcTable,#monTable,#cwTable,#cwSum,#pvTable,#pvSum,#kpis,#yearTabs,#freqTable,#profMetrics,#nbTable,#layList,#jumpNav').forEach(x=>x.replaceChildren());
   dash.hidden=true;
   const head=`<header class="top"><h1>回購／再購分析<span class="ver">檢視版</span><small id="vSub">載入中…</small></h1></header>`;
   const snap=embed?JSON.stringify(SNAP).replace(/</g,'\\u003c'):'';
