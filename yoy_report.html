@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>檔期YOY報告產生器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root{
+  --bg:#F4F6FA; --surface:#FFFFFF; --ink:#16203A; --muted:#5B6577; --rule:#DCE1EA; --soft:#EEF2F8;
+  --navy:#1F3864; --wine:#7B2C3F; --up:#1F5FAD; --down:#C0392B; --hl:#FFF2CC; --focus:#3B6FD8;
+  color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#10141D; --surface:#171D29; --ink:#E6EAF2; --muted:#9AA4B6; --rule:#2A3242; --soft:#1E2635;
+  --navy:#7E9BD6; --wine:#D88AA0; --up:#7FB0F0; --down:#F08A7E; --hl:#3A3420; --focus:#7FA6F5; color-scheme:dark; } }
+:root[data-theme="dark"]{ --bg:#10141D; --surface:#171D29; --ink:#E6EAF2; --muted:#9AA4B6; --rule:#2A3242; --soft:#1E2635;
+  --navy:#7E9BD6; --wine:#D88AA0; --up:#7FB0F0; --down:#F08A7E; --hl:#3A3420; --focus:#7FA6F5; color-scheme:dark; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;font-size:14px;line-height:1.6;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 60px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:22px}
+header.top h1{margin:0;font-size:26px;font-weight:900;letter-spacing:.02em;color:var(--navy)}
+header.top p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.legend{display:flex;gap:10px;font-size:12px;color:var(--muted)}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--c)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:18px}
+.panel h2{margin:0 0 12px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.step{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--navy);color:var(--surface);font-size:12px;font-weight:700}
+.drop{display:block;border:2px dashed var(--rule);border-radius:6px;padding:26px 16px;text-align:center;color:var(--muted);cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.on{border-color:var(--navy);background:var(--soft)}
+.drop strong{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.drop input{display:none}
+.hint{font-size:12px;color:var(--muted);margin:10px 0 0}
+table.files{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+table.files th,table.files td{border-bottom:1px solid var(--rule);padding:7px 6px;text-align:left;vertical-align:middle}
+table.files th{color:var(--muted);font-weight:500;font-size:12px}
+table.files td.fn{word-break:break-all}
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:12px;background:var(--soft);color:var(--ink)}
+.tag.bad{background:transparent;color:var(--down);border:1px solid var(--down)}
+select,input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:5px 7px;width:100%}
+label.f{display:block;font-size:12px;color:var(--muted);margin:0 0 10px}
+label.f input{margin-top:3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;cursor:pointer;border-radius:4px;border:1px solid var(--navy);background:var(--navy);color:var(--surface);padding:9px 14px;font-weight:700}
+button.ghost{background:transparent;color:var(--navy)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,.drop:focus-visible,.tabs button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.warns{margin:12px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--down)}
+.warns li::before{content:"！";font-weight:700}
+.demo{background:var(--hl);border:1px solid color-mix(in srgb,var(--ink) 15%,transparent);border-radius:4px;padding:8px 12px;margin:0 0 16px;font-size:13px}
+.msg{font-size:13px;color:var(--muted);margin-top:8px;min-height:1.4em}
+#out{margin-top:22px}
+.tabbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:8px 0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.tabs button{background:transparent;color:var(--muted);border:none;border-bottom:3px solid transparent;border-radius:0;padding:8px 14px;font-weight:500}
+.tabs button[aria-selected=true]{color:var(--navy);border-bottom-color:var(--navy);font-weight:700}
+.sheet{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:20px;margin-top:10px}
+.sec{margin:26px 0 10px;padding:6px 10px;background:var(--navy);color:var(--surface);font-weight:700;font-size:14px;border-radius:3px}
+.sec:first-child{margin-top:0}
+.sub{font-size:12px;color:var(--muted);margin:-4px 0 10px}
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.ledger{grid-template-columns:1fr}}
+.ledger .side{border-top:4px solid var(--c)}
+.ledger h3{margin:8px 0 6px;font-size:14px;color:var(--c)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.t{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+table.t th,table.t td{border:1px solid var(--rule);padding:4px 7px}
+table.t th{background:var(--soft);font-weight:700;text-align:center}
+table.t td{text-align:right}
+table.t td.l{text-align:left}
+table.t tr.tot td{background:var(--hl);font-weight:700}
+table.t tr.sub td{background:var(--soft);font-weight:700}
+table.t td.name{white-space:normal;min-width:260px;max-width:420px}
+.up{color:var(--up);font-weight:700}.down{color:var(--down);font-weight:700}
+.idxhi{color:var(--up);font-weight:700;background:color-mix(in srgb,var(--up) 12%,transparent)}
+.idxlo{color:var(--down);font-weight:700;background:color-mix(in srgb,var(--down) 12%,transparent)}
+ul.sum{margin:0;padding-left:1.1em}
+ul.sum li{margin:0 0 8px;max-width:80em}
+h4.tt{margin:18px 0 6px;font-size:13px}
+.ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px}
+.ctl label{font-size:12px;color:var(--muted)}
+.ctl select,.ctl input{width:auto;min-width:130px}
+.yoyw{max-height:70vh;overflow:auto;border:1px solid var(--rule)}
+.yoyw table.t thead th{position:sticky;top:0;z-index:2}
+.yoyw table.t thead tr:nth-child(2) th{top:27px}
+.yoyw table.t thead tr:nth-child(3) th{top:54px}
+.yoyw td.k,.yoyw th.k{position:sticky;left:0;background:var(--surface);z-index:1;text-align:left}
+.yoyw thead th.k{z-index:3;background:var(--soft)}
+.pA,.pB{text-align:left!important}
+.pA{background:color-mix(in srgb,var(--navy) 85%,transparent)!important;color:var(--surface)}
+.pB{background:color-mix(in srgb,var(--wine) 85%,transparent)!important;color:var(--surface)}
+.empty{color:var(--muted);text-align:center;padding:40px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>檔期YOY報告產生器</h1>
+      <p>上傳類別YOY檔與商品明細，產出總覽＋摘要與類別1-2／2／3 YOY一覽，可下載Excel（上傳Google Sheet不跑版）。</p>
+    </div>
+    <div class="legend"><span style="--c:var(--up)">成長</span><span style="--c:var(--down)">衰退</span></div>
+  </header>
+
+  <div class="demo" id="demoBar" hidden>目前顯示<b>示範資料</b>（虛構數字），上傳自己的檔案後會自動取代。</div>
+  <div class="grid">
+    <section class="panel">
+      <h2><span class="step">1</span>上傳檔案</h2>
+      <label class="drop" id="drop" tabindex="0">
+        <strong>拖曳或點選Excel檔（可一次多選）</strong>
+        類別1-2／類別2／類別3（兩個時段）＋當期商品明細（兩個時段）
+        <input id="fileIn" type="file" accept=".xlsx,.xls" multiple>
+      </label>
+      <p class="hint"><button class="ghost" id="demoBtn" type="button">載入示範資料</button></p>
+      <p class="hint">自動辨識：類別檔依當期營收大小判斷「累計／單日」；商品明細以總金額比對類別檔，判斷時段與年度，比較年度的明細會自動略過。辨識有誤可在下表手動調整。</p>
+      <div id="fileList"></div>
+    </section>
+
+    <section class="panel">
+      <h2><span class="step">2</span>報告設定</h2>
+      <label class="f">報告標題<input id="oTitle" type="text" value="誠品線上檔期成效報告"></label>
+      <label class="f">時段A名稱（累計）<input id="oLa" type="text" value="11/1–11/11累計"></label>
+      <label class="f">時段B名稱（單日／高峰）<input id="oLb" type="text" value="11/11當天"></label>
+      <div class="row2">
+        <label class="f">當期年<input id="oCy" type="number"></label>
+        <label class="f">比較年<input id="oPy" type="number"></label>
+      </div>
+      <button id="run" disabled>產生報告</button>
+      <div class="msg" id="msg">先上傳檔案</div>
+      <ul class="warns" id="warns"></ul>
+    </section>
+  </div>
+
+  <section id="out" hidden>
+    <div class="tabbar">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <button id="dl">下載Excel</button>
+    </div>
+    <div id="view"></div>
+  </section>
+</div>
+
+<script>
+(function (root) {
+'use strict';
+const SEGS = ['oo', 'on', 'nn'];
+const SEGMAP = { old_old: 'oo', old_new: 'on', new_new: 'nn' };
+const SEGNAME = { oo: 'old_old舊客', on: 'old_new舊會員首購', nn: 'new_new新會員新客', new: '新客(old_new+new_new)' };
+const MET = { b: '購買人數', o: '訂單筆數', a: '銷售金額', q: '銷售數量' };
+const BOOKCATS = ['01_中文書', '02_日文書', '03_外文書', '06_童書', '16_電子書'];
+
+const num = v => { if (v === null || v === undefined || v === '') return 0; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '')); return isFinite(n) ? n : 0; };
+const str = v => (v === null || v === undefined) ? '' : String(v).trim();
+const ns = s => String(s).replace(/[ \u3000]+/g, '');           // 去空白（自撰文字）
+const catClean = s => String(s).replace(/\s+(?=[^\x00-\x7f(（])|(?<=[^\x00-\x7f])\s+|\s+(?=[(（])/g, '');
+const K = v => Math.round(v / 1000).toLocaleString('en-US') + 'K';
+const fmtN = v => Math.round(v).toLocaleString('en-US');
+const pct = (a, b) => b ? a / b - 1 : NaN;
+const sp = v => isFinite(v) ? (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%' : '—';
+const nm = s => { s = String(s); const i = s.indexOf('_'); return i >= 0 ? s.slice(i + 1) : s; };
+
+/* ---------------- 解析 ---------------- */
+function classify(aoa) {
+  const r1 = (aoa[1] || []).map(str);
+  if (r1.includes('商品名稱')) return 'prod';
+  if (r1[0] && r1[0].startsWith('類別')) return 'cat';
+  return null;
+}
+
+function findIdx(hdr, from, to, word) {
+  for (let c = from; c < to; c++) if (hdr[c] && hdr[c].includes(word)) return c;
+  return -1;
+}
+
+function blocksFrom(aoa, startCol) {
+  const r0 = (aoa[0] || []).map(str), r1 = (aoa[1] || []).map(str);
+  const width = Math.max(r1.length, r0.length);
+  const blocks = []; let cur = null;
+  for (let c = startCol; c < width; c++) {
+    if (!r0[c] && !r1[c]) continue;
+    const isStart = r1[c].startsWith('購買人數') && !(r1[c - 1] || '').startsWith('購買人數') && (!cur || c !== cur.start);
+    if (r0[c]) {
+      const lab = SEGMAP[r0[c]] || 'tot';
+      if (!cur || cur.seg !== lab || (isStart && findIdx(r1, cur.start, c, '購買人數') >= 0 && cur.seg === 'tot')) { cur = { seg: lab, start: c, end: c + 1 }; blocks.push(cur); continue; }
+    } else if (isStart && cur) { cur = { seg: 'tot', start: c, end: c + 1 }; blocks.push(cur); continue; }
+    if (!cur) { cur = { seg: 'tot', start: c, end: c + 1 }; blocks.push(cur); }
+    cur.end = c + 1;
+  }
+  return blocks;
+}
+
+function parseCat(aoa, fname) {
+  const r1 = (aoa[1] || []).map(str);
+  let nkey = 0; while (nkey < 3 && r1[nkey] && r1[nkey].startsWith('類別')) nkey++;
+  const blocks = blocksFrom(aoa, nkey);
+  const warn = [];
+  const plan = blocks.map(bk => {
+    const m = {};
+    for (const code of 'boaq') {
+      const i = findIdx(r1, bk.start, bk.end, MET[code]);
+      if (i < 0) throw new Error(fname + '：找不到「' + MET[code] + '」欄位');
+      let ci = i, pi = i + 1;
+      // 部分匯出檔數量欄順序為 當期／差異／比較：以差異% 判斷
+      if (code === 'q') {
+        const probe = aoa.slice(2).find(r => num(r[i + 1]) && num(r[i + 2]) && r[i + 3] !== undefined && r[i + 3] !== null);
+        if (probe) {
+          const a = num(probe[i + 1]), b = num(probe[i + 2]), p = num(probe[i + 3]);
+          if (Math.abs(a / b - p) < Math.abs(b / a - p)) { pi = i + 2; warn.push('數量欄順序為當期／差異／比較，已自動校正'); }
+        }
+      }
+      m[code] = [ci, pi];
+    }
+    return { seg: bk.seg, m };
+  });
+  const rows = []; let total = null;
+  for (let r = 2; r < aoa.length; r++) {
+    const row = aoa[r]; if (!row) continue;
+    const keys = []; let empty = true;
+    for (let k = 0; k < nkey; k++) { const v = str(row[k]); if (v) empty = false; keys.push(v); }
+    const v = {};
+    let hasNum = false;
+    for (const p of plan) for (const code of 'boaq') {
+      const c = num(row[p.m[code][0]]), q = num(row[p.m[code][1]]);
+      if (c || q) hasNum = true;
+      v[p.seg + '_' + code + '_c'] = (v[p.seg + '_' + code + '_c'] || 0) + c;
+      v[p.seg + '_' + code + '_p'] = (v[p.seg + '_' + code + '_p'] || 0) + q;
+    }
+    if (empty) { if (hasNum) total = v; continue; }
+    rows.push({ keys: keys.map(x => x || '(空白)'), v });
+  }
+  const segs = [...new Set(plan.map(p => p.seg))];
+  if (!total) { total = {}; for (const r of rows) for (const k in r.v) total[k] = (total[k] || 0) + r.v[k]; warn.push('找不到合計列，已以明細加總（人數會重複計算）'); }
+  return { kind: 'cat', level: nkey, rows, total, segs, warn: [...new Set(warn)] };
+}
+
+function parseProd(aoa, fname) {
+  const r1 = (aoa[1] || []).map(str);
+  const nameC = r1.indexOf('商品名稱');
+  const col = w => r1.findIndex((h, i) => i < nameC && h.includes(w));
+  const c12 = col('類別1-2'), c2 = r1.findIndex((h, i) => i < nameC && h === '類別2'), c3 = r1.findIndex((h, i) => i < nameC && h === '類別3');
+  const sku = r1.findIndex((h, i) => i < nameC && /26碼|貨號|SKU|商品編號/i.test(h));
+  const blocks = blocksFrom(aoa, nameC + 1).filter(b => b.seg !== 'tot');
+  if (!blocks.length) throw new Error(fname + '：找不到 old_old／old_new／new_new 客群欄位');
+  const plan = blocks.map(bk => { const m = {}; for (const code of 'boaq') m[code] = findIdx(r1, bk.start, bk.end, MET[code]); return { seg: bk.seg, m }; });
+  const map = new Map();
+  for (let r = 2; r < aoa.length; r++) {
+    const row = aoa[r]; if (!row) continue;
+    const name = str(row[nameC]); const c = str(row[c12]);
+    if (!name && !c) continue;
+    const id = str(row[sku]).replace(/\.0$/, '') + '|' + name;
+    let p = map.get(id);
+    if (!p) { p = { sku: str(row[sku]).replace(/\.0$/, ''), name, c12: c || '(空白)', c2: str(row[c2]) || '(空白)', c3: str(row[c3]) || '(空白)', oo: { b: 0, o: 0, a: 0, q: 0 }, on: { b: 0, o: 0, a: 0, q: 0 }, nn: { b: 0, o: 0, a: 0, q: 0 } }; map.set(id, p); }
+    for (const pl of plan) for (const code of 'boaq') if (pl.m[code] >= 0) p[pl.seg][code] += num(row[pl.m[code]]);
+  }
+  const items = [...map.values()];
+  for (const p of items) {
+    p.new = {}; p.all = {};
+    for (const code of 'boaq') { p.new[code] = p.on[code] + p.nn[code]; p.all[code] = p.new[code] + p.oo[code]; }
+  }
+  const tot = items.reduce((s, p) => s + p.all.a, 0);
+  const ym = fname.match(/20\d\d/);
+  return { kind: 'prod', items, totalA: tot, year: ym ? +ym[0] : null };
+}
+
+function parseWorkbook(XLSX, buf, fname) {
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return parseAoa(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null }), fname);
+}
+function parseAoa(aoa, fname) {
+  if (aoa[0] && (str(aoa[0][0]).startsWith('類別') || (aoa[0] || []).map(str).includes('商品名稱'))) aoa.unshift([]); // 單列表頭格式
+  const kind = classify(aoa);
+  if (kind === 'cat') return Object.assign(parseCat(aoa, fname), { fname });
+  if (kind === 'prod') return Object.assign(parseProd(aoa, fname), { fname });
+  throw new Error(fname + '：無法辨識（需為類別YOY檔或商品明細檔）');
+}
+
+/* 自動判斷角色：類別檔以當期營收大者為累計(A)、小者為單日(B)；商品明細以總額比對類別檔 */
+function autoAssign(files) {
+  const cats = files.filter(f => f.kind === 'cat');
+  const curA = f => f.total.tot_a_c || SEGS.reduce((s, x) => s + (f.total[x + '_a_c'] || 0), 0);
+  const amts = [...new Set(cats.map(curA).map(Math.round))].sort((a, b) => b - a);
+  for (const f of cats) {
+    const a = Math.round(curA(f));
+    f.role = amts.length > 1 && a === amts[amts.length - 1] && a < amts[0] * 0.8 ? 'B' : 'A';
+    if (amts.length > 1 && a !== amts[0]) {
+      // 依與最大值的距離分組
+      f.role = Math.abs(a - amts[0]) < Math.abs(a - amts[amts.length - 1]) ? 'A' : 'B';
+    }
+  }
+  const ref = {};
+  for (const r of ['A', 'B']) { const f = cats.find(x => x.role === r && x.level === 1) || cats.find(x => x.role === r); if (f) ref[r] = { c: curA(f), p: f.total.tot_a_p || SEGS.reduce((s, x) => s + (f.total[x + '_a_p'] || 0), 0) }; }
+  for (const f of files.filter(x => x.kind === 'prod')) {
+    let best = null;
+    for (const r in ref) for (const y of ['c', 'p']) {
+      const d = Math.abs(Math.log((f.totalA || 1) / (ref[r][y] || 1)));
+      if (!best || d < best.d) best = { r, y, d };
+    }
+    f.role = best ? (best.y === 'c' ? best.r : 'skip') : 'A';
+    f.match = best ? Math.exp(-best.d) : 0;
+  }
+  return files;
+}
+
+/* ---------------- 計算 ---------------- */
+function joinLevel(fa, fb, level) {
+  const map = new Map();
+  const add = (f, side) => {
+    if (!f) return;
+    for (const r of f.rows) {
+      const id = r.keys.join('\u0001');
+      let o = map.get(id); if (!o) { o = { keys: r.keys, A: {}, B: {} }; map.set(id, o); }
+      for (const k in r.v) o[side][k] = (o[side][k] || 0) + r.v[k];
+    }
+  };
+  add(fa, 'A'); add(fb, 'B');
+  const rows = [...map.values()];
+  const g = (o, k) => o.A[k] || 0;
+  if (level === 1) rows.sort((x, y) => x.keys[0].localeCompare(y.keys[0]));
+  else if (level === 2) rows.sort((x, y) => x.keys[0].localeCompare(y.keys[0]) || g(y, 'tot_a_c') - g(x, 'tot_a_c'));
+  else {
+    const t2 = {}; for (const r of rows) { const k = r.keys[0] + '\u0001' + r.keys[1]; t2[k] = (t2[k] || 0) + g(r, 'tot_a_c'); }
+    rows.sort((x, y) => x.keys[0].localeCompare(y.keys[0]) || t2[y.keys[0] + '\u0001' + y.keys[1]] - t2[x.keys[0] + '\u0001' + x.keys[1]] || x.keys[1].localeCompare(y.keys[1]) || g(y, 'tot_a_c') - g(x, 'tot_a_c'));
+  }
+  return { rows, totA: fa ? fa.total : {}, totB: fb ? fb.total : {}, hasSeg: !!((fa && fa.segs.includes('oo')) || (fb && fb.segs.includes('oo'))) };
+}
+
+function tv(v, seg, code, y) {
+  if (seg === 'new') return tv(v, 'on', code, y) + tv(v, 'nn', code, y);
+  if (seg === 'tot') { const t = v['tot_' + code + '_' + y]; if (t !== undefined) return t; return SEGS.reduce((s, x) => s + (v[x + '_' + code + '_' + y] || 0), 0); }
+  return v[seg + '_' + code + '_' + y] || 0;
+}
+
+function cleanItems(items) { return items.filter(p => !p.c12.startsWith('99') && p.all.a > 0 && p.all.b > 0 && p.all.a / p.all.b >= 10); }
+
+function topProducts(items, seg, sortkey, n) {
+  const s = seg === 'all' ? 'all' : seg;
+  return cleanItems(items).slice().sort((a, b) => (b[s][sortkey] - a[s][sortkey]) || (b[s].a - a[s].a)).slice(0, n);
+}
+
+function catPref(items) {
+  const t = {};
+  for (const p of cleanItems(items)) { const o = t[p.c12] || (t[p.c12] = { c12: p.c12, n: 0, o: 0 }); o.n += p.new.a; o.o += p.oo.a; }
+  const arr = Object.values(t).sort((a, b) => a.c12.localeCompare(b.c12));
+  const N = arr.reduce((s, x) => s + x.n, 0), O = arr.reduce((s, x) => s + x.o, 0), ov = N / (N + O);
+  for (const x of arr) { x.share = x.n / (x.n + x.o); x.idx = x.share / ov * 100; }
+  const rk = (k) => { const s = arr.slice().sort((a, b) => b[k] - a[k]); s.forEach((x, i) => x['r' + k] = i + 1); };
+  rk('n'); rk('o');
+  return { arr, ov, N, O };
+}
+
+function buildModel(files, opt) {
+  const cat = { A: {}, B: {} }, prod = {};
+  for (const f of files) {
+    if (f.kind === 'cat' && (f.role === 'A' || f.role === 'B')) cat[f.role][f.level] = f;
+    if (f.kind === 'prod' && (f.role === 'A' || f.role === 'B')) prod[f.role] = f;
+  }
+  const levels = {};
+  for (const L of [1, 2, 3]) if (cat.A[L] || cat.B[L]) levels[L] = joinLevel(cat.A[L], cat.B[L], L);
+  const base = levels[1] || levels[2] || levels[3];
+  const M = { opt, levels, prod, base, warn: [] };
+  if (!base) throw new Error('至少需要一份類別檔（建議類別1-2）');
+  if (!levels[1]) M.warn.push('缺少類別1-2檔：KPI以其他層級合計列計算');
+  if (!cat.A[1] && !cat.A[2] && !cat.A[3]) M.warn.push('缺少「' + opt.la + '」類別檔');
+  if (!cat.B[1] && !cat.B[2] && !cat.B[3]) M.warn.push('缺少「' + opt.lb + '」類別檔');
+  if (!prod.A) M.warn.push('缺少「' + opt.la + '」當期商品明細，商品分析略過');
+  if (!prod.B) M.warn.push('缺少「' + opt.lb + '」當期商品明細，商品分析略過');
+  M.summary = summarize(M);
+  return M;
+}
+
+/* ---------------- 摘要 ---------------- */
+function summarize(M) {
+  const { opt, base, levels, prod } = M;
+  const A = base.totA, B = base.totB, out = [];
+  const g = (v, s, c, y) => tv(v, s, c, y);
+  const cy = opt.cy, la = ns(opt.la), lb = ns(opt.lb);
+  if (A && g(A, 'tot', 'a', 'c')) {
+    const a = g(A, 'tot', 'a', 'c'), ap = g(A, 'tot', 'a', 'p'), b = g(A, 'tot', 'b', 'c'), bp = g(A, 'tot', 'b', 'p'), o = g(A, 'tot', 'o', 'c'), op = g(A, 'tot', 'o', 'p');
+    const ac = pct(a / b, ap / bp);
+    out.push('【整體】' + la + '營收' + K(a) + '（YOY' + sp(pct(a, ap)) + '），購買人數' + fmtN(b) + '人（' + sp(pct(b, bp)) + '）、訂單' + fmtN(o) + '筆（' + sp(pct(o, op)) + '）；平均客單價' + fmtN(a / b) + '元（' + sp(ac) + '）' +
+      (Math.abs(ac) < 0.03 ? '大致持平，成長主要來自「人數變多」而非「每人買更多」。' : ac > 0 ? '同步提升，人數與客單價雙引擎成長。' : '下滑，營收成長仰賴人數增加。'));
+  }
+  if (B && g(B, 'tot', 'a', 'c')) {
+    const a = g(B, 'tot', 'a', 'c'), ap = g(B, 'tot', 'a', 'p'), b = g(B, 'tot', 'b', 'c'), bp = g(B, 'tot', 'b', 'p');
+    const ac = pct(a / b, ap / bp);
+    let s = '【' + lb + '】營收' + K(a) + '（YOY' + sp(pct(a, ap)) + '）、購買人數' + fmtN(b) + '人（' + sp(pct(b, bp)) + '），客單價' + fmtN(a / b) + '元（' + sp(ac) + '）';
+    s += ac < -0.1 ? '明顯下滑，湧入大量中低單價訂單' : ac > 0.1 ? '明顯提升' : '大致持平';
+    if (A && g(A, 'tot', 'a', 'c')) s += '；' + lb + '佔' + la + '營收由' + (g(B, 'tot', 'a', 'p') / g(A, 'tot', 'a', 'p') * 100).toFixed(1) + '%變為' + (g(B, 'tot', 'a', 'c') / g(A, 'tot', 'a', 'c') * 100).toFixed(1) + '%';
+    out.push(s + '。');
+  }
+  const L1 = levels[1];
+  if (L1) {
+    const rows = L1.rows.filter(r => !r.keys[0].startsWith('99'));
+    const d = (r, side) => g(r[side], 'tot', 'a', 'c') - g(r[side], 'tot', 'a', 'p');
+    const up = side => rows.slice().sort((x, y) => d(y, side) - d(x, side)).filter(r => d(r, side) > 0).slice(0, 3).map(r => nm(r.keys[0]) + '+' + K(d(r, side))).join('、') || '無';
+    out.push('【成長品類】' + la + '營收增量前三：' + up('A') + '；' + lb + '前三：' + up('B') + '。');
+    const L2 = levels[2];
+    if (L2) {
+      const r2 = L2.rows.filter(r => !r.keys[0].startsWith('99'));
+      const eng = side => r2.slice().sort((x, y) => d(y, side) - d(x, side)).filter(r => d(r, side) > 0).slice(0, 4).map(r => nm(r.keys[0]) + '/' + r.keys[1] + '+' + K(d(r, side)) + '（' + sp(pct(g(r[side], 'tot', 'a', 'c'), g(r[side], 'tot', 'a', 'p'))) + '）').join('、') || '無';
+      out.push('【成長引擎（類別2）】' + la + '：' + eng('A') + '；' + lb + '：' + eng('B') + '。');
+    }
+    const dn = side => rows.filter(r => d(r, side) < 0).sort((x, y) => d(x, side) - d(y, side));
+    const dA = dn('A'), dB = dn('B');
+    let s = '【衰退警示】';
+    if (dA.length) {
+      const w = dA[0];
+      s += la + '衰退最多為' + nm(w.keys[0]) + '（−' + K(-d(w, 'A')) + '，YOY' + sp(pct(g(w.A, 'tot', 'a', 'c'), g(w.A, 'tot', 'a', 'p'))) + '）';
+      if (L2) {
+        const sub = L2.rows.filter(r => r.keys[0] === w.keys[0] && d(r, 'A') < 0).sort((x, y) => d(x, 'A') - d(y, 'A')).slice(0, 2);
+        if (sub.length) s += '，主要來自' + sub.map(r => r.keys[1] + '（−' + K(-d(r, 'A')) + '）').join('、');
+      }
+      if (dA.length > 1) s += '；其次為' + dA.slice(1, 3).map(r => nm(r.keys[0]) + '（−' + K(-d(r, 'A')) + '）').join('、');
+      s += '。';
+    } else s += la + '無衰退品類。';
+    s += dB.length ? lb + '衰退最多：' + dB.slice(0, 2).map(r => nm(r.keys[0]) + '（−' + K(-d(r, 'B')) + '）').join('、') + '。' : lb + '無衰退品類。';
+    out.push(s);
+  }
+  const short = n => { n = String(n); return n.length > 24 ? n.slice(0, 24) + '…' : n; };
+  const pn = p => BOOKCATS.includes(p.c12) ? '《' + short(p.name) + '》' : '「' + short(p.name) + '」';
+  if (prod.B || prod.A) {
+    let s = '【大家都在買什麼】';
+    if (prod.B) s += lb + '購買人數TOP3：' + topProducts(prod.B.items, 'all', 'b', 3).map(p => pn(p) + fmtN(p.all.b) + '人').join('、') + '；';
+    if (prod.A) {
+      const ta = topProducts(prod.A.items, 'all', 'a', 1)[0], tb = topProducts(prod.A.items, 'all', 'b', 1)[0];
+      if (ta) s += la + '營收單品第一為' + pn(ta) + '（' + K(ta.all.a) + '）';
+      if (tb) s += '、人數第一為' + pn(tb) + '（' + fmtN(tb.all.b) + '人）';
+      s += '。';
+    }
+    out.push(s);
+  }
+  const segLine = (T, lab) => {
+    const n = g(T, 'new', 'b', 'c'), np = g(T, 'new', 'b', 'p'), o = g(T, 'oo', 'b', 'c'), op = g(T, 'oo', 'b', 'p');
+    const na = g(T, 'new', 'a', 'c'), nap = g(T, 'new', 'a', 'p'), oa = g(T, 'oo', 'a', 'c'), oap = g(T, 'oo', 'a', 'p');
+    let s = '【' + lab + '新舊客】新客（new_new＋old_new）' + fmtN(n) + '人（' + sp(pct(n, np)) + '）、營收' + K(na) + '（' + sp(pct(na, nap)) + '）；舊客' + fmtN(o) + '人（' + sp(pct(o, op)) + '）、營收' + K(oa) + '（' + sp(pct(oa, oap)) + '）。';
+    const inc = (o - op) + (n - np);
+    s += (pct(n, np) > pct(o, op) ? '新客成長率較高' : '舊客成長率較高');
+    if (inc > 0 && o - op > 0) s += '，新增人數約' + Math.round((o - op) / inc * 100) + '%來自舊客';
+    s += '；新客客單價' + sp(pct(na / n, nap / np)) + '、舊客' + sp(pct(oa / o, oap / op)) + '，舊客貢獻約' + Math.round(oa / (oa + na) * 100) + '%營收。';
+    return s;
+  };
+  if (A && A.oo_b_c !== undefined) out.push(segLine(A, la));
+  if (B && B.oo_b_c !== undefined) out.push(segLine(B, lb));
+  if (prod.A) {
+    const cp = catPref(prod.A.items);
+    const hi = cp.arr.filter(x => x.n + x.o > (cp.N + cp.O) * 0.005).sort((a, b) => b.idx - a.idx);
+    out.push('【新客偏好（' + la + '）】新客營收佔比高於平均的品類（偏好指數）：' + hi.slice(0, 4).map(x => nm(x.c12) + Math.round(x.idx)).join('、') + '；舊客相對集中在' + hi.slice(-3).reverse().map(x => nm(x.c12) + Math.round(x.idx)).join('、') + '。可作為拉新與回購溝通的品類參考。');
+  }
+  return out.map(ns);
+}
+
+/* ---------------- Excel 匯出（ExcelJS） ---------------- */
+async function exportXlsx(ExcelJS, M) {
+  const { opt } = M; const cy = String(opt.cy), py = String(opt.py), la = ns(opt.la), lb = ns(opt.lb);
+  const wb = new ExcelJS.Workbook();
+  wb.calcProperties.fullCalcOnLoad = true;
+  const NAVY = '1F3864', LIGHT = 'D9E1F2', PALE = 'F2F5FB', YEL = 'FFF2CC', WINE = '7B2C3F', BLUE = '1F5FAD', RED = 'C0392B';
+  const NUM = '#,##0', PCT = '0.0%', YOY = '+0.0%;-0.0%;0.0%', DIF = '#,##0;-#,##0;0';
+  const thin = { style: 'thin', color: { argb: 'FFBFBFBF' } }, BOX = { top: thin, left: thin, bottom: thin, right: thin };
+  const CL = c => { let s = ''; while (c > 0) { const m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; };
+  const put = (ws, r, c, v, o = {}) => {
+    const cell = ws.getCell(r, c);
+    if (typeof v === 'string' && v.startsWith('=')) cell.value = { formula: v.slice(1) };
+    else if (typeof v === 'string') cell.value = o.raw === 'cat' ? catClean(v) : o.raw ? v : ns(v);
+    else cell.value = (v === undefined ? null : v);
+    cell.font = { name: 'Arial', size: o.size || 10, bold: !!o.bold, color: { argb: 'FF' + (o.color || '000000') } };
+    if (o.fmt) cell.numFmt = o.fmt;
+    if (o.bg) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + o.bg } };
+    cell.alignment = { horizontal: o.al || 'right', vertical: o.va || 'middle', wrapText: !!o.wrap };
+    if (o.box !== false) cell.border = BOX;
+    return cell;
+  };
+  const hdr = (ws, r, c1, c2, text, bg = NAVY, color = 'FFFFFF') => {
+    if (c2 > c1) ws.mergeCells(r, c1, r, c2);
+    for (let c = c1; c <= c2; c++) { const x = ws.getCell(r, c); x.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + bg } }; x.border = BOX; }
+    put(ws, r, c1, text, { bold: true, bg, color, al: 'center' });
+  };
+  const cf = (ws, ref) => ws.addConditionalFormatting({ ref, rules: [
+    { type: 'cellIs', operator: 'greaterThan', formulae: [0], priority: 1, style: { font: { color: { argb: 'FF' + BLUE }, bold: true } } },
+    { type: 'cellIs', operator: 'lessThan', formulae: [0], priority: 2, style: { font: { color: { argb: 'FF' + RED }, bold: true } } }] });
+
+  const ws0 = wb.addWorksheet('總覽+摘要', { views: [{ showGridLines: false, state: 'frozen', ySplit: 2 }], properties: { tabColor: { argb: 'FF' + NAVY } } });
+  const yoySheets = [];
+  const BLK = [['購買人數', [cy, py, 'YOY']], ['訂單筆數', [cy, py, 'YOY']], ['銷售金額', [cy, py, '差異', 'YOY', cy + '佔比']], ['銷售數量', [cy, py, 'YOY']], ['平均訂單價', [cy, py, 'YOY']], ['平均客單價', [cy, py, 'YOY']]];
+  const SEGBLK = ['oo', 'on', 'nn', 'new'].map(s => [SEGNAME[s], ['有購人數' + cy, '有購人數' + py, '有購人數YOY', '金額' + cy, '金額' + py, '金額YOY', '客群營收佔比', '數量' + cy, '數量' + py, '數量YOY'], s]);
+  let kpiRef = null;
+  for (const L of [1, 2, 3]) {
+    const J = M.levels[L]; if (!J) continue;
+    const title = ['', '類別1-2', '類別2', '類別3'][L] + 'YOY';
+    const ws = wb.addWorksheet(title, { properties: { tabColor: { argb: 'FF8EA9DB' } } });
+    const keyNames = ['類別1-2', '類別2', '類別3'].slice(0, L);
+    const groups = J.hasSeg ? BLK.concat(SEGBLK) : BLK;
+    const cols = []; groups.forEach(g => g[1].forEach(s => cols.push([g[0], s, g[2]])));
+    const nb = cols.length, sA = L + 2, sB = sA + nb + 1, last = sB + nb - 1;
+    ws.mergeCells(1, 1, 1, 16); put(ws, 1, 1, title.replace('YOY', '') + 'YOY一覽（' + cy + 'vs' + py + '同期）', { bold: true, size: 14, color: NAVY, al: 'left', box: false });
+    ws.mergeCells(2, 1, 2, 16);
+    put(ws, 2, 1, '左：' + la + '｜右：' + lb + '。YOY＝' + cy + '÷' + py + '−1；平均訂單價＝銷售金額÷訂單筆數；平均客單價＝銷售金額÷購買人數。藍字＝成長、紅字＝衰退；第5列已開篩選。' + (J.hasSeg ? '每個時間軸右側為新舊客區塊（old_old／old_new／new_new／新客＝old_new＋new_new），購買人數為各客群不重複人數，客群營收佔比＝該客群金額÷全站該品類金額。' : ''), { color: '595959', al: 'left', box: false, size: 9 });
+    hdr(ws, 3, sA, sA + nb - 1, la); hdr(ws, 3, sB, sB + nb - 1, lb, WINE);
+    keyNames.forEach((k, i) => { ws.mergeCells(3, 1 + i, 5, 1 + i); put(ws, 3, 1 + i, k, { bold: true, bg: LIGHT, al: 'center' }); });
+    for (const base of [sA, sB]) {
+      let j = 0;
+      for (const g of groups) { hdr(ws, 4, base + j, base + j + g[1].length - 1, g[0], PALE, '000000'); g[1].forEach((s, k) => put(ws, 5, base + j + k, s, { bold: true, bg: LIGHT, al: 'center' })); j += g[1].length; }
+    }
+    const TR = 6;
+    const colOf = (base) => { const m = {}; cols.forEach((c, j) => m[c[0] + '|' + c[1]] = base + j); return m; };
+    const writeRow = (r, VA, VB, isT) => {
+      const bg = isT ? YEL : undefined, bold = isT;
+      for (const [base, V] of [[sA, VA], [sB, VB]]) {
+        const col = colOf(base), A = k => CL(col[k]) + r;
+        const vv = (s, c, y) => tv(V || {}, s, c, y);
+        for (const [code, g] of [['b', '購買人數'], ['o', '訂單筆數'], ['a', '銷售金額'], ['q', '銷售數量']]) {
+          put(ws, r, col[g + '|' + cy], vv('tot', code, 'c'), { fmt: NUM, bg, bold }); put(ws, r, col[g + '|' + py], vv('tot', code, 'p'), { fmt: NUM, bg, bold });
+          if (code !== 'a') put(ws, r, col[g + '|YOY'], '=IFERROR(' + A(g + '|' + cy) + '/' + A(g + '|' + py) + '-1,"")', { fmt: YOY, bg });
+        }
+        put(ws, r, col['銷售金額|差異'], '=' + A('銷售金額|' + cy) + '-' + A('銷售金額|' + py), { fmt: DIF, bg, bold });
+        put(ws, r, col['銷售金額|YOY'], '=IFERROR(' + A('銷售金額|' + cy) + '/' + A('銷售金額|' + py) + '-1,"")', { fmt: YOY, bg });
+        put(ws, r, col['銷售金額|' + cy + '佔比'], '=IFERROR(' + A('銷售金額|' + cy) + '/' + CL(col['銷售金額|' + cy]) + '$' + TR + ',"")', { fmt: PCT, bg });
+        for (const y of [cy, py]) {
+          put(ws, r, col['平均訂單價|' + y], '=IFERROR(' + A('銷售金額|' + y) + '/' + A('訂單筆數|' + y) + ',"")', { fmt: NUM, bg });
+          put(ws, r, col['平均客單價|' + y], '=IFERROR(' + A('銷售金額|' + y) + '/' + A('購買人數|' + y) + ',"")', { fmt: NUM, bg });
+        }
+        for (const g of ['平均訂單價', '平均客單價']) put(ws, r, col[g + '|YOY'], '=IFERROR(' + A(g + '|' + cy) + '/' + A(g + '|' + py) + '-1,"")', { fmt: YOY, bg });
+        if (J.hasSeg) for (const [gname, , s] of SEGBLK) {
+          const k = x => gname + '|' + x;
+          for (const [lab, code, y] of [['有購人數' + cy, 'b', 'c'], ['有購人數' + py, 'b', 'p'], ['金額' + cy, 'a', 'c'], ['金額' + py, 'a', 'p'], ['數量' + cy, 'q', 'c'], ['數量' + py, 'q', 'p']]) {
+            if (s === 'new') put(ws, r, col[k(lab)], '=' + CL(col[SEGNAME.on + '|' + lab]) + r + '+' + CL(col[SEGNAME.nn + '|' + lab]) + r, { fmt: NUM, bg, bold });
+            else put(ws, r, col[k(lab)], vv(s, code, y), { fmt: NUM, bg, bold });
+          }
+          for (const m of ['有購人數', '金額', '數量']) put(ws, r, col[k(m + 'YOY')], '=IFERROR(' + A(k(m + cy)) + '/' + A(k(m + py)) + '-1,"")', { fmt: YOY, bg });
+          put(ws, r, col[k('客群營收佔比')], '=IFERROR(' + A(k('金額' + cy)) + '/' + A('銷售金額|' + cy) + ',"")', { fmt: PCT, bg });
+        }
+      }
+    };
+    put(ws, TR, 1, '合計（全站）', { bold: true, bg: YEL, al: 'left' }); for (let i = 1; i < L; i++) put(ws, TR, 1 + i, '', { bg: YEL });
+    writeRow(TR, J.totA, J.totB, true);
+    let r = TR + 1;
+    for (const row of J.rows) { row.keys.forEach((k, i) => put(ws, r, 1 + i, k, { al: 'left', raw: 'cat' })); writeRow(r, row.A, row.B, false); r++; }
+    const lastRow = r - 1;
+    for (const base of [sA, sB]) cols.forEach((c, j) => { if (/YOY|差異/.test(c[1])) cf(ws, CL(base + j) + TR + ':' + CL(base + j) + lastRow); });
+    [12, 16, 22].slice(0, L).forEach((w, i) => ws.getColumn(1 + i).width = w);
+    ws.getColumn(L + 1).width = 2; ws.getColumn(sB - 1).width = 2;
+    for (const base of [sA, sB]) cols.forEach((c, j) => ws.getColumn(base + j).width = /YOY|佔比/.test(c[1]) ? 11 : 12.5);
+    ws.views = [{ state: 'frozen', xSplit: L + 1, ySplit: TR, showGridLines: false }];
+    ws.autoFilter = 'A5:' + CL(last) + lastRow;
+    if (!kpiRef || L === 1) kpiRef = { title, col: { A: colOf(sA), B: colOf(sB) }, TR };
+    yoySheets.push(ws);
+  }
+
+  /* ---- 總覽 ---- */
+  const ws = ws0, NC = 15;
+  ws.getColumn(1).width = 2; ws.getColumn(2).width = 20; for (let c = 3; c <= NC; c++) ws.getColumn(c).width = 12.5;
+  let R = 1;
+  ws.mergeCells(1, 2, 1, NC); put(ws, 1, 2, opt.title, { bold: true, size: 16, color: NAVY, al: 'left', box: false }); ws.getRow(1).height = 30;
+  ws.mergeCells(2, 2, 2, NC); put(ws, 2, 2, '比較基準：' + py + '同期｜時間軸：' + la + '、' + lb + '｜資料來源：類別1-2／類別2／類別3YOY檔、當期商品明細（新舊會員身分別）', { color: '595959', al: 'left', box: false, size: 9 });
+  R = 2;
+  const section = (t, sub) => {
+    R += 1; ws.mergeCells(R, 2, R, NC);
+    for (let c = 2; c <= NC; c++) ws.getCell(R, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + NAVY } };
+    put(ws, R, 2, t, { bold: true, bg: NAVY, color: 'FFFFFF', al: 'left', box: false, size: 11 }); ws.getRow(R).height = 22; R++;
+    if (sub) { ws.mergeCells(R, 2, R, NC); put(ws, R, 2, sub, { color: '595959', al: 'left', box: false, size: 9 }); R++; }
+  };
+  section('一、整體KPI總覽', 'KPI以「' + kpiRef.title + '」頁的全站合計列為準（公式連結），修改該頁數字會自動更新本表。');
+  hdr(ws, R, 3, 6, la); hdr(ws, R, 8, 11, lb, WINE); put(ws, R, 2, '', { bg: LIGHT }); R++;
+  [[2, '指標'], [3, cy], [4, py], [5, '差異'], [6, 'YOY'], [8, cy], [9, py], [10, '差異'], [11, 'YOY']].forEach(([c, t]) => put(ws, R, c, t, { bold: true, bg: LIGHT, al: 'center' })); R++;
+  const kr = {}; const k0 = R;
+  for (const name of ['購買人數', '訂單筆數', '銷售金額', '銷售數量', '平均訂單價', '平均客單價']) {
+    put(ws, R, 2, name, { bold: true, al: 'left' });
+    for (const [cc, side] of [[3, 'A'], [8, 'B']]) {
+      const col = kpiRef.col[side];
+      put(ws, R, cc, "='" + kpiRef.title + "'!" + CL(col[name + '|' + cy]) + kpiRef.TR, { fmt: NUM });
+      put(ws, R, cc + 1, "='" + kpiRef.title + "'!" + CL(col[name + '|' + py]) + kpiRef.TR, { fmt: NUM });
+      put(ws, R, cc + 2, '=' + CL(cc) + R + '-' + CL(cc + 1) + R, { fmt: DIF });
+      put(ws, R, cc + 3, '=IFERROR(' + CL(cc) + R + '/' + CL(cc + 1) + R + '-1,"")', { fmt: YOY });
+    }
+    kr[name] = R; R++;
+  }
+  const ra = kr['銷售金額'];
+  put(ws, R, 2, lb + '佔' + la + '營收', { bold: true, al: 'left' });
+  put(ws, R, 8, '=IFERROR(H' + ra + '/C' + ra + ',"")', { fmt: PCT }); put(ws, R, 9, '=IFERROR(I' + ra + '/D' + ra + ',"")', { fmt: PCT });
+  put(ws, R, 10, '=IFERROR(H' + R + '-I' + R + ',"")', { fmt: YOY }); put(ws, R, 11, '');
+  for (let c = 3; c <= 6; c++) put(ws, R, c, '—', { al: 'center', color: '808080' });
+  cf(ws, 'E' + k0 + ':F' + R); cf(ws, 'J' + k0 + ':K' + R); R++;
+
+  section('二、重點摘要');
+  for (const t of M.summary) {
+    ws.mergeCells(R, 2, R, NC); put(ws, R, 2, '•' + t, { al: 'left', va: 'top', box: false, wrap: true });
+    const units = [...t].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
+    ws.getRow(R).height = 15 * Math.max(1, Math.ceil(units / 150)) + 6; R++;
+  }
+
+  const segTot = side => M.base['tot' + side];
+  if (M.base.hasSeg) {
+    section('三、新舊客結構', '客群定義（依類別檔「新舊會員身分別」，與KPI同源）：new_new＝新會員新客、old_new＝舊會員首購新客、old_old＝舊客；新客＝new_new＋old_new。人數為客群內不重複人數。');
+    for (const [side, lab, bgc] of [['A', la, NAVY], ['B', lb, WINE]]) {
+      const T = segTot(side); if (!T || T.oo_b_c === undefined) continue;
+      hdr(ws, R, 2, 12, lab, bgc); R++;
+      ['客群', '購買人數' + cy, '購買人數' + py, '人數YOY', '銷售金額' + cy, '銷售金額' + py, '金額YOY', cy + '營收佔比', '客單價' + cy, '客單價' + py, '客單價YOY'].forEach((h, i) => put(ws, R, 2 + i, h, { bold: true, bg: LIGHT, al: 'center', wrap: true }));
+      ws.getRow(R).height = 30; R++;
+      const r0 = R;
+      const rows = [['new_new新會員新客', 'nn'], ['old_new舊會員首購', 'on'], ['新客小計', 'sub'], ['old_old舊客', 'oo'], ['合計', 'all']];
+      for (const [name, code] of rows) {
+        const bg = code === 'sub' ? PALE : code === 'all' ? YEL : undefined, bold = code === 'sub' || code === 'all';
+        put(ws, R, 2, name, { bold, bg, al: 'left' });
+        if (['nn', 'on', 'oo'].includes(code)) {
+          put(ws, R, 3, tv(T, code, 'b', 'c'), { fmt: NUM, bg }); put(ws, R, 4, tv(T, code, 'b', 'p'), { fmt: NUM, bg });
+          put(ws, R, 6, tv(T, code, 'a', 'c'), { fmt: NUM, bg }); put(ws, R, 7, tv(T, code, 'a', 'p'), { fmt: NUM, bg });
+        } else if (code === 'sub') for (const c of [3, 4, 6, 7]) put(ws, R, c, '=SUM(' + CL(c) + r0 + ':' + CL(c) + (r0 + 1) + ')', { fmt: NUM, bold, bg });
+        else for (const c of [3, 4, 6, 7]) put(ws, R, c, '=' + CL(c) + (r0 + 2) + '+' + CL(c) + (r0 + 3), { fmt: NUM, bold, bg });
+        put(ws, R, 5, '=IFERROR(C' + R + '/D' + R + '-1,"")', { fmt: YOY, bg }); put(ws, R, 8, '=IFERROR(F' + R + '/G' + R + '-1,"")', { fmt: YOY, bg });
+        put(ws, R, 9, '=IFERROR(F' + R + '/F$' + (r0 + 4) + ',"")', { fmt: PCT, bg });
+        put(ws, R, 10, '=IFERROR(F' + R + '/C' + R + ',"")', { fmt: NUM, bg }); put(ws, R, 11, '=IFERROR(G' + R + '/D' + R + ',"")', { fmt: NUM, bg });
+        put(ws, R, 12, '=IFERROR(J' + R + '/K' + R + '-1,"")', { fmt: YOY, bg });
+        R++;
+      }
+      cf(ws, 'E' + r0 + ':E' + (R - 1)); cf(ws, 'H' + r0 + ':H' + (R - 1)); cf(ws, 'L' + r0 + ':L' + (R - 1));
+      R++;
+    }
+  }
+
+  const prodTable = (title, items, seg, n, key) => {
+    hdr(ws, R, 2, 14, title, PALE, '000000'); R++;
+    const lab = seg === 'new' ? '新客' : '舊客';
+    const heads = seg === 'all' ? ['排名', '類別1-2', '類別2', '商品名稱', '', '', '', '購買人數', '訂單筆數', '銷售金額', '新客人數', '舊客人數', '新客佔比']
+      : ['排名', '類別1-2', '類別2', '商品名稱', '', '', '', lab + '購買人數', lab + '銷售金額', lab + '客單價', '商品總購買人數', lab + '佔該商品', ''];
+    heads.forEach((h, i) => put(ws, R, 2 + i, h, { bold: true, bg: LIGHT, al: 'center' }));
+    ws.mergeCells(R, 5, R, 8); R++;
+    topProducts(items, seg, key, n).forEach((p, i) => {
+      put(ws, R, 2, i + 1, { fmt: '0', al: 'center' }); put(ws, R, 3, p.c12, { al: 'left', raw: 'cat' }); put(ws, R, 4, p.c2, { al: 'left', raw: 'cat' });
+      for (let c = 5; c <= 8; c++) ws.getCell(R, c).border = BOX;
+      ws.mergeCells(R, 5, R, 8); put(ws, R, 5, p.name, { al: 'left', raw: true });
+      if (seg === 'all') {
+        put(ws, R, 9, p.all.b, { fmt: NUM }); put(ws, R, 10, p.all.o, { fmt: NUM }); put(ws, R, 11, p.all.a, { fmt: NUM });
+        put(ws, R, 12, p.new.b, { fmt: NUM }); put(ws, R, 13, p.oo.b, { fmt: NUM }); put(ws, R, 14, '=IFERROR(L' + R + '/I' + R + ',"")', { fmt: PCT });
+      } else {
+        put(ws, R, 9, p[seg].b, { fmt: NUM }); put(ws, R, 10, p[seg].a, { fmt: NUM }); put(ws, R, 11, '=IFERROR(J' + R + '/I' + R + ',"")', { fmt: NUM });
+        put(ws, R, 12, p.all.b, { fmt: NUM }); put(ws, R, 13, '=IFERROR(I' + R + '/L' + R + ',"")', { fmt: PCT });
+      }
+      R++;
+    });
+    R++;
+  };
+  const catPrefTable = (title, items) => {
+    hdr(ws, R, 2, 11, title, PALE, '000000'); R++;
+    ['類別1-2', '新客銷售金額', '舊客銷售金額', '品類總營收', '新客營收佔比', '新客偏好指數', '新客營收排名', '舊客營收排名'].forEach((h, i) => put(ws, R, 2 + i, h, { bold: true, bg: LIGHT, al: 'center', wrap: true }));
+    ws.getRow(R).height = 30; R++;
+    const { arr } = catPref(items); const r0 = R, r1 = R + arr.length - 1, tr = r1 + 1;
+    for (const x of arr) {
+      put(ws, R, 2, x.c12, { al: 'left', raw: 'cat' }); put(ws, R, 3, x.n, { fmt: NUM }); put(ws, R, 4, x.o, { fmt: NUM });
+      put(ws, R, 5, '=C' + R + '+D' + R, { fmt: NUM }); put(ws, R, 6, '=IFERROR(C' + R + '/E' + R + ',"")', { fmt: PCT });
+      put(ws, R, 7, '=IFERROR(F' + R + '/F$' + tr + '*100,"")', { fmt: '0' });
+      put(ws, R, 8, '=RANK(C' + R + ',C$' + r0 + ':C$' + r1 + ')', { fmt: '0', al: 'center' }); put(ws, R, 9, '=RANK(D' + R + ',D$' + r0 + ':D$' + r1 + ')', { fmt: '0', al: 'center' });
+      R++;
+    }
+    put(ws, R, 2, '合計', { bold: true, bg: YEL, al: 'left' });
+    for (const c of [3, 4, 5]) put(ws, R, c, '=SUM(' + CL(c) + r0 + ':' + CL(c) + r1 + ')', { fmt: NUM, bold: true, bg: YEL });
+    put(ws, R, 6, '=IFERROR(C' + R + '/E' + R + ',"")', { fmt: PCT, bold: true, bg: YEL }); put(ws, R, 7, 100, { fmt: '0', bold: true, bg: YEL }); put(ws, R, 8, '', { bg: YEL }); put(ws, R, 9, '', { bg: YEL });
+    ws.addConditionalFormatting({ ref: 'G' + r0 + ':G' + r1, rules: [
+      { type: 'cellIs', operator: 'greaterThanOrEqual', formulae: [120], priority: 1, style: { font: { color: { argb: 'FF' + BLUE }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDDEBF7' } } } },
+      { type: 'cellIs', operator: 'lessThanOrEqual', formulae: [80], priority: 2, style: { font: { color: { argb: 'FF' + RED }, bold: true }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFCE4E4' } } } }] });
+    R++; ws.mergeCells(R, 2, R, NC);
+    put(ws, R, 2, '新客偏好指數＝該品類新客營收佔比÷全站新客營收佔比×100；≥120（藍底）代表新客特別愛買、≤80（紅底）代表以舊客為主。', { color: '595959', al: 'left', box: false, size: 9 }); R += 2;
+  };
+  const NOTE = '排除99_其他（訂單處理費、滿額贈品）及平均每人金額<NT$10的贈品／免費電子書。商品人數為各客群人數加總（同一人跨客群不會重複）。';
+  const secNo = ['四', '五'];
+  [['A', la], ['B', lb]].forEach(([side, lab], i) => {
+    const P = M.prod[side]; if (!P) return;
+    section(secNo[i] + '、大家都在買什麼？（' + lab + '，' + cy + '）', NOTE);
+    prodTable('A.全體TOP20熱銷商品（依購買人數）', P.items, 'all', 20, 'b');
+    prodTable('B.全體TOP10營收商品（依銷售金額）', P.items, 'all', 10, 'a');
+    prodTable('C.新客（new_new＋old_new）都在買什麼？TOP10（依新客購買人數）', P.items, 'new', 10, 'b');
+    prodTable('D.舊客（old_old）都在買什麼？TOP10（依舊客購買人數）', P.items, 'oo', 10, 'b');
+    catPrefTable('E.新舊客品類結構與新客偏好指數（類別1-2）', P.items);
+  });
+  for (let r = 3; r <= R + 1; r++) if (!ws.getRow(r).height) ws.getRow(r).height = 18;
+  for (const w of wb.worksheets) w.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  // 總覽放第一頁
+  return wb.xlsx.writeBuffer();
+}
+
+const Core = { blocksFrom, parseAoa, parseWorkbook, autoAssign, buildModel, exportXlsx, topProducts, catPref, tv, K, fmtN, sp, pct, nm, ns, catClean, SEGNAME, cleanItems };
+if (typeof module !== 'undefined') module.exports = Core; else root.Core = Core;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+(function(){
+'use strict';
+const C = window.Core;
+const $ = id => document.getElementById(id);
+let files = [], model = null, curTab = 'ov';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const N = v => isFinite(v) ? Math.round(v).toLocaleString('en-US') : '';
+const P1 = v => isFinite(v) ? (v*100).toFixed(1)+'%' : '';
+const Y = v => isFinite(v) ? '<span class="'+(v>0?'up':v<0?'down':'')+'">'+(v>0?'+':'')+(v*100).toFixed(1)+'%</span>' : '';
+const D = v => isFinite(v) ? '<span class="'+(v>0?'up':v<0?'down':'')+'">'+Math.round(v).toLocaleString('en-US')+'</span>' : '';
+const yoy = (a,b) => b ? a/b-1 : NaN;
+const dv = (a,b) => b ? a/b : NaN;
+
+
+/* ---------- 示範資料（虛構數字，結構同Looker匯出檔） ---------- */
+function genDemo() {
+  let seed = 20261111; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const R = (a, b) => a + (b - a) * rnd();
+  const TREE = {
+    '01_中文書': { '文學': ['華文創作', '翻譯文學', '輕小說'], '商業財經': ['投資理財', '管理'], '動漫畫／圖文': ['日系漫畫', '圖文書'], '心理勵志': ['自我成長', '人際關係'] },
+    '04_雜誌': { '生活雜誌': ['美食旅遊', '居家'], '財經雜誌': ['商業週刊類'] },
+    '05_影音': { '華語CD': ['流行', '獨立'], '影像BD／DVD': ['演唱會', '電影'] },
+    '06_童書': { '繪本': ['0-3歲', '3-6歲'], '兒童讀物': ['橋梁書', '科普'] },
+    '07_親子用品': { '兒童玩具': ['積木', '桌遊'], '嬰幼用品': ['餐具', '寢具'] },
+    '08_文具潮藝': { '嗜好收藏': ['聯名卡', '公仔'], '筆記本／紙製品': ['手帳', '筆記本'], '書寫工具': ['鋼筆', '原子筆'] },
+    '09_服飾鞋包': { '包款': ['後背包', '托特包'], '配件': ['帽子', '襪子'] },
+    '10_美妝保養': { '香水／香氛': ['淡香精', '擴香'], '保養': ['乳液', '面膜'] },
+    '11_3C': { '手機平板／智慧週邊': ['耳機', '充電'], '相機／攝錄影及週邊': ['拍立得', '配件'] },
+    '12_食品保健': { '休閒零食': ['餅乾', '茶飲'], '禮盒': ['年節禮盒'] },
+    '13_家電': { '大型家電': ['清淨機', '除濕機'], '廚房家電': ['氣炸鍋', '咖啡機'] }
+  };
+  const SEG = ['old_old', 'old_new', 'new_new'], SK = { old_old: 'oo', old_new: 'on', new_new: 'nn' };
+  const SHARE = { oo: 0.78, on: 0.14, nn: 0.08 };
+  const CATBIAS = { '11_3C': 1.9, '13_家電': 1.7, '10_美妝保養': 1.4, '07_親子用品': 1.4, '12_食品保健': 0.4, '04_雜誌': 0.7 };
+  const GROW = { '08_文具潮藝': 1.6, '07_親子用品': 1.5, '13_家電': 1.45, '11_3C': 0.78, '04_雜誌': 0.95 };
+  const PRICE = { '01_中文書': 380, '04_雜誌': 220, '05_影音': 700, '06_童書': 330, '07_親子用品': 900, '08_文具潮藝': 420, '09_服飾鞋包': 1600, '10_美妝保養': 1500, '11_3C': 2600, '12_食品保健': 650, '13_家電': 4800 };
+  const leaves = [];
+  for (const c12 in TREE) for (const c2 in TREE[c12]) for (const c3 of TREE[c12][c2]) leaves.push({ c12, c2, c3 });
+  const mk = (period) => {
+    const sc = period === 'A' ? 1 : 0.27;
+    return leaves.map(l => {
+      const v = {};
+      const base = R(300, 2200) * sc, g = (GROW[l.c12] || 1.15) * R(0.85, 1.2) * (period === 'B' ? 1.35 : 1);
+      for (const s of SEG) {
+        const k = SK[s], bias = s === 'old_old' ? 1 : (CATBIAS[l.c12] || 1);
+        const bp = Math.max(1, Math.round(base * SHARE[k] * bias)), bc = Math.max(1, Math.round(bp * g * R(0.9, 1.12) * (s === 'old_old' ? 1 : 1.05)));
+        const price = PRICE[l.c12] * R(0.8, 1.25), dropC = period === 'B' ? R(0.72, 0.95) : R(0.95, 1.03);
+        v[s] = { b: [bc, bp], o: [Math.round(bc * R(1.05, 1.2)), Math.round(bp * R(1.05, 1.2))], a: [Math.round(bc * price * dropC), Math.round(bp * price)], q: [Math.round(bc * R(1.3, 2.4)), Math.round(bp * R(1.3, 2.4))] };
+      }
+      return Object.assign({}, l, { v });
+    });
+  };
+  const block = (m) => {
+    const out = [];
+    for (const k of ['b', 'o', 'a', 'q']) { const [c, p] = m[k]; out.push(c, p, c - p, p ? (c - p) / p : null); }
+    out.push(Math.round(m.q[0] * 0.6), Math.round(m.q[1] * 0.6), 0, 0);
+    for (const [n, d] of [['a', 'o'], ['a', 'b']]) { const c = m[d][0] ? m[n][0] / m[d][0] : 0, p = m[d][1] ? m[n][1] / m[d][1] : 0; out.push(c, p, c - p, p ? (c - p) / p : null); }
+    return out;
+  };
+  const MH = ['購買人數', '訂單筆數', '銷售金額', '銷售數量', '銷售品項', '平均訂單價', '平均客單價'];
+  const hdrs = MH.flatMap(m => [m + '當期值', m + '比較值', m + '差異', m + '差異(%)']);
+  const sum = (arr, s, dedupe) => { const m = { b: [0, 0], o: [0, 0], a: [0, 0], q: [0, 0] }; for (const x of arr) for (const k in m) for (const i of [0, 1]) m[k][i] += x.v[s][k][i]; if (dedupe) for (const i of [0, 1]) m.b[i] = Math.round(m.b[i] * dedupe); return m; };
+  const add = (ms) => { const m = { b: [0, 0], o: [0, 0], a: [0, 0], q: [0, 0] }; for (const x of ms) for (const k in m) for (const i of [0, 1]) m[k][i] += x[k][i]; return m; };
+  const files = [];
+  const lab = { A: '1101-1111', B: '1111' };
+  for (const per of ['A', 'B']) {
+    const data = mk(per);
+    for (const L of [1, 2, 3]) {
+      const keyN = ['類別1-2', '類別2', '類別3'].slice(0, L);
+      const r0 = keyN.map((_, i) => i === 0 ? '新舊會員身分別' : null);
+      SEG.forEach(s => { for (let i = 0; i < 28; i++) r0.push(s); }); for (let i = 0; i < 28; i++) r0.push(null);
+      const r1 = keyN.concat(hdrs, hdrs, hdrs, hdrs);
+      const groups = new Map();
+      for (const d of data) { const id = [d.c12, d.c2, d.c3].slice(0, L).join('|'); if (!groups.has(id)) groups.set(id, []); groups.get(id).push(d); }
+      const dd = [1, 0.93, 0.86][L - 1];
+      const rows = [...groups].map(([id, arr]) => { const segs = SEG.map(s => sum(arr, s, dd)); return id.split('|').concat(...segs.map(block), block(add(segs))); });
+      const segsT = SEG.map(s => sum(data, s, 0.8));
+      rows.push(keyN.map(() => null).concat(...segsT.map(block), block(add(segsT))));
+      files.push({ fname: '示範_' + lab[per] + '_類別' + ['', '1-2', '2', '3'][L] + '.xlsx', aoa: [r0, r1].concat(rows) });
+    }
+    // 當期商品明細
+    const PH = ['購買人數', '訂單筆數', '銷售金額', '銷售品項', '銷售數量', '平均訂單價', '平均客單價', '佔比'];
+    const r0 = [null, null, null, null, '新舊會員身分別'];
+    SEG.forEach(s => PH.forEach(() => r0.push(s)));
+    const r1 = ['類別1-2', '類別2', '類別3', '26碼', '商品名稱'].concat(PH, PH, PH);
+    const rows = []; let n = 1;
+    for (const d of data) {
+      const k = 2 + Math.floor(rnd() * 3), w = Array.from({ length: k }, () => R(0.2, 1)); const ws = w.reduce((a, b) => a + b, 0);
+      w.forEach((wi, j) => {
+        const row = [d.c12, d.c2, d.c3, String(2600000000000 + n), '示範商品' + String(n).padStart(3, '0') + '｜' + d.c3 + (j === 0 ? '人氣款' : j === 1 ? '新品' : '限定款')];
+        SEG.forEach(s => { const m = d.v[s], f = wi / ws; const b = Math.max(1, Math.round(m.b[0] * f * 1.1)); row.push(b, Math.round(m.o[0] * f), Math.round(m.a[0] * f), 1, Math.round(m.q[0] * f), 0, 0, 0); });
+        rows.push(row); n++;
+      });
+    }
+    files.push({ fname: '示範_2026' + lab[per] + '_商品明細.xlsx', aoa: [r0, r1].concat(rows) });
+  }
+  return files;
+}
+function loadDemo() {
+  files = genDemo().map(f => C.parseAoa(f.aoa, f.fname));
+  C.autoAssign(files);
+  $('oTitle').value = '示範｜2026雙11成效報告'; $('oCy').value = 2026; $('oPy').value = 2025;
+  renderFiles();
+  $('demoBar').hidden = false;
+  $('run').click();
+}
+
+/* ---------- 上傳 ---------- */
+const drop = $('drop'), fin = $('fileIn');
+['dragenter','dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('on'); }));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', ev => addFiles(ev.dataTransfer.files));
+drop.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); fin.click(); } });
+fin.addEventListener('change', () => { addFiles(fin.files); fin.value = ''; });
+
+async function addFiles(list) {
+  list = [...list];
+  if (!$('demoBar').hidden) { files = []; $('demoBar').hidden = true; $('oTitle').value = '誠品線上檔期成效報告'; }
+  $('msg').textContent = '讀取中…';
+  for (const f of list) {
+    try {
+      const buf = new Uint8Array(await f.arrayBuffer());
+      const p = C.parseWorkbook(XLSX, buf, f.name);
+      files = files.filter(x => x.fname !== f.name); files.push(p);
+    } catch (e) { files = files.filter(x => x.fname !== f.name); files.push({ fname: f.name, kind: 'err', err: e.message }); }
+  }
+  C.autoAssign(files.filter(f => f.kind !== 'err'));
+  const yrs = files.filter(f => f.kind === 'prod' && f.year && f.role !== 'skip').map(f => f.year);
+  if (!$('oCy').value) { const cy = yrs.length ? Math.max(...yrs) : new Date().getFullYear(); $('oCy').value = cy; $('oPy').value = cy - 1; }
+  renderFiles();
+}
+
+function renderFiles() {
+  const order = f => (f.kind === 'cat' ? f.level : f.kind === 'prod' ? 5 : 9) * 10 + (f.role === 'B' ? 1 : 0);
+  files.sort((a,b) => order(a) - order(b) || a.fname.localeCompare(b.fname));
+  if (!files.length) { $('fileList').innerHTML = ''; $('run').disabled = true; return; }
+  let h = '<table class="files"><thead><tr><th>檔案</th><th>類型</th><th>時段</th></tr></thead><tbody>';
+  files.forEach((f, i) => {
+    if (f.kind === 'err') { h += '<tr><td class="fn">'+esc(f.fname)+'</td><td colspan="2"><span class="tag bad">'+esc(f.err)+'</span></td></tr>'; return; }
+    const type = f.kind === 'cat' ? '類別' + ['','1-2','2','3'][f.level] + (f.segs.includes('oo') ? '・含新舊客' : '') : '商品明細' + (f.year ? '・' + f.year : '');
+    const opts = [['A',$('oLa').value||'時段A'],['B',$('oLb').value||'時段B']].concat(f.kind === 'prod' ? [['skip','不使用（比較年／其他）']] : [['skip','不使用']]);
+    h += '<tr><td class="fn">'+esc(f.fname)+(f.warn && f.warn.length ? '<br><small class="hint">'+esc(f.warn.join('；'))+'</small>' : '')+'</td><td><span class="tag">'+esc(type)+'</span></td><td><select data-i="'+i+'" aria-label="時段">'+opts.map(o => '<option value="'+o[0]+'"'+(f.role===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></td></tr>';
+  });
+  h += '</tbody></table><p class="hint"><button class="ghost" id="clr" type="button">清除全部</button></p>';
+  $('fileList').innerHTML = h;
+  $('fileList').querySelectorAll('select').forEach(s => s.addEventListener('change', () => { files[+s.dataset.i].role = s.value; }));
+  $('clr').addEventListener('click', () => { $('demoBar').hidden = true; files = []; renderFiles(); $('out').hidden = true; $('msg').textContent = '先上傳檔案'; $('warns').innerHTML=''; });
+  const ok = files.some(f => f.kind === 'cat');
+  $('run').disabled = !ok;
+  $('msg').textContent = ok ? '確認時段後按「產生報告」' : '至少需要一份類別YOY檔';
+}
+['oLa','oLb'].forEach(id => $(id).addEventListener('change', renderFiles));
+$('demoBtn').addEventListener('click', loadDemo);
+
+/* ---------- 產生 ---------- */
+$('run').addEventListener('click', () => {
+  try {
+    const opt = { title: $('oTitle').value.trim() || '檔期成效報告', la: $('oLa').value.trim() || '時段A', lb: $('oLb').value.trim() || '時段B', cy: +$('oCy').value || new Date().getFullYear(), py: +$('oPy').value || (+$('oCy').value - 1) };
+    model = C.buildModel(files.filter(f => f.kind !== 'err'), opt);
+    $('warns').innerHTML = model.warn.map(w => '<li>'+esc(w)+'</li>').join('');
+    $('msg').textContent = '報告已產生，可在下方預覽或下載Excel';
+    buildTabs(); $('out').hidden = false; show('ov');
+    if (!window.__demoInit) $('out').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  } catch (e) { $('msg').textContent = e.message; }
+});
+
+function buildTabs() {
+  const tabs = [['ov','總覽+摘要']].concat([1,2,3].filter(L => model.levels[L]).map(L => ['L'+L, ['','類別1-2','類別2','類別3'][L]+'YOY']));
+  $('tabs').innerHTML = tabs.map(t => '<button role="tab" data-t="'+t[0]+'" aria-selected="false">'+t[1]+'</button>').join('');
+  $('tabs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => show(b.dataset.t)));
+}
+function show(t) {
+  curTab = t;
+  $('tabs').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
+  $('view').innerHTML = '<div class="sheet">' + (t === 'ov' ? renderOverview() : renderYoyShell(+t.slice(1))) + '</div>';
+  if (t !== 'ov') wireYoy(+t.slice(1));
+}
+
+/* ---------- 總覽預覽 ---------- */
+function renderOverview() {
+  const M = model, o = M.opt, cy = o.cy, py = o.py, tv = C.tv;
+  const A = M.base.totA || {}, B = M.base.totB || {};
+  let h = '<div class="sec">'+esc(o.title)+'｜一、整體KPI總覽</div><div class="ledger">';
+  for (const [T, lab, c] of [[A, o.la, 'var(--navy)'], [B, o.lb, 'var(--wine)']]) {
+    const g = (s,k,y) => tv(T,s,k,y);
+    const rows = [['購買人數', g('tot','b','c'), g('tot','b','p')], ['訂單筆數', g('tot','o','c'), g('tot','o','p')], ['銷售金額', g('tot','a','c'), g('tot','a','p')], ['銷售數量', g('tot','q','c'), g('tot','q','p')],
+      ['平均訂單價', dv(g('tot','a','c'), g('tot','o','c')), dv(g('tot','a','p'), g('tot','o','p'))], ['平均客單價', dv(g('tot','a','c'), g('tot','b','c')), dv(g('tot','a','p'), g('tot','b','p'))]];
+    h += '<div class="side" style="--c:'+c+'"><h3>'+esc(o.la === lab ? o.la : o.lb)+'</h3><div class="tw"><table class="t"><thead><tr><th>指標</th><th>'+cy+'</th><th>'+py+'</th><th>差異</th><th>YOY</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td class="l"><b>'+r[0]+'</b></td><td>'+N(r[1])+'</td><td>'+N(r[2])+'</td><td>'+D(r[1]-r[2])+'</td><td>'+Y(yoy(r[1],r[2]))+'</td></tr>').join('') + '</tbody></table></div></div>';
+  }
+  h += '</div>';
+  if (A.tot_a_c || A.oo_a_c) { const sa = tv(B,'tot','a','c')/tv(A,'tot','a','c'), sb = tv(B,'tot','a','p')/tv(A,'tot','a','p'); h += '<p class="sub" style="margin-top:8px">'+esc(o.lb)+'佔'+esc(o.la)+'營收：'+cy+' '+P1(sa)+'｜'+py+' '+P1(sb)+'</p>'; }
+  h += '<div class="sec">二、重點摘要</div><ul class="sum">' + M.summary.map(s => '<li>'+esc(s)+'</li>').join('') + '</ul>';
+  if (M.base.hasSeg) {
+    h += '<div class="sec">三、新舊客結構</div><p class="sub">new_new＝新會員新客、old_new＝舊會員首購新客、old_old＝舊客；新客＝new_new＋old_new。人數為客群內不重複人數。</p><div class="ledger">';
+    for (const [T, lab, c] of [[A, o.la, 'var(--navy)'], [B, o.lb, 'var(--wine)']]) {
+      if (T.oo_b_c === undefined) continue;
+      const segs = [['new_new新會員新客','nn'],['old_new舊會員首購','on'],['新客小計','new','sub'],['old_old舊客','oo'],['合計','tot','tot']];
+      const ta = tv(T,'tot','a','c');
+      h += '<div class="side" style="--c:'+c+'"><h3>'+esc(lab)+'</h3><div class="tw"><table class="t"><thead><tr><th>客群</th><th>人數'+cy+'</th><th>人數'+py+'</th><th>人數YOY</th><th>金額'+cy+'</th><th>金額YOY</th><th>營收佔比</th><th>客單價'+cy+'</th><th>客單價YOY</th></tr></thead><tbody>' +
+        segs.map(([n, s, cls]) => { const b = tv(T,s,'b','c'), bp = tv(T,s,'b','p'), a = tv(T,s,'a','c'), ap = tv(T,s,'a','p');
+          return '<tr class="'+(cls||'')+'"><td class="l">'+n+'</td><td>'+N(b)+'</td><td>'+N(bp)+'</td><td>'+Y(yoy(b,bp))+'</td><td>'+N(a)+'</td><td>'+Y(yoy(a,ap))+'</td><td>'+P1(a/ta)+'</td><td>'+N(a/b)+'</td><td>'+Y(yoy(a/b, ap/bp))+'</td></tr>'; }).join('') + '</tbody></table></div></div>';
+    }
+    h += '</div>';
+  }
+  ['A','B'].forEach((side, i) => {
+    const P = M.prod[side]; if (!P) return;
+    const lab = side === 'A' ? o.la : o.lb;
+    h += '<div class="sec">'+['四','五'][i]+'、大家都在買什麼？（'+esc(lab)+'，'+cy+'）</div><p class="sub">排除99_其他（處理費、贈品）及平均每人金額&lt;NT$10的贈品／免費電子書。</p>';
+    h += prodTable('A.全體TOP20熱銷商品（依購買人數）', C.topProducts(P.items,'all','b',20), 'all');
+    h += prodTable('B.全體TOP10營收商品（依銷售金額）', C.topProducts(P.items,'all','a',10), 'all');
+    h += prodTable('C.新客都在買什麼？TOP10', C.topProducts(P.items,'new','b',10), 'new');
+    h += prodTable('D.舊客都在買什麼？TOP10', C.topProducts(P.items,'oo','b',10), 'oo');
+    const cp = C.catPref(P.items);
+    h += '<h4 class="tt">E.新舊客品類結構與新客偏好指數</h4><div class="tw"><table class="t"><thead><tr><th>類別1-2</th><th>新客銷售金額</th><th>舊客銷售金額</th><th>新客營收佔比</th><th>新客偏好指數</th><th>新客營收排名</th><th>舊客營收排名</th></tr></thead><tbody>' +
+      cp.arr.map(x => '<tr><td class="l">'+esc(C.catClean(x.c12))+'</td><td>'+N(x.n)+'</td><td>'+N(x.o)+'</td><td>'+P1(x.share)+'</td><td class="'+(x.idx>=120?'idxhi':x.idx<=80?'idxlo':'')+'">'+Math.round(x.idx)+'</td><td>'+x.rn+'</td><td>'+x.ro+'</td></tr>').join('') +
+      '<tr class="tot"><td class="l">合計</td><td>'+N(cp.N)+'</td><td>'+N(cp.O)+'</td><td>'+P1(cp.ov)+'</td><td>100</td><td></td><td></td></tr></tbody></table></div><p class="sub" style="margin-top:6px">新客偏好指數＝該品類新客營收佔比÷全站新客營收佔比×100；≥120藍底、≤80紅底。</p>';
+  });
+  return h;
+}
+function prodTable(title, list, seg) {
+  const lab = seg === 'new' ? '新客' : '舊客';
+  let h = '<h4 class="tt">'+title+'</h4><div class="tw"><table class="t"><thead><tr><th>排名</th><th>類別1-2</th><th>類別2</th><th>商品名稱</th>' +
+    (seg === 'all' ? '<th>購買人數</th><th>訂單筆數</th><th>銷售金額</th><th>新客人數</th><th>舊客人數</th><th>新客佔比</th>' : '<th>'+lab+'購買人數</th><th>'+lab+'銷售金額</th><th>'+lab+'客單價</th><th>商品總購買人數</th><th>'+lab+'佔該商品</th>') + '</tr></thead><tbody>';
+  list.forEach((p, i) => {
+    h += '<tr><td style="text-align:center">'+(i+1)+'</td><td class="l">'+esc(C.catClean(p.c12))+'</td><td class="l">'+esc(C.catClean(p.c2))+'</td><td class="l name">'+esc(p.name)+'</td>' +
+      (seg === 'all' ? '<td>'+N(p.all.b)+'</td><td>'+N(p.all.o)+'</td><td>'+N(p.all.a)+'</td><td>'+N(p.new.b)+'</td><td>'+N(p.oo.b)+'</td><td>'+P1(p.new.b/p.all.b)+'</td>'
+        : '<td>'+N(p[seg].b)+'</td><td>'+N(p[seg].a)+'</td><td>'+N(p[seg].a/p[seg].b)+'</td><td>'+N(p.all.b)+'</td><td>'+P1(p[seg].b/p.all.b)+'</td>') + '</tr>';
+  });
+  return h + '</tbody></table></div>';
+}
+
+/* ---------- YOY預覽 ---------- */
+function renderYoyShell(L) {
+  const J = model.levels[L], o = model.opt;
+  const c1 = [...new Set(J.rows.map(r => r.keys[0]))];
+  return '<div class="ctl">' +
+    '<label>時段<br><select id="yP"><option value="AB">兩個時段</option><option value="A">'+esc(o.la)+'</option><option value="B">'+esc(o.lb)+'</option></select></label>' +
+    '<label>指標<br><select id="yM"><option value="all">整體指標</option>'+(J.hasSeg?'<option value="seg">新舊客（有購人數／金額）</option>':'')+'</select></label>' +
+    '<label>類別1-2<br><select id="yC"><option value="">全部</option>'+c1.map(c => '<option>'+esc(c)+'</option>').join('')+'</select></label>' +
+    '<label>搜尋<br><input id="yQ" type="text" placeholder="品類名稱"></label>' +
+    '<label>排序<br><select id="yS"><option value="">原始順序</option><option value="ad">營收差異（大→小）</option><option value="au">營收差異（小→大）</option><option value="a">'+o.cy+'營收（大→小）</option></select></label>' +
+    '</div><div class="yoyw" id="yT"></div><p class="sub" id="yN" style="margin-top:6px"></p>';
+}
+function wireYoy(L) { ['yP','yM','yC','yS'].forEach(id => $(id).addEventListener('change', () => drawYoy(L))); $('yQ').addEventListener('input', () => drawYoy(L)); drawYoy(L); }
+function drawYoy(L) {
+  const J = model.levels[L], o = model.opt, tv = C.tv, per = $('yP').value, mode = $('yM').value, fc = $('yC').value, q = $('yQ').value.trim().toLowerCase(), so = $('yS').value;
+  const sides = per === 'AB' ? ['A','B'] : [per];
+  const sideA = so ? (sides[0]) : 'A';
+  let rows = J.rows.filter(r => (!fc || r.keys[0] === fc) && (!q || r.keys.join(' ').toLowerCase().includes(q)));
+  const dif = r => tv(r[sideA],'tot','a','c') - tv(r[sideA],'tot','a','p');
+  if (so === 'ad') rows = rows.slice().sort((a,b) => dif(b) - dif(a));
+  if (so === 'au') rows = rows.slice().sort((a,b) => dif(a) - dif(b));
+  if (so === 'a') rows = rows.slice().sort((a,b) => tv(b[sideA],'tot','a','c') - tv(a[sideA],'tot','a','c'));
+  const LIMIT = 400, shown = rows.slice(0, LIMIT);
+  const cy = o.cy, py = o.py;
+  let groups;
+  if (mode === 'seg') groups = ['oo','on','nn','new'].map(s => [C.SEGNAME[s], [['人數'+cy, T => tv(T,s,'b','c'),'n'],['人數'+py, T => tv(T,s,'b','p'),'n'],['人數YOY', T => yoy(tv(T,s,'b','c'), tv(T,s,'b','p')),'y'],['金額'+cy, T => tv(T,s,'a','c'),'n'],['金額YOY', T => yoy(tv(T,s,'a','c'), tv(T,s,'a','p')),'y'],['營收佔比', T => dv(tv(T,s,'a','c'), tv(T,'tot','a','c')),'p']]]);
+  else groups = [
+    ['購買人數', [[String(cy), T => tv(T,'tot','b','c'),'n'],[String(py), T => tv(T,'tot','b','p'),'n'],['YOY', T => yoy(tv(T,'tot','b','c'), tv(T,'tot','b','p')),'y']]],
+    ['訂單筆數', [[String(cy), T => tv(T,'tot','o','c'),'n'],['YOY', T => yoy(tv(T,'tot','o','c'), tv(T,'tot','o','p')),'y']]],
+    ['銷售金額', [[String(cy), T => tv(T,'tot','a','c'),'n'],[String(py), T => tv(T,'tot','a','p'),'n'],['差異', T => tv(T,'tot','a','c') - tv(T,'tot','a','p'),'d'],['YOY', T => yoy(tv(T,'tot','a','c'), tv(T,'tot','a','p')),'y'],['佔比', T => dv(tv(T,'tot','a','c'), tv(J['tot'+cur],'tot','a','c')),'p']]],
+    ['平均客單價', [[String(cy), T => dv(tv(T,'tot','a','c'), tv(T,'tot','b','c')),'n'],['YOY', T => yoy(dv(tv(T,'tot','a','c'), tv(T,'tot','b','c')), dv(tv(T,'tot','a','p'), tv(T,'tot','b','p'))),'y']]]];
+  let cur = 'A';
+  const fmt = (v, t) => t === 'y' ? Y(v) : t === 'd' ? D(v) : t === 'p' ? P1(v) : N(v);
+  const kn = ['類別1-2','類別2','類別3'].slice(0, L);
+  let h = '<table class="t"><thead><tr>' + kn.map(k => '<th class="k" rowspan="3">'+k+'</th>').join('');
+  sides.forEach(s => { const n = groups.reduce((a,g) => a + g[1].length, 0); h += '<th colspan="'+n+'" class="'+(s==='A'?'pA':'pB')+'">'+esc(s==='A'?o.la:o.lb)+'</th>'; });
+  h += '</tr><tr>' + sides.map(() => groups.map(g => '<th colspan="'+g[1].length+'">'+esc(g[0])+'</th>').join('')).join('') + '</tr><tr>' + sides.map(() => groups.map(g => g[1].map(c => '<th>'+esc(c[0])+'</th>').join('')).join('')).join('') + '</tr></thead><tbody>';
+  const line = (keys, get, cls) => { let s = '<tr class="'+(cls||'')+'">' + keys.map((k,i) => '<td class="k l"'+(i===0&&keys.length<L?' colspan="'+L+'"':'')+'>'+esc(C.catClean(k))+'</td>').join(''); sides.forEach(sd => { cur = sd; const T = get(sd) || {}; groups.forEach(g => g[1].forEach(c => { s += '<td>'+fmt(c[1](T), c[2])+'</td>'; })); }); return s + '</tr>'; };
+  h += line(['合計（全站）'], s => J['tot'+s], 'tot');
+  for (const r of shown) h += line(r.keys, s => r[s]);
+  h += '</tbody></table>';
+  $('yT').innerHTML = h;
+  $('yN').textContent = '共' + rows.length + '列' + (rows.length > LIMIT ? '，預覽顯示前' + LIMIT + '列（Excel含全部）' : '') + '。預覽為精簡欄位，Excel版含訂單、數量、訂單價等完整指標。';
+}
+
+/* ---------- 下載 ---------- */
+$('dl').addEventListener('click', async () => {
+  if (!model) return;
+  const btn = $('dl'); btn.disabled = true; const old = btn.textContent; btn.textContent = '產生中…';
+  try {
+    const buf = await C.exportXlsx(ExcelJS, model);
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const filename = C.ns(model.opt.title) + '.xlsx';
+    let dl = null;
+    try { if (window.claude && window.claude.use) dl = await window.claude.use('downloads'); } catch (e) { dl = null; }
+    if (dl) {
+      try { await dl.save({ filename, data: blob }); $('msg').textContent = '已下載 ' + filename; }
+      catch (e) { $('msg').textContent = e && e.code === 'declined' ? '已取消下載' : '下載失敗：' + (e && e.message || e); }
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      $('msg').textContent = '已下載 ' + filename;
+    }
+  } catch (e) { $('msg').textContent = '產生Excel失敗：' + e.message; }
+  btn.disabled = false; btn.textContent = old;
+});
+window.__demoInit = true; try { loadDemo(); } catch (e) { console.error(e); } window.__demoInit = false;
+})();
+</script>
+</body>
+</html>
