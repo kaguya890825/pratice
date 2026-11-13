@@ -259,7 +259,7 @@
             <summary>信件寬度、圓角與外框線</summary>
           <div class="row2">
             <div><label class="l">信件寬度</label>
-              <select id="width"><option value="600">600px</option><option value="640">640px</option><option value="680">680px</option><option value="750">750px</option><option value="800">800px</option><option value="1000">1000px（整張切圖 EDM 常用）</option></select></div>
+              <select id="width"><option value="600">600px</option><option value="640">640px</option><option value="680">680px</option><option value="750">750px</option><option value="800">800px</option><option value="1000">1000px（整張切圖 EDM 常用）</option><option value="1200">1200px（切圖 EDM 原尺寸）</option></select></div>
             <div><label class="l">信件圓角 px</label><input type="number" id="radius" min="0" max="24"></div>
             <div style="grid-column:1 / -1;"><label class="l">信件外框線</label>
               <select id="frameLine"><option value="">自動（外框背景透明、或和信件底色一樣時，加細框線）</option><option value="none">不加</option><option value="thin">細框線（邊框色）</option><option value="accent">粗框線（主色）</option></select>
@@ -469,7 +469,16 @@ function toast(msg, actLabel, act){
   t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'), actLabel?5000:1800);
 }
 /* 文字：跳脫後，<span>字</span> 轉主色、換行轉 <br> */
-function rich(s, color){ return esc(s).replace(/&lt;span&gt;([\s\S]*?)&lt;\/span&gt;/g, `<span style="color:${color};">$1</span>`).replace(/\n/g,'<br>'); }
+let RICH_LINK = null;   // buildHTML 執行時指向 L()，讓 [文字](網址) 也能套 UTM
+function rich(s, color){
+  return esc(s)
+    .replace(/&lt;span&gt;([\s\S]*?)&lt;\/span&gt;/g, `<span style="color:${color};">$1</span>`)
+    .replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/g, '<b>$1</b>')
+    .replace(/\[([^\]\n]{1,80})\]\(([^)\s]{3,})\)/g, (m,tx,url)=>{
+      const u = url.replace(/&amp;/g,'&');
+      return `<a href="${RICH_LINK ? RICH_LINK(u) : esc(u)}" target="_blank" style="color:${color};text-decoration:underline;">${tx}</a>`; })
+    .replace(/\n/g,'<br>');
+}
 
 /* ---------- UTM：去除與置入（連結的 # 錨點會保留在最後） ---------- */
 function stripUtmUrl(raw){
@@ -560,15 +569,24 @@ const BLOCKS = {
   titleHero:{label:'大標題', fields:[['kicker','小標','text'],['title','大標題（可換行）','textarea'],['date','日期／副標','text']]},
   text:{label:'文字段落', fields:[
     ['text','內容（可換行；<span>字</span> 會變主色）','textarea'],
-    ['align','對齊','select:center=置中|left=靠左'],['color','顏色','select:text=內文字|title=標題字|accent=主色|accent2=輔色|sub=次要字'],
+    ['align','對齊','select:center=置中|left=靠左'],['color','顏色','select:text=內文字|title=標題字|accent=主色|accent2=輔色|sub=次要字|custom=自訂顏色'],['customColor','自訂顏色色碼（顏色選「自訂顏色」時用，例：#c85a86）','text'],
     ['size','字級 px','number'],['bold','粗體','check'],['boxed','放進淡色底框','check']]},
   cta:{label:'CTA 優惠', fields:[
     ['style','樣式','select:gradient=漸層卡片|soft=淡色框|button=只有按鈕'],
     ['title','主標題（可換行）','textarea'],['sub','副標題（可換行）','textarea'],['btnText','按鈕文字','text'],['btnLink','按鈕連結','text'],
     ['btnTone','按鈕顏色','select:accent=主色|accent2=輔色'],['note','小字備註（可留空）','text']]},
   pills:{label:'標籤導覽', list:true, itemFields:['title','link']},
+  pillTitle:{label:'大圓標分隔', fields:[
+    ['title','標籤文字（例：星座幸運色）','text'],['link','連結（可留空）','text'],
+    ['bg','底色（留空＝輔色）','text'],['color','文字顏色','text'],['size','字級 px','number'],['space','字距 px','number']]},
+  zodiac:{label:'漸層資訊卡（頭像＋標題＋長文）', fields:[
+    ['img','左側頭像／小圖網址（可留空）','textarea'],['title','標題（例：天秤座：粉色）','text'],
+    ['body','內文（可換行；<b>字</b>=粗體；<span>字</span>=主色）','textarea'],['link','連結（可留空）','text'],
+    ['from','漸層起訖色（留空＝輔色）','text'],['to','漸層中間色（留空＝淡色底）','text'],['textColor','文字顏色','text']]},
   products:{label:'商品 2欄橫式', list:true, section:true, itemFields:['img','tag','title','sub','price','link']},
-  cards:{label:'商品 2欄大圖', list:true, section:true, itemFields:['img','tag','title','price','link']},
+  cards:{label:'商品 2欄大圖', list:true, section:true, itemFields:['head','img','tag','title','price','link'], fields:[
+    ['headBg','卡片頂端標題條底色（留空＝淡色底）','text'],['headColor','卡片頂端標題條文字顏色（留空＝主色）','text'],
+    ['cardBg','卡片底色（留空＝白色）','text'],['cardBorder','卡片外框色（留空＝主題外框色）','text']]},
   articles:{label:'文章 左文右圖', list:true, section:true, itemFields:['img','tag','title','body','link']},
   banner3:{label:'活動方圖 3欄', list:true, section:true, itemFields:['img','title','link']},
   guide3:{label:'活動圖卡 3欄純圖', list:true, section:true, itemFields:['img','title','link']},
@@ -599,7 +617,7 @@ const BLOCKS = {
     itemLabels:{tag:'館別名稱（徽章）', sub:'折扣條小字（例：全面）', title:'折扣條大字（例：79、$268）', body:'單位（例：折起，可留空）'}, fields:[
     ['mcols','手機每排幾張','select:3=3 張|2=2 張'],['badgeBg','徽章顏色（填 transparent＝透明；留空＝連結色）','text'],
     ['barFrom','折扣條漸層：左','text'],['barMid','折扣條漸層：中','text'],['barTo','折扣條漸層：右','text'],['numColor','大字顏色','text']]},
-  slices:{label:'切圖拼接（整張設計圖切片）', list:true, itemFields:['img','link','title'],
+  slices:{label:'切圖拼接（整張設計圖切片）', list:true, itemFields:['img','link','title','w','sameRow'],
     itemLabels:{img:'切片圖片網址', link:'連結（留空＝這張不加連結）', title:'替代文字（圖片沒載入時顯示）'}, fields:[
     ['fullBleed','滿版（貼齊信件左右邊緣，切圖 EDM 請勾選）','check'],['gapPx','切片之間的間距 px（切圖請保持 0）','number']]},
   brandWall:{label:'品牌活動卡（圖＋Logo＋折扣字）', list:true, section:true, itemFields:['img','logo','title','link'],
@@ -623,13 +641,14 @@ const BLOCKS = {
     ['btnText','按鈕文字','text'],['btnLink','按鈕連結','text'],['btnTone','按鈕顏色','select:accent=主色|accent2=輔色'],['note','小字備註（可留空）','text'],
     ['icon','圓形圖示（深色橫幅用，emoji，例：🚀）','text'],['bannerBg','橫幅底色（填 transparent＝透明；留空＝輔色）','text'],['iconBg','圓形圖示底色','text']]},
   footer:{label:'Footer', fields:[
-    ['unsubLink','訂閱／取消電子報連結','text'],['disclaimer','顯示價格但書「本電子報所呈現之商品金額僅供參考…」（權益通知等不需要時取消勾選）','check'],['lines','其他文字（每行一段）','textarea']]}
+    ['unsubLink','訂閱／取消電子報連結','text'],['bg','底色（留空＝不加底色，只有一條細線；例：#3a3a3a）','text'],['color','文字顏色（留空＝次要字色）','text'],['linkColor','連結顏色（留空＝同文字色）','text'],['disclaimer','顯示價格但書「本電子報所呈現之商品金額僅供參考…」（權益通知等不需要時取消勾選）','check'],['lines','其他文字（每行一段）','textarea']]}
 };
-const ITEM_LABEL = {logo:'品牌 Logo 圖片網址（可留空）', img:'圖片網址', tag:'標籤／小標', title:'標題（可換行）', sub:'副標／賣點', price:'價格（例：79折 $356）', body:'摘要', link:'連結', btn:'按鈕文字（留空＝不顯示）', color:'標籤顏色（例：#1f8fe8，留空＝連結色）'};
-const ITEM_KIND = {logo:'textarea', img:'textarea', tag:'text', title:'textarea', sub:'text', price:'text', body:'textarea', link:'text', btn:'text', color:'text'};
+const ITEM_LABEL = {head:'卡片頂端標題條（例：社交達人型；留空＝不顯示）', w:'原始寬度 px（只有同一列並排時要填，用來算左右比例）', sameRow:'與上一張並排在同一列（左右切片用）', logo:'品牌 Logo 圖片網址（可留空）', img:'圖片網址', tag:'標籤／小標', title:'標題（可換行）', sub:'副標／賣點', price:'價格（例：79折 $356）', body:'摘要', link:'連結', btn:'按鈕文字（留空＝不顯示）', color:'標籤顏色（例：#1f8fe8，留空＝連結色）'};
+const ITEM_KIND = {head:'text', w:'number', sameRow:'check', logo:'textarea', img:'textarea', tag:'text', title:'textarea', sub:'text', price:'text', body:'textarea', link:'text', btn:'text', color:'text'};
 const TYPE_HELP = {
   slices:'把設計好的整張 EDM 切成多張圖、上下無縫拼接，每張可各自設連結（例：父親節整張圖 EDM）', brandWall:'品牌情境圖＋白底 Logo＋底部折扣字，可加緞帶大標與「活動辦法」圓形按鈕。電腦 3／4／6 欄、手機 3 或 2 欄', bannerSide:'左邊一張活動大橫幅、右邊一張單品卡（色條＋品名＋特價），手機上下排',
   offers:'白色小卡放在深色底板上：標籤、小標、大字、說明＋每張自己的按鈕。電腦 3 欄、手機 2 欄', deals:'館別徽章＋商品圖＋漸層折扣條（例：全面 79 折起）。電腦 4 欄、手機 3 欄或 2 欄',
+  pillTitle:'一顆置中的大圓角色塊，用來分隔信件裡的大段落（例：星座幸運色、送禮找個性）', zodiac:'漸層底的資訊卡：左邊小圖、右邊標題，下面一段長文（例：星座運勢、品牌介紹）',
   coupons:'虛線票券樣式：標籤＝券名／適用範圍、標題＝金額（例：$100）、副標＝使用門檻、摘要＝期限或說明', gallery:'純圖片自由排：可選 1～4 欄、1大2小、上大下小，手機排法依選項自動調整', products:'左小圖＋右文字，手機變 1 欄', cards:'上大圖＋下文字，手機變 1 欄', articles:'文字在左、縮圖在右，手機上下排',
   banner3:'方形活動圖＋標題，手機仍 3 欄', products3:'上圖下文 3 欄，手機仍 3 欄（適合書封、小商品）', rank:'名次＋小圖＋品名價格，一列一項，適合熱銷 TOP', info:'左邊項目、右邊內容，適合活動期間、領取方式、注意事項', imgText:'一張大圖配標題、說明與按鈕，手機上下排', guide3:'純圖片 3 欄，手機仍 3 欄', hot4:'桌機一排 4 個，手機 2×2', dual:'兩張橫幅並排，手機上下排', pills:'圓角標籤連結，自動換行'
 };
@@ -640,7 +659,7 @@ function newBlock(type){
     header:{gap:16, align:'split', logo:'https://events.eslite.com/asset/images/logo_b.png', logoLink:'https://www.eslite.com/', openText:'如果無法開啟此訊息，', openLinkText:'請按此連結', openLink:''},
     kv:{gap:0, imgDesk:'', imgMob:'', link:'', alt:'', radius:10, fullBleed:false},
     titleHero:{kicker:'', title:'大標題', date:''},
-    text:{text:'文字內容', align:'center', color:'text', size:15, bold:true, boxed:false},
+    text:{text:'文字內容', align:'center', color:'text', customColor:'', size:15, bold:true, boxed:false},
     gallery:{layout:'c2s', caption:false, frame:false, radius:8, gutter:8},
     coupons:{cols:'3', btnText:'立即領取'},
     offers:{cols:'3', panel:true, panelTitle:'嚴選優惠', panelSub:'', panelBg:'', pillFrom:'', pillTo:'', btnBg:'', btnColor:'#ffde3b'},
@@ -652,9 +671,11 @@ function newBlock(type){
     imgText:{side:'left', img:'', link:'', kicker:'', title:'標題', text:'說明文字', btnText:'了解更多', btnLink:'', btnTone:'accent', radius:8},
     info:{look:'table'},
     divider:{gap:18, style:'line', height:0},
+    pillTitle:{gap:16, title:'段落標題', link:'', bg:'', color:'#ffffff', size:17, space:3},
+    zodiac:{gap:0, img:'', title:'標題', body:'說明文字', link:'', from:'', to:'', textColor:'#33383d'},
     cta:{gap:18, style:'gradient', title:'主標題', sub:'副標題', btnText:'立即前往', btnLink:'', btnTone:'accent', note:''},
     closing:{look:'card', title:'', text:'', btnText:'更多好物立即逛', btnLink:'', btnTone:'accent', note:'', icon:'', bannerBg:'', iconBg:'#ffde3b'},
-    footer:{gap:20, unsubLink:'https://www.eslite.com/member/newsletter', disclaimer:true, lines:'建議使用瀏覽器版本：Google Chrome版本60以上 / Firefox版本48以上 / Safari 版本11以上\n本信件為系統自動發送，請勿直接回覆'}
+    footer:{gap:20, unsubLink:'https://www.eslite.com/member/newsletter', bg:'', color:'', linkColor:'', disclaimer:true, lines:'建議使用瀏覽器版本：Google Chrome版本60以上 / Firefox版本48以上 / Safari 版本11以上\n本信件為系統自動發送，請勿直接回覆'}
   };
   Object.assign(b, D[type] || {});
   if(BLOCKS[type].section){ b.secTitle='區塊標題'; b.moreText=''; b.moreLink=''; }
@@ -1441,6 +1462,7 @@ function buildHTML(st, opt={}){
   const t = st.theme, W = Number(st.meta.width)||640;
   const PX = Math.min(48, Math.max(0, st.meta.padX ?? 20)), PXM = Math.min(32, Math.max(0, st.meta.padXm ?? 12)), IN = W - PX*2;
   let seq = 0;
+  RICH_LINK = raw => L(raw);
   const L = raw => {
     let u = String(raw||'').trim();
     if(!u) return '#';
@@ -1638,7 +1660,7 @@ function buildHTML(st, opt={}){
     },
     titleHero:b=> row(b, `<table ${TBL} style="border-bottom:1px solid ${t.border};"><tr><td align="left" valign="bottom" style="padding-bottom:18px;">${b.kicker?`<span style="display:block;font-size:13px;letter-spacing:2px;color:${t.sub};margin-bottom:8px;">${esc(b.kicker)}</span>`:''}<span class="hero-title" style="font-family:${SERIF};font-size:34px;font-weight:600;color:${t.title};">${rich(b.title,t.accent)}</span></td><td align="right" valign="bottom" style="padding-bottom:18px;font-family:${SERIF};font-size:18px;color:${t.title};white-space:nowrap;">${esc(b.date)}</td></tr></table>`),
     text:b=>{
-      const c = t[b.color] || t.text;
+      const c = b.color==='custom' ? (b.customColor || t.text) : (t[b.color] || t.text);
       const p = `<p style="margin:0;font-size:${Number(b.size)||14}px;line-height:1.8;color:${c};${b.bold?'font-weight:700;':''}text-align:${b.align};">${rich(b.text,t.accent)}</p>`;
       if(b.boxed) return row(b, `<table ${TBL} style="background:${t.soft};border-radius:6px;"><tr><td style="padding:16px 20px;">${p}</td></tr></table>`);
       return row(b, p);
@@ -1649,6 +1671,22 @@ function buildHTML(st, opt={}){
       if(b.style==='button') return row(b, `<table ${TBL}><tr><td align="center" style="text-align:center;">${btn(b.btnText,b.btnLink,bg)}${note}</td></tr></table>`);
       if(b.style==='soft') return row(b, `<table ${TBL} style="background:${t.soft};border-radius:8px;"><tr><td align="center" style="padding:22px 16px;text-align:center;">${b.title?`<p style="margin:0 0 4px 0;font-size:17px;line-height:1.4;font-weight:700;color:${t.title};">${rich(b.title,t.accent)}</p>`:''}${b.sub?`<p style="margin:0 0 14px 0;font-size:13px;line-height:1.6;color:${t.sub};">${rich(b.sub,t.accent)}</p>`:'<div style="height:10px;line-height:10px;font-size:0;">&nbsp;</div>'}${btn(b.btnText,b.btnLink,bg,'#ffffff',15)}${note}</td></tr></table>`);
       return row(b, `<table ${TBL} style="background:${t.accent};background:linear-gradient(135deg,${t.accent},${t.accent2});border-radius:14px;"><tr><td align="center" style="padding:22px 16px;text-align:center;">${b.title?`<p style="margin:0 0 4px 0;font-size:19px;line-height:1.35;font-weight:800;color:#ffffff;">${rich(b.title,'#ffe9a8')}</p>`:''}${b.sub?`<p style="margin:0 0 14px 0;font-size:13px;line-height:1.6;color:#fdeeda;">${rich(b.sub,'#ffffff')}</p>`:''}<a href="${L(b.btnLink)}" target="_blank" style="display:inline-block;background:#ffffff;color:${t.accent};text-decoration:none;font-size:16px;font-weight:800;padding:13px 34px;border-radius:999px;">${esc(b.btnText)}</a>${note}</td></tr></table>`);
+    },
+    pillTitle:b=>{
+      if(!b.title) return '';
+      const bg = b.bg || t.accent2, c = b.color || '#ffffff';
+      const sp = `<span style="display:inline-block;background:${bg};color:${c};font-weight:700;border-radius:100px;font-size:${Number(b.size)||17}px;line-height:1.4;letter-spacing:${Number(b.space)||0}px;padding:10px 38px;">${rich(b.title,c)}</span>`;
+      return row(b, `<table ${TBL}><tr><td align="center" style="text-align:center;">${b.link ? A(L(b.link), sp, c) : sp}</td></tr></table>`);
+    },
+    /* 注意：SAP 會刪掉「包住 table 的 <a>」，所以這裡只讓圖片和標題可點 */
+    zodiac:b=>{
+      const c1 = b.from || t.accent2, c2 = b.to || t.soft, tc = b.textColor || '#33383d', h = L(b.link);
+      const im = b.img ? `<td width="104" valign="middle" style="width:104px;">${b.link?`<a href="${h}" target="_blank">`:''}<img src="${esc(b.img)}" width="96" alt="${esc(b.title)}" style="display:block;width:96px;max-width:96px;height:auto;border:0;">${b.link?'</a>':''}</td>` : '';
+      const head = `<table ${TBL}><tr>${im}<td valign="middle" style="font-size:20px;line-height:1.4;font-weight:700;color:${tc};padding-left:${b.img?6:0}px;">${b.link ? A(h, rich(b.title,tc), tc) : rich(b.title,tc)}</td></tr></table>`;
+      const inner = `<table ${TBL}><tr><td style="border-bottom:1px solid rgba(51,56,61,0.35);padding-bottom:8px;">${head}</td></tr>` +
+        (b.body ? `<tr><td style="font-size:13px;line-height:1.9;color:${tc};padding-top:10px;">${rich(b.body, tc)}</td></tr>` : '') + `</table>`;
+      return row(b, `<table ${TBL} style="background:${c1};background:linear-gradient(45deg,${c1} 10%,${c2} 50%,${c1} 100%);border-radius:16px;"><tr><td style="padding:16px 14px;">` +
+        `<table ${TBL} style="background:rgba(255,255,255,0.16);border-radius:12px;"><tr><td style="padding:16px 18px;">${inner}</td></tr></table></td></tr></table>`);
     },
     pills:b=>{
       if(!b.items.length) return '';
@@ -1665,7 +1703,8 @@ function buildHTML(st, opt={}){
              p.price && [esc(p.price), `font-size:12px;line-height:1.4;font-weight:700;color:${t.price};`]]) +
       `</td></tr></table>`; })),
     cards:b=> row(b, sec(b) + grid2(b.items, p=>{ const h=L(p.link);
-      return `<table ${TBL} style="width:100%;table-layout:fixed;background:#ffffff;border:1px solid ${t.border};border-radius:6px;"><tr><td align="center" valign="middle" height="148" style="height:148px;background:#f7f5f0;border-radius:6px 6px 0 0;text-align:center;padding:4px;"><a href="${h}" target="_blank"><img src="${esc(thumb(p.img,320))}" width="100" alt="${esc(p.title)}" style="display:block;width:auto;max-width:100%;height:auto;max-height:140px;margin:0 auto;border:0;"></a></td></tr><tr><td style="padding:8px 10px 10px 10px;">` +
+      const head = p.head ? `<tr><td align="center" style="background:${b.headBg||t.soft};color:${b.headColor||t.accent};font-size:14px;line-height:1.5;font-weight:900;text-align:center;padding:7px 4px;border-radius:6px 6px 0 0;">${esc(p.head)}</td></tr>` : '';
+      return `<table ${TBL} style="width:100%;table-layout:fixed;background:${b.cardBg||'#ffffff'};border:1px solid ${b.cardBorder||t.border};border-radius:6px;">${head}<tr><td align="center" valign="middle" height="148" style="height:148px;background:#f7f5f0;border-radius:${p.head?'0':'6px 6px 0 0'};text-align:center;padding:4px;"><a href="${h}" target="_blank"><img src="${esc(thumb(p.img,320))}" width="100" alt="${esc(p.title)}" style="display:block;width:auto;max-width:100%;height:auto;max-height:140px;margin:0 auto;border:0;"></a></td></tr><tr><td style="padding:8px 10px 10px 10px;">` +
       TL(h, [p.tag && [esc(p.tag), `font-size:12px;line-height:1.5;color:${t.accent};`],
              [rich(p.title,t.accent), `font-size:14px;line-height:1.5;font-weight:700;color:${t.text};`],
              p.price && [esc(p.price), `font-size:15px;line-height:1.4;font-weight:700;color:${t.price};`]]) +
@@ -1823,10 +1862,22 @@ function buildHTML(st, opt={}){
     slices:b=>{
       const its = b.items.filter(p=>p.img); if(!its.length) return '';
       const full = b.fullBleed !== false, w = full ? W : IN, gp = Math.max(0, Number(b.gapPx)||0);
-      const inner = its.map((p,i)=>{
-        const im = `<img src="${esc(p.img)}" width="${w}" alt="${esc(p.title)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;">`;
-        return (i && gp ? `<div style="height:${gp}px;line-height:${gp}px;font-size:0;">&nbsp;</div>` : '') +
-          (p.link ? `<a href="${L(p.link)}" target="_blank" style="display:block;">${im}</a>` : im);
+      // 把切片依「與上一張並排」分成一列一列；一列一張時就是原本的整排滿版圖
+      const rows = []; its.forEach((p,i)=>{ if(i===0 || !p.sameRow) rows.push([p]); else rows[rows.length-1].push(p); });
+      const link = (p, im) => p.link ? `<a href="${L(p.link)}" target="_blank" style="display:block;">${im}</a>` : im;
+      const img = (p, cw) => `<img src="${esc(p.img)}" width="${cw}" alt="${esc(p.title)}" style="display:block;width:100%;max-width:${cw}px;height:auto;border:0;">`;
+      // 一列的總寬：以最寬的那一列當 100%，比較窄的列右邊補空白，左右比例才不會跑掉
+      const rowW = r => r.reduce((s,p)=>s + (Number(p.w)||0), 0);
+      const maxW = Math.max(...rows.map(r=>r.length>1 ? rowW(r) : 0), 0);
+      const inner = rows.map((r,ri)=>{
+        const gap = ri && gp ? `<div style="height:${gp}px;line-height:${gp}px;font-size:0;">&nbsp;</div>` : '';
+        if(r.length===1) return gap + link(r[0], img(r[0], w));
+        const tot = rowW(r) || 0, base = Math.max(tot, maxW) || r.length;
+        const pct = v => (Math.round(v/base*10000)/100) + '%';
+        const tds = r.map(p=>{ const pw = Number(p.w) || base/r.length, cw = Math.round(w*pw/base);
+          return `<td width="${pct(pw)}" style="padding:0;font-size:0;line-height:0;">${link(p, img(p, cw))}</td>`; }).join('');
+        const restW = base - tot, rest = tot && restW > base*0.01 ? `<td width="${pct(restW)}" style="padding:0;font-size:0;line-height:0;">&nbsp;</td>` : '';
+        return gap + `<table ${TBL} style="table-layout:fixed;"><tr>${tds}${rest}</tr></table>`;
       }).join('');
       return row(b, inner, full ? {px:0, cls:''} : {});
     },
@@ -1917,11 +1968,13 @@ function buildHTML(st, opt={}){
     },
     footer:b=>{
       const lines = String(b.lines||'').split('\n').map(s=>s.trim()).filter(Boolean);
-      const P = h => `<p style="margin:0;font-size:11px;line-height:1.8;color:${t.sub};">${h}</p>`;
-      return row(b, `<table ${TBL}><tr><td align="center" style="border-top:1px solid ${t.border};padding-top:14px;text-align:center;">` +
-        P(`誠品線上 - 誠品生活股份有限公司｜<a href="${L(b.unsubLink)}" target="_blank" style="color:${t.sub};text-decoration:underline;">訂閱/取消電子報</a>`) +
-        (b.disclaimer?P('本電子報所呈現之商品金額僅供參考，實際請以活動頁面顯示為主'):'') +
-        lines.map(l=>P(esc(l))).join('') + `</td></tr></table>`, {pb:24});
+      const fc = b.color || t.sub, lc = b.linkColor || fc;
+      const P = (h, i) => `<p style="margin:${i?'6px 0 0 0':'0'};font-size:${i?10:11}px;line-height:1.8;color:${fc};">${h}</p>`;
+      const inner = P(`誠品線上 - 誠品生活股份有限公司｜<a href="${L(b.unsubLink)}" target="_blank" style="color:${lc};text-decoration:underline;">訂閱/取消電子報</a>`) +
+        (b.disclaimer?P('本電子報所呈現之商品金額僅供參考，實際請以活動頁面顯示為主',1):'') +
+        lines.map(l=>P(esc(l),1)).join('');
+      if(b.bg) return row(b, `<table ${TBL} style="background:${b.bg};"><tr><td align="center" style="padding:22px 24px;text-align:center;">${inner}</td></tr></table>`, {px:0, cls:'', pb:0});
+      return row(b, `<table ${TBL}><tr><td align="center" style="border-top:1px solid ${t.border};padding-top:14px;text-align:center;">${inner}</td></tr></table>`, {pb:24});
     }
   };
 
@@ -2415,6 +2468,8 @@ const LAY_ICONS = {
   pills:[[2,15,12,8,'a'],[16,15,12,8,'a'],[30,15,12,8,'a'],[44,15,10,8,'a']],
   info:[[2,4,16,6,'a'],[20,4,34,6,'t'],[2,12,16,6,'a'],[20,12,34,6,'t'],[2,20,16,6,'a'],[20,20,34,6,'t'],[2,28,16,6,'a'],[20,28,34,6,'t']],
   slices:[[6,2,44,12,'i'],[6,14,44,12,'i'],[6,26,44,12,'i']],
+  pillTitle:[[14,16,28,9,'a']],
+  zodiac:[[2,4,52,32,'a'],[6,8,14,14,'w'],[23,10,26,4,'w'],[6,25,44,2,'w'],[6,30,38,2,'w']],
   cta:[[8,6,40,3,'t'],[14,12,28,2,'t'],[18,20,20,8,'a']],
   closing:[[2,8,52,24,'a'],[8,14,24,3,'w'],[8,20,16,2,'w'],[40,14,10,10,'w']],
   text:[[4,6,48,2,'t'],[4,11,44,2,'t'],[4,16,48,2,'t'],[4,21,38,2,'t'],[4,26,46,2,'t']],
@@ -2440,7 +2495,7 @@ function layPicker(opts, cur, onPick){
 }
 /* ---------- 區塊類型切換 ---------- */
 const LIST_TYPES = ['slices','products','cards','products3','rank','gallery','banner3','guide3','hot4','deals','brandWall','dual','articles','coupons','offers','pills','info'];
-const MSG_TYPES = ['cta','closing','text','imgText'];
+const MSG_TYPES = ['cta','closing','text','imgText','pillTitle','zodiac'];
 const typeGroup = t => LIST_TYPES.includes(t) ? LIST_TYPES : MSG_TYPES.includes(t) ? MSG_TYPES : null;
 function changeType(b, to){
   if(!to || to===b.type) return;
@@ -3713,39 +3768,117 @@ function detectUtm(doc){
   const base = Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0]; if(!base) return null;
   return {utm: base[0], seq: hs.some(h=>/[?&]utm_content=\d+/i.test(h))};
 }
-/* 整張切圖 EDM：多張寬圖（每張只包在一個連結裡、旁邊沒有文字）上下拼接 */
-function slicedState(doc, src){
+/* 整張切圖 EDM：整封信幾乎只有圖、沒有文字；每一列可能是一張滿版圖，也可能是左右並排的幾張切片 */
+function sliceRows(doc){
   const sty = e => (e && e.getAttribute && e.getAttribute('style')) || '';
-  const wOf = img => Number(img.getAttribute('width')) || Number((sty(img).match(/(?:^|;)\s*width:\s*(\d+)px/i)||[])[1]) || 0;
-  const big = [...doc.querySelectorAll('img')].filter(img=>{
-    if(wOf(img) < 500) return false;
-    const td = img.closest('td'); if(!td) return false;
-    return td.textContent.replace(/\s+/g,'').length===0 && td.querySelectorAll('img').length===1;
+  const wOf = img => Number(img.getAttribute('width')) ||
+    Number((sty(img).match(/(?:^|;)\s*(?:max-)?width:\s*(\d+)px/i)||[])[1]) || 0;
+  // 切片所在的那張表格，除了「按此連結／訂閱取消」這類固定文字外不該有別的字；
+  // 否則那是一般的圖文 EDM（例如商品圖一列、品名價格一列），當成切圖會把文字整段弄丟
+  const SKIP_TXT = /按此|開啟此|無法開啟|訂閱|取消|退訂|瀏覽器|分級|版權|著作權|Copyright|unsubscribe/i;
+  const tblOk = new Map();
+  const tableClean = tb => {
+    if(!tb) return false;
+    if(tblOk.has(tb)) return tblOk.get(tb);
+    let other = 0;
+    tb.querySelectorAll('tr').forEach(r=>{ if(r.querySelector('table')) return;
+      const tx = r.textContent.replace(/\s|\u00a0/g,''); if(tx && !SKIP_TXT.test(tx)) other += tx.length; });
+    const ok = other <= 20; tblOk.set(tb, ok); return ok;
+  };
+  const rows = [];
+  [...doc.querySelectorAll('tr')].forEach(tr=>{
+    const tds = [...tr.children].filter(c=>/^t[dh]$/i.test(c.tagName));
+    if(!tds.length) return;
+    if(tr.textContent.replace(/\s|\u00a0/g,'') !== '') return;         // 這一列有文字 → 不是純切圖
+    if(!tableClean(tr.closest('table'))) return;
+    const ims = [];
+    for(const td of tds){
+      if(!td.innerHTML.replace(/\s|&nbsp;|<br\s*\/?>/gi,'')) continue;  // 空白格（墊片）先跳過
+      if(td.querySelector('table')) return;                            // 裡面還有表格 → 交給內層的列處理
+      const im = td.querySelectorAll('img');
+      if(im.length !== 1) return;
+      ims.push(im[0]);
+    }
+    if(ims.length) rows.push(ims.map(im=>({im, w: wOf(im)})));
   });
-  const imgs300 = [...doc.querySelectorAll('img')].filter(img=>wOf(img)>=300).length;
-  if(big.length < 3 || big.length < imgs300*0.8) return null;
+  return rows;
+}
+function slicedState(doc, src){
+  const clean = h => cleanHref(h||'', true);
+  const sty = e => (e && e.getAttribute && e.getAttribute('style')) || '';
+  const isLogo = im => /logo/i.test(im.getAttribute('src')||'') || /logo/i.test(im.getAttribute('alt')||'');
+  let rows = sliceRows(doc).filter(r=>!(r.length===1 && isLogo(r[0].im)));
+  if(rows.length < 3) return null;
+  const rowW = r => r.reduce((s,c)=>s+c.w, 0);
+  const W0 = Math.max(...rows.map(rowW));
+  if(W0 < 500) return null;
+  rows = rows.filter(r=>rowW(r) >= W0*0.5);                 // 比主圖窄很多的零星小圖不算切片
+  const sliced = rows.reduce((n,r)=>n+r.length, 0);
+  const all = [...doc.querySelectorAll('img')].filter(im=>{
+    const w = Number(im.getAttribute('width')) || Number((sty(im).match(/(?:^|;)\s*(?:max-)?width:\s*(\d+)px/i)||[])[1]) || 0;
+    return w >= 80 && !isLogo(im);
+  }).length;
+  if(rows.length < 3 || sliced < 3 || sliced < all*0.75) return null;
+  // 信裡還有一堆文字 → 不是純切圖 EDM，交給一般拆解（避免把商品圖當切片、文字整段弄丟）
+  if(doc.body.textContent.replace(/\s|\u00a0/g,'').length > 400) return null;
+
   const st = TEMPLATES.blank.build(); st.blocks = [];
-  const W0 = Math.max(...big.map(wOf));
-  st.meta.width = W0>=900?1000:W0>=780?800:W0>=720?750:W0>=670?680:W0>=620?640:600;
+  st.meta.width = W0>=1100?1200:W0>=900?1000:W0>=780?800:W0>=720?750:W0>=670?680:W0>=620?640:600;
   st.meta.title = (doc.title||'').trim() || st.meta.title;
   const desc = [...doc.querySelectorAll('meta[name]')].find(x=>/^description$/i.test(x.getAttribute('name')));
   st.meta.pre = desc ? (desc.getAttribute('content')||'').replace(/\s+/g,' ').trim() : '';
   st.meta.frameLine = 'none';
   st.theme = Object.assign(themeOf('minimal'), {outer:'#ffffff', card:'#ffffff', radius:0}); delete st.theme.key; st.theme.name='自訂';
-  const clean = h => cleanHref(h||'', true);
   const hd = newBlock('header');
   const open = [...doc.querySelectorAll('a')].find(a=>/按此|開啟|連結/.test(a.textContent) && !a.querySelector('img'));
   if(open) hd.openLink = clean(open.getAttribute('href'));
-  const logoA = [...doc.querySelectorAll('a')].find(a=>{ const im=a.querySelector('img'); return im && /logo/i.test(im.getAttribute('src')||''); });
+  const logoA = [...doc.querySelectorAll('a')].find(a=>{ const im=a.querySelector('img'); return im && isLogo(im); });
   if(logoA){ hd.logoLink = clean(logoA.getAttribute('href')); const lg = logoA.querySelector('img').getAttribute('src'); if(lg) hd.logo = lg; }
   st.blocks.push(hd);
-  const sl = newBlock('slices');
-  sl.items = big.map(img=>{ const a = img.closest('a'); return Object.assign(newItem('slices'), {img: img.getAttribute('src')||'', link: a ? clean(a.getAttribute('href')) : '', title: img.getAttribute('alt')||''}); });
+  const sl = newBlock('slices'); sl.items = [];
+  rows.forEach(r=> r.forEach((c,ci)=>{
+    const a = c.im.closest('a');
+    sl.items.push(Object.assign(newItem('slices'), {
+      img: c.im.getAttribute('src')||'', link: a ? clean(a.getAttribute('href')) : '',
+      title: c.im.getAttribute('alt')||'', w: c.w || 0, sameRow: ci>0 }));
+  }));
   st.blocks.push(sl);
   const ft = newBlock('footer'); ft.disclaimer = /僅供參考/.test(doc.body.textContent);
   const un = [...doc.querySelectorAll('a')].find(a=>/訂閱|取消/.test(a.textContent)); if(un) ft.unsubLink = clean(un.getAttribute('href'));
   st.blocks.push(ft);
   return st;
+}
+/* 一格 HTML → 工具的文字寫法：保留粗體、換行與行內連結 */
+function htmlToRich(el){
+  const d = el.cloneNode(true);
+  d.querySelectorAll('br').forEach(b=>b.replaceWith('\n'));
+  d.querySelectorAll('b,strong').forEach(b=>b.replaceWith('<b>'+b.textContent.trim()+'</b>'));
+  d.querySelectorAll('a[href]').forEach(a=>a.replaceWith(`[${a.textContent.replace(/\s+/g,' ').trim()}](${cleanHref(a.getAttribute('href')||'',true)})`));
+  return d.textContent.replace(/[ \t]+/g,' ').replace(/ ?\n ?/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+/* 一張卡片（上圖下文，可能有頂端標題條）→ cards 的一項 */
+function readCardCell(tb, cssBg, sty, bgOf, cssRule){
+  const im = tb.querySelector('img'), a = im && im.closest('a');
+  const txt = [...tb.querySelectorAll('td,div,p,span')].filter(x=>x.textContent.trim() && !x.querySelector('td,div,p,span') && !x.querySelector('img'));
+  const seen = new Set(), parts = [];
+  txt.forEach(x=>{ const v=x.textContent.replace(/\s+/g,' ').trim(); if(v && !seen.has(v)){ seen.add(v); parts.push([v,x]); } });
+  const out = {img: im ? im.getAttribute('src')||'' : '', link: a ? cleanHref(a.getAttribute('href')||'',true) : '', head:'', tag:'', title:'', price:''};
+  out.cardBg = bgOf(tb) || [...(tb.classList||[])].map(c=>cssBg('\\.'+c)).find(Boolean) || '';
+  out.cardBorder = ((sty(tb).match(/border:\s*1px solid\s*(#[0-9a-f]{3,6})/i)||[])[1]
+    || [...(tb.classList||[])].map(c=>{ const m=cssRule(c); return m && (m.match(/border:\s*1px solid\s*(#[0-9a-fA-F]{3,6})/)||[])[1]; }).find(Boolean) || '').toLowerCase();
+  const clsBg = x => bgOf(x) || [...(x.classList||[])].map(c=>cssBg('\\.'+c)).find(Boolean) || null;
+  if(parts.length && clsBg(parts[0][1])){
+    out.head = parts[0][0]; out.headBg = clsBg(parts[0][1]);
+    const c = [...(parts[0][1].classList||[])].map(c=>{ const m = (cssBg('x')===null, null); return null; }).find(Boolean);
+    const col = (sty(parts[0][1]).match(/(?:^|;)\s*color:\s*(#[0-9a-f]{3,6})/i)||[])[1]; if(col) out.headColor = col.toLowerCase();
+    parts.shift();
+  }
+  const pi = parts.findIndex(x=>PRICE_RE.test(x[0]));
+  if(pi>-1){ out.price = parts[pi][0]; parts.splice(pi,1); }
+  if(parts.length>=2){ out.tag = parts[0][0]; out.title = parts[1][0]; }
+  else if(parts.length===1) out.title = parts[0][0];
+  if(!out.title && im) out.title = im.getAttribute('alt')||'';
+  return out;
 }
 function htmlToState(src){
   const st0 = htmlToState0(src);
@@ -3764,6 +3897,7 @@ function htmlToState0(src){
   const sty = e => (e && e.getAttribute && e.getAttribute('style')) || '';
   const bgOf = e => { const m=sty(e).match(/background(?:-color)?:\s*(#[0-9a-f]{3,6})/i); return m?hex(m[1]):null; };
   const css = [...doc.querySelectorAll('style')].map(x=>x.textContent).join('\n');
+  const cssRule = cls => { const m = css.match(new RegExp('\\.'+cls+'\\s*\\{([^}]*)\\}')); return m ? m[1] : ''; };
   const cssBg = sel => { const m = css.match(new RegExp(sel+'\\s*\\{[^}]*background(?:-color)?:\\s*(#[0-9a-fA-F]{3,6})')); return m?hex(m[1]):null; };
 
   // 信件設定
@@ -3788,9 +3922,11 @@ function htmlToState0(src){
     const sp = firstTitle.tagName==='TABLE' ? firstTitle.querySelector('span') : firstTitle; const tc = hex((sty(sp).match(/color:\s*#[0-9a-f]{3,6}/i)||[''])[0]); if(tc){ st.theme.title=tc; st.theme.text=tc; }
     const more = firstTitle.querySelector('a'); if(more) st.theme.moreStyle = /background/i.test(sty(more)) ? 'pill' : 'text';
   }
-  const bord = [...doc.querySelectorAll('table')].map(t=>(sty(t).match(/border:\s*1px solid\s*(#[0-9a-f]{3,6})/i)||[])[1]).find(Boolean); if(bord) st.theme.border=hex(bord);
+  const bord = [...doc.querySelectorAll('table')].map(t=>(sty(t).match(/border:\s*1px solid\s*(#[0-9a-f]{3,6})/i)||[])[1]).find(Boolean)
+            || (css.match(/border:\s*1px solid\s*(#[0-9a-fA-F]{3,6})/)||[])[1];
+  if(bord) st.theme.border=hex(bord);
 
-  const done = new Set(); let cur = null, kvDone=false, headerDone=false;
+  const done = new Set(), cardRowDone = new Set(); let cur = null, kvDone=false, headerDone=false, lastCardRow=null;
   const flush = keepTitle => {
     if(!cur) return;
     if(keepTitle && !cur.items.length) return;
@@ -3805,6 +3941,7 @@ function htmlToState0(src){
     cur = null;
   };
   const inside = e => { for(const d of done){ if(d.contains(e)) return true; } return false; };
+  const takeTitle = () => { if(cur && cur.title && !cur.items.length){ const x=cur.title; cur=null; return x; } return ''; };
 
   doc.body.querySelectorAll('*').forEach(e=>{
     if(inside(e)) return;
@@ -3840,10 +3977,86 @@ function htmlToState0(src){
       if(dash){ const sb = bgOf(e); if(sb) st.theme.soft = sb; }
       st.blocks.push(b); done.add(e); return;
     }
+    // 大圓標分隔（一顆置中的大圓角色塊，沒有圖片）
+    if(e.tagName==='TD' && !e.querySelector('img,table')){
+      const pill = [...e.querySelectorAll('span')].filter(x=>/border-radius/i.test(sty(x)) && bgOf(x));
+      if(pill.length===1 && fsize(pill[0])>=15 && shortTxt(e) && e.textContent.trim()===pill[0].textContent.trim()){
+        const pt=takeTitle(); flush(true); const b=newBlock('pillTitle'); b.title=pill[0].textContent.trim(); b.bg=bgOf(pill[0]);
+        if(pt) b.secTitle=pt;
+        const col=(sty(pill[0]).match(/(?:^|;)\s*color:\s*(#[0-9a-f]{3,6})/i)||[])[1]; if(col) b.color=hex(col);
+        b.size=fsize(pill[0]); b.space=Number((sty(pill[0]).match(/letter-spacing:\s*(\d+)/i)||[])[1])||0;
+        const pa = pill[0].closest('a'); if(pa) b.link=cleanHref(pa.getAttribute('href')||'',true);
+        const pd=(sty(e).match(/padding[^;]*/i)||[''])[0]; b.gap = /padding-top:\s*(\d+)/.test(pd) ? Number(RegExp.$1) : 16;
+        st.blocks.push(b); done.add(e); return;
+      }
+    }
+    // 漸層資訊卡（漸層底＋小圖＋標題＋長文）
+    if(e.tagName==='TABLE' && /linear-gradient/i.test(s) && e.querySelector('img') && e.textContent.replace(/\s/g,'').length>40){
+      const zt=takeTitle(); flush(true);
+      const b=newBlock('zodiac'); b.secTitle=zt; const im=e.querySelector('img'), g=s.match(/linear-gradient\([^,]+,\s*(#[0-9a-f]{3,6})[^,]*,\s*(#[0-9a-f]{3,6})/i);
+      b.img=im.getAttribute('src')||''; if(g){ b.from=hex(g[1]); b.to=hex(g[2]); }
+      const a=e.closest('a')||e.querySelector('a'); if(a) b.link=cleanHref(a.getAttribute('href')||'',true);
+      const tds=[...e.querySelectorAll('td')].filter(td=>!td.querySelector('table,img') && td.textContent.trim());
+      if(tds.length){ b.title=tds[0].textContent.replace(/\s+/g,' ').trim();
+        b.textColor=hex((sty(tds[0]).match(/color:\s*#[0-9a-f]{3,6}/i)||[''])[0]) || b.textColor;
+        b.body=tds.slice(1).map(td=>htmlToRich(td)).join('\n\n'); }
+      st.blocks.push(b); done.add(e.closest('a')||e); return;
+    }
+    // 2 欄（或 3 欄）卡片列：每格一張小表格、裡面只有一張圖＋文字
+    if(e.tagName==='TABLE' && !e.closest('a') && !cardRowDone.has(e)){
+      const tr0=[...e.children].flatMap(x=>x.tagName==='TBODY'?[...x.children]:[x]).filter(x=>x.tagName==='TR');
+      if(tr0.length===1){
+        const tds=[...tr0[0].children].filter(c=>c.tagName==='TD');
+        const cells=tds.filter(td=>{ const tb=td.querySelector('table'); return tb && tb.querySelectorAll('img').length===1; });
+        if(cells.length>=2 && tds.length<=5 && cells.length>=tds.length-2){
+          flush(true);
+          const items=cells.map(td=>readCardCell(td.querySelector('table'), cssBg, sty, bgOf, cssRule));
+          const withHead = items.some(x=>x.head);
+          const prev = st.blocks[st.blocks.length-1];
+          const myRow = e.closest('tr');
+          if(prev && prev.type==='cards' && !!prev.items.some(x=>x.head)===withHead && lastCardRow && myRow && myRow.previousElementSibling===lastCardRow){
+            items.forEach(it=>prev.items.push(Object.assign(newItem('cards'), it)));
+          } else {
+            const b=newBlock('cards'); b.secTitle=takeTitle(); b.gap=12;
+            if(withHead){ const hb=items.find(x=>x.headBg); if(hb){ b.headBg=hb.headBg; b.headColor=hb.headColor||''; } }
+            const cb=items.find(x=>x.cardBg||x.cardBorder); if(cb){ b.cardBg=cb.cardBg||''; b.cardBorder=cb.cardBorder||''; }
+            items.forEach(it=>b.items.push(Object.assign(newItem('cards'), it)));
+            st.blocks.push(b);
+          }
+          st.blocks[st.blocks.length-1].items.forEach(it=>{ delete it.headBg; delete it.headColor; delete it.cardBg; delete it.cardBorder; });
+          lastCardRow = myRow; cardRowDone.add(e); done.add(e); return;
+        }
+      }
+    }
+    // 單獨一顆按鈕
+    if(e.tagName==='TD' && !e.querySelector('img,table')){
+      const as=[...e.querySelectorAll('a')];
+      if(as.length===1 && /border-radius/i.test(sty(as[0])) && bgOf(as[0]) && e.textContent.replace(/\s+/g,' ').trim()===as[0].textContent.replace(/\s+/g,' ').trim()){
+        flush(true); const b=newBlock('cta'); b.style='button'; b.title=''; b.sub=''; b.note='';
+        b.btnText=as[0].textContent.replace(/\s+/g,' ').trim(); b.btnLink=cleanHref(as[0].getAttribute('href')||'',true);
+        b._bg = bgOf(as[0]);
+        b.gap=14; st.blocks.push(b); done.add(e); return;
+      }
+    }
+    // 純文字段（沒有圖片、表格、按鈕的一格字）；正在收集商品圖的時候不算，那是圖片下面的品名
+    if(e.tagName==='TD' && (!cur || !cur.items.length) && !e.querySelector('img,table,h1,h2,h3') && !/footer|section-title/i.test(e.className||'')){
+      const tx=htmlToRich(e), plain=e.textContent.replace(/\s+/g,' ').trim();
+      if(plain.length>=4 && plain.length<=300 && ![...e.querySelectorAll('a')].some(a=>/border-radius/i.test(sty(a)))){
+        flush(true); const b=newBlock('text'); b.text=tx; b.gap=12;
+        b.align = /text-align:\s*center/i.test(sty(e)) ? 'center' : 'left';
+        const sp=e.querySelector('span,p')||e; b.size=fsize(sp)||15; b.bold=/font-weight:\s*(700|800|900|bold)/i.test(sty(sp));
+        const col=hex((sty(sp).match(/(?:^|;)\s*color:\s*#[0-9a-f]{3,6}/i)||[''])[0]);
+        b.color = !col ? 'text' : col===st.theme.accent ? 'accent' : col===st.theme.accent2 ? 'accent2'
+                : col===st.theme.title ? 'title' : col===st.theme.sub ? 'sub' : col===st.theme.text ? 'text' : 'custom';
+        if(b.color==='custom') b.customColor=col;
+        st.blocks.push(b); done.add(e); return;
+      }
+    }
     // 標籤導覽（3 個以上圓角連結、沒有圖片）
     if(e.tagName==='TD' && !e.querySelector('img,table')){
       const as=[...e.querySelectorAll('a')].filter(a=>/border-radius/i.test(sty(a)) && /background/i.test(sty(a)));
-      if(as.length>=3){ flush(true); const b=newBlock('pills'); b.items=as.map(a=>Object.assign(newItem('pills'),{title:a.textContent.trim(), link:cleanHref(a.getAttribute('href')||'',true)})); st.blocks.push(b); done.add(e); return; }
+      if(as.length>=3){ const pt=takeTitle(); flush(true); const b=newBlock('pills'); b.secTitle=pt;
+        const pb=bgOf(as[0]); if(pb) st.theme.soft=pb; b.items=as.map(a=>Object.assign(newItem('pills'),{title:a.textContent.trim(), link:cleanHref(a.getAttribute('href')||'',true)})); st.blocks.push(b); done.add(e); return; }
     }
     // 職場雷達式大標題（30px 以上的短字）
     if(e.tagName==='SPAN' && fsize(e)>=30 && shortTxt(e) && !e.querySelector('img')){
@@ -3890,6 +4103,17 @@ function htmlToState0(src){
   flush();
   const ft = newBlock('footer'); ft.disclaimer = /僅供參考/.test(doc.body.textContent);
   const un = [...doc.querySelectorAll('a')].find(a=>/訂閱|取消/.test(a.textContent)); if(un) ft.unsubLink = cleanHref(un.getAttribute('href')||'',true);
+  { const fe = un && [...doc.querySelectorAll('td,table,div')].reverse().find(x=>x.contains(un) && (bgOf(x) || [...(x.classList||[])].map(c=>cssBg('\\.'+c)).find(Boolean)));
+    const fb = fe && (bgOf(fe) || [...(fe.classList||[])].map(c=>cssBg('\\.'+c)).find(Boolean));
+    if(fb && fb!==st.theme.card && fb!==st.theme.outer){ ft.bg = fb;
+      const pp = fe.querySelector('p,span'); const pc = (sty(pp||fe).match(/(?:^|;)\s*color:\s*(#[0-9a-f]{3,6})/i)||[])[1]
+        || (css.match(/\.footer\s+p\s*\{[^}]*color:\s*(#[0-9a-fA-F]{3,6})/)||[])[1];
+      if(pc) ft.color = hex(pc);
+      const lcm = css.match(/\.footer\s+a\s*\{[^}]*color:\s*(#[0-9a-fA-F]{3,6})/) || (sty(un).match(/color:\s*(#[0-9a-f]{3,6})/i));
+      if(lcm) ft.linkColor = hex(lcm[1]);
+    } }
+  { const extra = un && un.closest('td');
+    if(extra){ const ps=[...extra.querySelectorAll('p')].slice(1).map(x=>x.textContent.replace(/\s+/g,' ').trim()).filter(Boolean); if(ps.length) ft.lines = ps.join('\n'); } }
   st.blocks.push(ft);
   // 自動判斷標題樣式
   if(firstTitle && firstTitle.tagName==='TABLE' && /1px solid/i.test(tBorder(firstTitle))) st.theme.titleStyle='serif';
@@ -3918,9 +4142,18 @@ function htmlToState0(src){
     }
   }catch(e){}
   if(!cont || !(bgOf(cont) || cssBg('\\.container'))) st.theme.card = st.theme.outer;
+  { // 標題顏色：寫在 <style> 裡的 .section-title h2
+    const m = css.match(/\.section-title\s+h2\s*\{[^}]*color:\s*(#[0-9a-fA-F]{3,6})/); if(m) st.theme.title = hex(m[1]);
+    const mb = css.match(/\.section-title\s+\.bar\s*\{[^}]*background(?:-color)?:\s*(#[0-9a-fA-F]{3,6})/); if(mb) st.theme.accent2 = hex(mb[1]);
+  }
   if(!firstTitle || firstTitle.tagName!=='TABLE'){  // 沒有底線標題時，用第一顆實心按鈕的顏色當主色
     const b1 = [...doc.querySelectorAll('a')].find(a=>/border-radius/i.test(sty(a)) && bgOf(a) && /color:\s*#fff/i.test(sty(a)));
     if(b1){ st.theme.accent = bgOf(b1); st.theme.price = bgOf(b1); }
+  }
+  { // 按鈕顏色：跟主色一樣用主色，不一樣就當輔色
+    const alt = st.blocks.map(b=>b._bg).find(c=>c && c!==st.theme.accent);
+    if(alt && st.theme.accent2===st.theme.accent) st.theme.accent2 = alt;
+    st.blocks.forEach(b=>{ if('_bg' in b){ b.btnTone = b._bg===st.theme.accent ? 'accent' : 'accent2'; delete b._bg; } });
   }
   return st;
 }
