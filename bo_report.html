@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EC會員行銷觀測報表 摘要產生器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#EEF2F6; --paper:#FFFFFF; --ink:#1B2430; --muted:#5B6878; --rule:#C9D3DE; --soft:#E3E9F0;
+  --pos:#1F4FD1; --neg:#C8322B; --pos-bg:#E6EDFC; --neg-bg:#FBE9E8; --sel:#FFF6D6; --ok:#1E7B45; --focus:#1F4FD1;
+  color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121821; --paper:#1A222D; --ink:#E4EAF1; --muted:#9AA7B6; --rule:#33404F; --soft:#232D3A;
+    --pos:#7FA2FF; --neg:#FF8A80; --pos-bg:#1E2A4A; --neg-bg:#3A1F1E; --sel:#3A3420; --ok:#6FD39A; --focus:#7FA2FF; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121821; --paper:#1A222D; --ink:#E4EAF1; --muted:#9AA7B6; --rule:#33404F; --soft:#232D3A;
+  --pos:#7FA2FF; --neg:#FF8A80; --pos-bg:#1E2A4A; --neg-bg:#3A1F1E; --sel:#3A3420; --ok:#6FD39A; --focus:#7FA2FF; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700}
+header p{margin:0;color:var(--muted);max-width:72ch}
+.step{display:grid;grid-template-columns:44px 1fr;gap:16px;margin-top:30px}
+.step-no{width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center;font-weight:700}
+.step h2{font-size:18px;margin:4px 0 4px}
+.hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:78ch}
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:14px 16px}
+.drop{border:2px dashed var(--rule);border-radius:6px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:var(--paper)}
+.drop.over{border-color:var(--focus);color:var(--ink)}
+.drop strong{color:var(--ink)}
+.checklist{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.checklist li{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:8px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mark{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.mark.ok{background:var(--ok);color:var(--paper)} .mark.no{border:2px solid var(--rule);color:var(--muted)}
+.checklist .what{font-weight:500} .checklist .file{color:var(--muted);font-size:13px}
+.checklist select{margin-left:auto}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:6px 8px;min-width:0}
+textarea{width:100%;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.drop:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button{font:inherit;cursor:pointer;border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:7px 14px;font-weight:500}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 16px}
+.settings .wide{grid-column:1/-1}
+.radio{display:flex;gap:16px;flex-wrap:wrap;font-size:14px}
+.radio label{display:flex;gap:6px;align-items:center}
+.block{margin-top:14px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.block h3{margin:0;padding:10px 16px;font-size:16px;border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.block h3 small{color:var(--muted);font-weight:400;font-size:13px}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--soft);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:500;background:var(--soft)}
+td.name,th.name{text-align:left;white-space:normal;min-width:160px}
+td.c,th.c{text-align:center;width:36px}
+tr.on td{background:var(--sel)}
+.p{color:var(--pos)} .n{color:var(--neg)}
+.sub{padding:10px 16px 14px;border-top:1px solid var(--rule)}
+.sub h4{margin:4px 0 8px;font-size:14.5px}
+.note{color:var(--muted);font-size:13px;margin:0 0 8px}
+.out-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.status{color:var(--muted);font-size:13px}
+.preview{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;white-space:pre-wrap;font-size:14px;line-height:1.8;margin-top:10px}
+.tabs{display:flex;gap:4px;margin-bottom:-1px}
+.tabs button{border-radius:6px 6px 0 0;background:transparent;color:var(--muted);border:1px solid transparent;border-bottom:none}
+.tabs button[aria-selected="true"]{background:var(--paper);color:var(--ink);border-color:var(--rule)}
+details.logic{margin-top:34px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 16px}
+details.logic summary{cursor:pointer;font-weight:700}
+details.logic h4{margin:14px 0 4px;font-size:14.5px}
+details.logic ul{padding-left:20px;margin:4px 0;max-width:82ch} details.logic li{margin:4px 0}
+.empty{color:var(--muted);padding:12px 0}
+.err{color:var(--neg);font-size:13px}
+@media (max-width:640px){.step{grid-template-columns:1fr}.step-no{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>EC會員行銷觀測報表 摘要產生器</h1>
+  <p>把每月的來源檔丟進來，自動算出整體四項指標、YTD 前10% 貢獻、卡別表現、品類成長與衰退 Top2，並寫出可以直接貼進「摘要報告」的完整摘要。有上傳品類商品明細時，會一併補上主類別和帶動商品。</p>
+</header>
+
+<section class="step">
+  <div class="step-no">1</div>
+  <div>
+    <h2>上傳來源檔</h2>
+    <p class="hint">一次把所有檔案拖進來即可，工具會依內容自動判斷是哪一份。3、2、9 三份是必要的；品類商品明細（例如「中文_商品明細.xlsx」）可以之後再補。其他用不到的檔案會略過。</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇或拖曳檔案">
+      <strong>拖曳 .xlsx 到這裡</strong>，或點一下選擇檔案
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple hidden>
+    </div>
+    <ul class="checklist" id="checklist"></ul>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">2</div>
+  <div>
+    <h2>確認設定</h2>
+    <p class="hint">「去年同期基準」會影響第一段四項指標的 YOY。來源檔每月會回補去年的數字，所以會和報表『1)基本資訊』2025 列（也就是摘要圖表用的數字）有些微差異；想和圖表一致，請改用手動輸入。</p>
+    <div class="panel settings">
+      <div class="wide">
+        <div class="radio" role="radiogroup" aria-label="去年同期基準">
+          <label><input type="radio" name="base" value="file" checked> 用來源檔的去年同月（最新回補數字）</label>
+          <label><input type="radio" name="base" value="manual"> 手動輸入（對齊報表『1)基本資訊』2025 列）</label>
+        </div>
+      </div>
+      <label class="f">去年同月 不重複消費人數<input type="text" id="bPpl" placeholder="例如：60223" disabled></label>
+      <label class="f">去年同月 會員消費金額（元）<input type="text" id="bAmt" placeholder="例如：99473641" disabled></label>
+      <label class="f">去年同月 消費筆次<input type="text" id="bTrn" placeholder="例如：74460" disabled></label>
+      <label class="f">品類成長／衰退各取幾名<input type="number" id="topCat" min="1" max="5" value="2"></label>
+      <label class="f">主類別取前幾名<input type="number" id="topMid" min="0" max="5" value="2"></label>
+      <label class="f">每個主類別列幾個帶動商品<input type="number" id="topSer" min="0" max="6" value="3"></label>
+      <label class="f wide">商品合併關鍵字（逗號分隔；商品名稱含這些字就合併成同一系列）
+        <input type="text" id="kw" placeholder="例如：天官賜福, BEYBLADE, Jellycat, X-E5, PIXPRO C1">
+      </label>
+      <label class="f wide">中類排除規則（品類:關鍵字，多組用分號分隔）
+        <input type="text" id="exRules" value="中文書:3C家電">
+      </label>
+    </div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">3</div>
+  <div>
+    <h2>檢查計算結果</h2>
+    <p class="hint">每一段摘要用到的數字都列在這裡，可以先對一下報表。主類別和商品可以勾選要不要寫進摘要。</p>
+    <div id="results"><p class="empty">上傳 3、2、9 三份來源檔後，這裡會出現計算結果。</p></div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">4</div>
+  <div>
+    <h2>複製摘要</h2>
+    <p class="hint">「觀察」段落是依數字規則自動產生的初稿，建議補上當月的商品或活動脈絡。直接修改文字後，勾選變動就不會覆蓋你的修改；要重新套用請按「依目前結果重新產生」。</p>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" id="tabEdit">編輯文字</button>
+      <button role="tab" aria-selected="false" id="tabPrev">上色預覽</button>
+    </div>
+    <textarea id="text" rows="26" spellcheck="false" placeholder="產生的摘要會出現在這裡"></textarea>
+    <div class="preview" id="preview" hidden></div>
+    <div class="out-actions">
+      <button id="copy">複製摘要</button>
+      <button class="ghost" id="regen">依目前結果重新產生</button>
+      <span class="status" id="status" role="status"></span>
+    </div>
+    <p class="hint" style="margin-top:8px">貼進 Excel 後，「+」開頭的數字設成藍色、「-」開頭的設成紅色，就和報表原本的格式一致。</p>
+  </div>
+</section>
+
+<details class="logic">
+  <summary>摘要的計算邏輯</summary>
+  <h4>使用的來源檔</h4>
+  <ul>
+    <li><b>3_EC消費_分月_趨勢_消費卡別</b>：整體四項指標與卡別表現。取「查詢年月」那一欄當本月，同一列表頭等於去年同月的那一欄當去年同期。檔名含「系統日回推」的版本不會使用。</li>
+    <li><b>2_EC消費_TOP_觀察</b>：YTD 前10% 貢獻。對應報表『2)三階會員貢獻』的算法。</li>
+    <li><b>9_EC消費_館別_觀察</b>（品類觀察A）：品類 YOY。用「消費金額」區塊的 A_本月 對 C_同期，對應報表『8)線別分析』的去年同期差額。</li>
+    <li><b>品類商品明細</b>（選用）：主類別與帶動商品。</li>
+  </ul>
+  <h4>第一段：四項指標</h4>
+  <ul>
+    <li>人數、金額、筆次取「全會員」區塊；平均客單價沿用報表慣例，用「平均每人消費金額」（金額 ÷ 人數）。</li>
+    <li>YOY 差額＝本月－去年同月，成長率＝差額 ÷ 去年同月。手動輸入基準時，客單價改用 手動金額 ÷ 手動人數。</li>
+  </ul>
+  <h4>第二段：YTD 前10% 與卡別</h4>
+  <ul>
+    <li>前10% 貢獻＝「B_Top 01~10%」各卡 YTD 金額合計 ÷（Top 01~10% 到 Bottom 50% 全部金額合計），不含 Top 2% 和無消費兩列，與報表公式相同。卡別括號內是該卡前10% 金額 ÷ 同一個分母。</li>
+    <li>卡別消費金額 YOY 依差額由大到小排列，括號內是成長率（兩位小數）。</li>
+    <li>卡別的人數佔比、金額佔比直接取來源檔的數字；平均每人消費金額、人均筆次的 YOY 是本月 ÷ 去年同月 − 1。</li>
+  </ul>
+  <h4>觀察段落的判斷規則</h4>
+  <ul>
+    <li>人數或筆次成長率高於金額成長率、且客單價下滑：寫「成長主要靠『量』帶動」。客單價也成長：寫「量價齊揚」。金額衰退：寫「營收下滑」並點出主要拖累的指標。</li>
+    <li>卡別：金額成長率最高的寫「成長主力」；最低且人數、筆次、金額都衰退的寫「全面下滑」；其餘依成長率寫「溫和成長」（0～5%）、「明顯成長」（5% 以上）、「小幅下滑」或「下滑」。</li>
+    <li>金額佔比變動 1 個百分點以上的卡別會寫出佔比變化，並依卡別客單價高低描述對整體客單價的影響。</li>
+  </ul>
+  <h4>第三段：品類 Top2 與主類別</h4>
+  <ul>
+    <li>品類排除「全站、其他、Z_ 開頭」。成長取差額最大且為正的前幾名，衰退取差額最小且為負的前幾名。</li>
+    <li>主類別：該品類明細依「排除規則」去掉指定中類後，依中類差額排序。帶動商品先合併同系列（關鍵字優先，其次自動去掉冊數、顏色、容量、括號說明），預設只勾選差額佔該中類 5% 以上的系列。</li>
+    <li>成長系列去年同期 ≤ 本期 10% 視為新品，全部是新品時寫「等新品帶動」；去年就有銷售的加註「較去年 ±XK」。衰退寫成「去年同期有…熱銷，今年缺乏同量級新品」，有新品替代的情況（例如 iPhone 換代）建議手動改寫。</li>
+    <li>書籍、影音類的商品名稱自動加上《》。沒有上傳明細的品類，主類別會寫成「（待補）」。</li>
+  </ul>
+</details>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const S={src3:null,src2:null,src9:null,details:[],skipped:[],errors:[],textDirty:false,sel:{}};
+let uid=0;
+
+/* ---------- format ---------- */
+const nf=new Intl.NumberFormat('en-US');
+const N=v=>nf.format(Math.round(v));
+const K=v=>nf.format(Math.round(v/1000));
+const sN=v=>(v>=0?'+':'-')+nf.format(Math.abs(Math.round(v)));
+const sK=v=>(v>=0?'+':'-')+nf.format(Math.abs(Math.round(v/1000)))+'K';
+const sP=(v,d=1)=>v==null||!isFinite(v)?'-':(v>=0?'+':'')+(v*100).toFixed(d)+'%';
+const P=(v,d=1)=>v==null||!isFinite(v)?'-':(v*100).toFixed(d)+'%';
+const cls=v=>v>=0?'p':'n';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=v=>{const x=typeof v==='number'?v:parseFloat(String(v).replace(/,/g,''));return isFinite(x)?x:null;};
+const clean=s=>s==null?'':String(s).replace(/\s+/g,'');
+
+/* ---------- storage ---------- */
+const LS='ec-summary-writer-v1';
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem(LS)||'{}');['kw','exRules','topCat','topMid','topSer'].forEach(k=>{if(s[k]!=null)$('#'+k).value=s[k];});}catch(e){}}
+function saveSettings(){try{const o={};['kw','exRules','topCat','topMid','topSer'].forEach(k=>o[k]=$('#'+k).value);localStorage.setItem(LS,JSON.stringify(o));}catch(e){}}
+
+/* ---------- parsers ---------- */
+const aoaOf=ws=>XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+function findCell(aoa,test,maxR=80){for(let r=0;r<Math.min(aoa.length,maxR);r++){const row=aoa[r]||[];for(let c=0;c<row.length;c++){if(row[c]!=null&&test(String(row[c])))return [r,c];}}return null;}
+
+function parse3(wb){
+  for(const sn of wb.SheetNames){
+    const a=aoaOf(wb.Sheets[sn]);
+    const q=findCell(a,x=>x.includes('查詢年月'));if(!q)continue;
+    const cur=(String(a[q[0]][q[1]]).match(/\d{6}/)||[])[0];if(!cur)continue;
+    let hr=-1;for(let r=0;r<20;r++){if((a[r]||[]).filter(x=>/^\d{6}$/.test(String(x))).length>=6){hr=r;break;}}
+    if(hr<0)continue;
+    const h=a[hr].map(x=>x==null?'':String(x).trim());
+    const ly=String(+cur-100);
+    const cc=h.indexOf(cur),lc=h.indexOf(ly);
+    if(cc<0||lc<0)return {error:`找不到 ${cur} 或 ${ly} 的欄位`};
+    const blocks={};let blk=null;
+    for(let r=hr+1;r<a.length;r++){
+      const row=a[r]||[];
+      for(let c=0;c<Math.min(row.length,cc);c++){const t=clean(row[c]);if(/^(黑卡|金卡|白卡|全會員|誠品人|累計卡)$/.test(t)){blk=t;blocks[blk]={};}}
+      if(!blk)continue;
+      let label=null;for(let c=0;c<Math.min(row.length,cc);c++){const t=clean(row[c]);if(/人數|金額|筆次|佔比|客單價/.test(t)){label=t;}}
+      if(label)blocks[blk][label]={cur:num(row[cc]),ly:num(row[lc])};
+    }
+    if(!blocks['全會員'])return {error:'找不到「全會員」區塊'};
+    return {cur,ly,blocks,sheet:sn};
+  }
+  return null;
+}
+function parse2(wb){
+  for(const sn of wb.SheetNames){
+    const a=aoaOf(wb.Sheets[sn]);
+    const p=findCell(a,x=>x.trim()==='YTD金額');if(!p)continue;
+    const [r0,c0]=p;const head=a[r0];
+    const cols={};for(let c=c0+1;c<head.length;c++){const t=String(head[c]||'');if(t.includes('黑'))cols['黑卡']=c;else if(t.includes('金'))cols['金卡']=c;else if(t.includes('白'))cols['白卡']=c;else if(t.includes('小童'))cols['小童學']=c;else if(t==='')break;}
+    const ym=findCell(a,x=>x.includes('資料年月'));
+    const month=ym?String((a[ym[0]]||[])[ym[1]+1]||'').match(/\d{6}/)?.[0]:null;
+    let top10=null;const rows=[];
+    for(let r=r0+1;r<a.length;r++){
+      const lab=String((a[r]||[])[c0]||'');if(!lab)continue;
+      const vals={};let s=0;for(const k in cols){const v=num(a[r][cols[k]])||0;vals[k]=v;s+=v;}
+      if(/01~10/.test(lab))top10=vals;
+      if(/Top 2%|無消費/i.test(lab))continue;
+      rows.push({lab,vals,s});
+    }
+    if(!top10)return {error:'找不到「Top 01~10%」列'};
+    const total=rows.reduce((x,r)=>x+r.s,0);
+    return {month,top10,total,sheet:sn};
+  }
+  return null;
+}
+function parse9(wb){
+  const order=[...wb.SheetNames].sort((x,y)=>(y.includes('A')?1:0)-(x.includes('A')?1:0));
+  for(const sn of order){
+    const a=aoaOf(wb.Sheets[sn]);
+    const p=findCell(a,x=>x.trim()==='消費金額');if(!p)continue;
+    const [r0,c0]=p;
+    let hr=-1,cc=-1,lc=-1;
+    for(let r=Math.max(0,r0-3);r<=r0;r++){const row=a[r]||[];for(let c=c0+1;c<row.length;c++){const t=String(row[c]||'');if(t.includes('本月')&&cc<0){cc=c;hr=r;}if(t.includes('同期')&&lc<0)lc=c;}}
+    if(cc<0||lc<0)continue;
+    const ym=findCell(a,x=>x.includes('資料年月'));
+    const month=ym?String((a[ym[0]]||[])[ym[1]+1]||'').match(/\d{6}/)?.[0]:null;
+    const cats=[];
+    for(let r=r0+1;r<a.length;r++){
+      const name=(a[r]||[])[c0];if(name==null||name==='')continue;
+      const n=String(name).trim();
+      if(n==='全站'||n==='其他'||/^Z_/.test(n))continue;
+      const cur=num(a[r][cc])||0,ly=num(a[r][lc])||0;
+      cats.push({name:n,cur,ly,d:cur-ly,yoy:ly?(cur-ly)/ly:null});
+    }
+    return {month,cats,sheet:sn};
+  }
+  return null;
+}
+function parseDetail(wb){
+  let best=null;
+  const pick=(h,tests)=>{for(const t of tests){const i=h.findIndex(x=>x!=null&&t(String(x).trim()));if(i>=0)return i;}return -1;};
+  for(const sn of wb.SheetNames){
+    const a=aoaOf(wb.Sheets[sn]);
+    let hr=-1;for(let i=0;i<Math.min(a.length,10);i++){const r=(a[i]||[]).map(x=>x==null?'':String(x));if(r.some(x=>x.includes('年月'))&&r.some(x=>x.includes('中類'))){hr=i;break;}}
+    if(hr<0)continue;
+    const h=a[hr];
+    const ix={m:pick(h,[x=>x==='年月',x=>x.includes('年月')]),ch:pick(h,[x=>x.includes('通路')]),mid:pick(h,[x=>x==='中類名稱',x=>x.includes('中類')]),
+      prod:pick(h,[x=>x==='商品全名',x=>x.includes('商品全名'),x=>x.includes('商品名稱')]),amt:pick(h,[x=>x.includes('消費金額'),x=>x.includes('金額')]),trn:pick(h,[x=>x.includes('筆次')])};
+    if(ix.m<0||ix.mid<0||ix.amt<0)continue;
+    const rows=[];
+    for(let i=hr+1;i<a.length;i++){const r=a[i];if(!r||r[ix.m]==null||r[ix.mid]==null)continue;
+      const m=String(r[ix.m]).replace(/\D/g,'').slice(0,6);if(m.length!==6)continue;
+      rows.push({m,ch:ix.ch>=0&&r[ix.ch]!=null?String(r[ix.ch]):'',mid:String(r[ix.mid]).trim(),prod:ix.prod>=0&&r[ix.prod]!=null?String(r[ix.prod]).trim():'',amt:+r[ix.amt]||0,trn:ix.trn>=0?(+r[ix.trn]||0):0});}
+    if(!best||rows.length>best.rows.length)best={rows,hasProd:ix.prod>=0,sheet:sn};
+  }
+  return best;
+}
+
+async function handleFiles(files){
+  for(const f of files){
+    try{
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+      const fn=f.name;
+      if(/系統日回推/.test(fn)){S.skipped.push(fn);continue;}
+      const p3=parse3(wb);
+      if(p3){if(p3.error)S.errors.push(fn+'：'+p3.error);else S.src3={...p3,file:fn};continue;}
+      const p2=parse2(wb);
+      if(p2){if(p2.error)S.errors.push(fn+'：'+p2.error);else S.src2={...p2,file:fn};continue;}
+      if(wb.SheetNames.some(n=>/品類觀察/.test(n))||findCell(aoaOf(wb.Sheets[wb.SheetNames[0]]),x=>x.trim()==='消費金額')){
+        const p9=parse9(wb);if(p9){S.src9={...p9,file:fn};continue;}
+      }
+      const d=parseDetail(wb);
+      if(d&&d.rows.length){
+        const key=fn.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_\s-]*(商品明細|中類明細|明細)$/,'').trim();
+        S.details=S.details.filter(x=>x.file!==fn);
+        S.details.push({id:++uid,file:fn,key,cat:'',...d});continue;
+      }
+      S.skipped.push(fn);
+    }catch(e){S.errors.push(f.name+'：讀取失敗（'+(e&&e.message||e)+'）');}
+  }
+  autoMatch();renderChecklist();recompute();
+}
+function autoMatch(){
+  if(!S.src9)return;
+  const names=S.src9.cats.map(c=>c.name);
+  S.details.forEach(d=>{
+    if(d.cat&&names.includes(d.cat))return;
+    const k=d.key.toLowerCase();
+    d.cat=names.find(n=>n.toLowerCase()===k)||names.find(n=>n.toLowerCase().startsWith(k)||k.startsWith(n.toLowerCase()))||'';
+  });
+}
+
+/* ---------- checklist ---------- */
+function renderChecklist(){
+  const it=(ok,what,file)=>`<li><span class="mark ${ok?'ok':'no'}">${ok?'✓':''}</span><span class="what">${what}</span><span class="file">${file?esc(file):'尚未上傳'}</span></li>`;
+  let h=it(!!S.src3,'3_EC消費_分月_趨勢_消費卡別',S.src3&&`${S.src3.file}（查詢年月 ${S.src3.cur}）`)
+    +it(!!S.src2,'2_EC消費_TOP_觀察',S.src2&&`${S.src2.file}（資料年月 ${S.src2.month||'-'}）`)
+    +it(!!S.src9,'9_EC消費_館別_觀察',S.src9&&`${S.src9.file}（資料年月 ${S.src9.month||'-'}）`);
+  const opts=S.src9?S.src9.cats.map(c=>c.name):[];
+  S.details.forEach(d=>{h+=`<li><span class="mark ok">✓</span><span class="what">品類明細</span><span class="file">${esc(d.file)}（${nf.format(d.rows.length)} 列${d.hasProd?'，含商品':''}）</span>
+    <select data-det="${d.id}" aria-label="對應品類"><option value="">對應品類…</option>${opts.map(o=>`<option${o===d.cat?' selected':''}>${esc(o)}</option>`).join('')}</select></li>`;});
+  const months=[S.src3?.cur,S.src2?.month,S.src9?.month].filter(Boolean);
+  if(new Set(months).size>1)h+=`<li><span class="mark no">!</span><span class="err">三份來源檔的年月不一致（${months.join('、')}），請確認是不是放到不同月份的檔案。</span></li>`;
+  S.errors.forEach(e=>h+=`<li><span class="mark no">!</span><span class="err">${esc(e)}</span></li>`);
+  if(S.skipped.length)h+=`<li><span class="mark no">–</span><span class="file">摘要用不到、已略過：${esc(S.skipped.join('、'))}</span></li>`;
+  $('#checklist').innerHTML=h;
+}
+$('#checklist').addEventListener('change',e=>{const id=e.target.dataset.det;if(!id)return;const d=S.details.find(x=>x.id==id);d.cat=e.target.value;S.sel={};recompute();});
+
+/* ---------- compute: overall + cards ---------- */
+function overall(){
+  const b=S.src3.blocks['全會員'];
+  const g=k=>Object.keys(b).find(x=>x===k)||Object.keys(b).find(x=>x.includes(k));
+  const ppl=b[g('不重複消費人數')],amt=b[g('含稅消費金額')],trn=b[g('交易筆次')];
+  let ly={ppl:ppl.ly,amt:amt.ly,trn:trn.ly};
+  if(document.querySelector('input[name=base]:checked').value==='manual'){
+    const mp=num($('#bPpl').value),ma=num($('#bAmt').value),mt=num($('#bTrn').value);
+    if(mp)ly.ppl=mp;if(ma)ly.amt=ma;if(mt)ly.trn=mt;
+  }
+  const cur={ppl:ppl.cur,amt:amt.cur,trn:trn.cur};
+  cur.avg=cur.amt/cur.ppl;ly.avg=ly.amt/ly.ppl;
+  const r={};for(const k of ['ppl','amt','trn','avg'])r[k]={cur:cur[k],ly:ly[k],d:cur[k]-ly[k],g:(cur[k]-ly[k])/ly[k]};
+  return r;
+}
+function cards(){
+  const out=[];
+  for(const [name,letter] of [['黑卡','A'],['金卡','B'],['白卡','C']]){
+    const b=S.src3.blocks[name];if(!b)continue;
+    const get=k=>b[Object.keys(b).find(x=>x.includes(k))]||{cur:null,ly:null};
+    const amt=get('含稅消費金額'),ppl=get('不重複消費人數'),trn=get('交易筆次'),ps=get('消費人數佔比'),as=get('消費總金額佔比'),avg=get('平均每人消費金額'),fr=get('平均每人消費筆次'),aov=get('客單價');
+    out.push({name,letter,amt,ppl,trn,ps,as,avg,fr,aov,
+      d:amt.cur-amt.ly,g:(amt.cur-amt.ly)/amt.ly,pg:(ppl.cur-ppl.ly)/ppl.ly,tg:(trn.cur-trn.ly)/trn.ly,
+      avgG:avg.cur/avg.ly-1,frG:fr.cur/fr.ly-1});
+  }
+  return out;
+}
+
+/* ---------- compute: categories + details ---------- */
+const CN='一二三四五六七八九十百';
+function seriesOf(name){
+  const kws=$('#kw').value.split(/[,，、]/).map(s=>s.trim()).filter(Boolean);
+  const low=name.toLowerCase();for(const k of kws)if(low.includes(k.toLowerCase()))return k;
+  let s=name.replace(/【預購】|\(預購\)|（預購）|【[^】]*預購[^】]*】/g,'').replace(/[【】]/g,' ').trim();
+  const cut=s.search(/\s*[\(（\/／]|:\s|：/);if(cut>0)s=s.slice(0,cut);
+  s=s.replace(/\s+\d+\s*(GB|TB)\b.*$/i,'');
+  const vol=new RegExp(`\\s*(\\d+\\s*[-~～]\\s*\\d+|[${CN}]+\\s*[-~～]\\s*[${CN}]+|\\d+|[${CN}]+)$`);
+  for(let i=0;i<3;i++){const m=s.match(vol);if(!m)break;const before=s.slice(0,m.index).trim();
+    if(/^\s*\d/.test(m[0])&&/[A-Za-z0-9]$/.test(before))break;
+    if(before&&before.length>=2)s=before;else break;}
+  return s.trim()||name;
+}
+function exRulesFor(cat){
+  const out=[];$('#exRules').value.split(/[;；]/).forEach(p=>{const [c,k]=p.split(/[:：]/);if(c&&k&&c.trim()===cat)k.split(/[,，、]/).forEach(x=>x.trim()&&out.push(x.trim()));});return out;
+}
+function detailFor(cat,dir){
+  const d=S.details.find(x=>x.cat===cat);if(!d)return null;
+  const cur=S.src3?.cur||S.src9?.month,ly=String(+cur-100);
+  const ex=exRulesFor(cat);
+  const hasEC=d.rows.some(r=>r.ch==='EC');
+  const mids=new Map();
+  for(const r of d.rows){
+    if(r.m!==cur&&r.m!==ly)continue;if(hasEC&&r.ch&&r.ch!=='EC')continue;
+    if(ex.some(k=>r.mid.startsWith(k)||r.mid.includes(k)))continue;
+    let o=mids.get(r.mid);if(!o){o={mid:r.mid,cur:0,ly:0,ser:new Map()};mids.set(r.mid,o);}
+    if(r.m===cur)o.cur+=r.amt;else o.ly+=r.amt;
+    if(d.hasProd&&r.prod){const k=seriesOf(r.prod);let s=o.ser.get(k);if(!s){s={name:k,cur:0,ly:0,ct:0,lt:0,items:new Set()};o.ser.set(k,s);}
+      if(r.m===cur){s.cur+=r.amt;s.ct+=r.trn;}else{s.ly+=r.amt;s.lt+=r.trn;}s.items.add(r.prod);}
+  }
+  const list=[...mids.values()].map(o=>({...o,d:o.cur-o.ly}));
+  list.sort((a,b)=>dir==='g'?b.d-a.d:a.d-b.d);
+  list.forEach(o=>{o.series=[...o.ser.values()].map(s=>({...s,d:s.cur-s.ly})).sort((a,b)=>dir==='g'?b.d-a.d:a.d-b.d);});
+  return {d,list,ex,tc:list.reduce((x,o)=>x+o.cur,0),tl:list.reduce((x,o)=>x+o.ly,0)};
+}
+function topCats(){
+  const n=Math.max(1,+$('#topCat').value||2);
+  const g=S.src9.cats.filter(c=>c.d>0).sort((a,b)=>b.d-a.d).slice(0,n);
+  const d=S.src9.cats.filter(c=>c.d<0).sort((a,b)=>a.d-b.d).slice(0,n);
+  return {g,d};
+}
+function selFor(cat,dir,det){
+  const key=cat+'|'+dir;
+  if(!S.sel[key]){
+    const tm=Math.max(0,+$('#topMid').value||0),ts=Math.max(0,+$('#topSer').value||0);
+    const mids=det.list.filter(o=>dir==='g'?o.d>0:o.d<0).slice(0,tm);
+    const ser={};mids.forEach(o=>{ser[o.mid]=new Set(o.series.filter(s=>(dir==='g'?s.d>0:s.d<0)&&Math.abs(s.d)>=Math.abs(o.d)*0.05).slice(0,ts).map(s=>s.name));});
+    S.sel[key]={mids:new Set(mids.map(o=>o.mid)),ser};
+  }
+  return S.sel[key];
+}
+
+/* ---------- observation ---------- */
+function observation(o,cs,mon){
+  const parts=[];
+  const a=o.amt.g,p=o.ppl.g,t=o.trn.g,v=o.avg.g;
+  if(a>=0){
+    if(v<0&&(p>a||t>a))parts.push(`${mon}月營收YOY${sP(a)}，成長主要靠「量」帶動：不重複消費人數(${sP(p)})與消費筆次(${sP(t)})同步成長，但平均客單價下滑(${sP(v)})`);
+    else if(v>=0)parts.push(`${mon}月營收YOY${sP(a)}，量價齊揚：不重複消費人數${sP(p)}、平均客單價${sP(v)}`);
+    else parts.push(`${mon}月營收YOY${sP(a)}，人數${sP(p)}、筆次${sP(t)}、平均客單價${sP(v)}`);
+  }else{
+    const worst=[['不重複消費人數',p],['消費筆次',t],['平均客單價',v]].sort((x,y)=>x[1]-y[1])[0];
+    parts.push(`${mon}月營收YOY${sP(a)}，營收下滑，主要受${worst[0]}(${sP(worst[1])})拖累`);
+  }
+  const s=[...cs].sort((x,y)=>y.g-x.g);
+  const word=g=>g>=0.05?'明顯成長':g>=0?'溫和成長':g>-0.05?'小幅下滑':'下滑';
+  const cardTxt=[];
+  s.forEach((c,i)=>{
+    if(i===0&&c.g>0)cardTxt.push(`${c.name}為成長主力，消費金額${sP(c.g)}、消費人數${sP(c.pg)}`);
+    else if(i===s.length-1&&c.g<0&&c.pg<0&&c.tg<0)cardTxt.push(`${c.name}則人數(${sP(c.pg)})、筆次(${sP(c.tg)})、金額(${sP(c.g)})全面下滑`);
+    else cardTxt.push(`${c.name}${word(c.g)}(${sP(c.g)})`);
+  });
+  parts.push('卡別表現：'+cardTxt.join('；'));
+  const byAov=[...cs].filter(c=>c.avg.cur).sort((x,y)=>y.avg.cur-x.avg.cur);
+  const hi=byAov[0],lo=byAov[byAov.length-1];
+  const sh=c=>({c,dv:(c.as.cur||0)-(c.as.ly||0)});
+  const shifts=cs.map(sh).filter(x=>Math.abs(x.dv)>=0.0099);
+  if(shifts.length&&hi&&lo&&hi!==lo){
+    const ph=c=>`${Math.round(c.as.ly*100)}%→${Math.round(c.as.cur*100)}%`;
+    const desc=shifts.map(({c,dv})=>`${c===lo?'客單價偏低的':c===hi?'客單價偏高的':''}${c.name}消費金額佔比${dv>0?'擴大':'縮小'}(${ph(c)})`).join('、');
+    const loUp=shifts.some(x=>x.c===lo&&x.dv>0),hiDown=shifts.some(x=>x.c===hi&&x.dv<0);
+    parts.push(desc+(loUp||hiDown?'，拉低整體平均客單價':(shifts.some(x=>x.c===hi&&x.dv>0)?'，有助拉高整體平均客單價':'')));
+  }
+  return parts.join('。');
+}
+
+/* ---------- build text ---------- */
+let R=null;
+function compute(){
+  if(!S.src3||!S.src2||!S.src9)return null;
+  const o=overall(),cs=cards(),tc=topCats();
+  const det={};
+  for(const dir of ['g','d'])tc[dir].forEach(c=>{const x=detailFor(c.name,dir);if(x)det[c.name]=x;});
+  return {o,cs,tc,det,mon:+S.src3.cur.slice(4)};
+}
+function buildText(){
+  if(!R)return '';
+  const {o,cs,tc,det,mon}=R;const I='\u3000';const L=[];
+  L.push(`●【${mon}月不重複消費人數】${N(o.ppl.cur)}人，YOY${sN(o.ppl.d)}人，成長率${sP(o.ppl.g)}`);
+  L.push(`●【${mon}月會員消費金額】${K(o.amt.cur)}K，YOY${sK(o.amt.d)}，成長率${sP(o.amt.g)}`);
+  L.push(`●【${mon}月消費筆次】${N(o.trn.cur)}筆，YOY${sN(o.trn.d)}筆，成長率${sP(o.trn.g)}`);
+  L.push(`●【${mon}月平均客單價】$${N(o.avg.cur)}，YOY${o.avg.d>=0?'+':'-'}$${N(Math.abs(o.avg.d))}，成長率${sP(o.avg.g)}`);
+  L.push('');
+  const t=S.src2;const shares=cs.map(c=>({n:c.name,v:(t.top10[c.name]||0)/t.total})).sort((a,b)=>b.v-a.v);
+  const all10=Object.values(t.top10).reduce((a,b)=>a+b,0)/t.total;
+  L.push(`※YTD至${mon}月前10%貢獻會員創造 ${Math.round(all10*100)}% 業績，其中${shares.map(s=>`${s.n}(${(s.v*100).toFixed(1)}%)`).join('>')}`);
+  const byD=[...cs].sort((a,b)=>b.d-a.d);
+  L.push(`※${mon}月YOY_卡別消費金額表現：${byD.map(c=>`${c.name}${sK(c.d)}(${sP(c.g,2)})`).join('>')}`);
+  L.push(`● ${mon}月卡別有購人數佔比、消費金額佔比、人均消、人均筆次：`);
+  cs.forEach(c=>L.push(`${c.letter}. ${c.name}有購人數佔比${P(c.ps.cur)}、消費金額佔比${P(c.as.cur)}、平均每人消費金額 $${N(c.avg.cur)} (YOY${sP(c.avgG,2)})、人均筆次${(c.fr.cur||0).toFixed(2)}次 (YOY${sP(c.frG,2)})`));
+  L.push('<觀察> ');
+  L.push(observation(o,cs,mon));
+  L.push('');
+  for(const dir of ['g','d']){
+    const list=tc[dir];if(!list.length)continue;
+    L.push(`※${mon}月YOY_品類${dir==='g'?'成長':'衰退'}Top${list.length}：`);
+    list.forEach((c,i)=>{
+      L.push(`${I}${i+1}. ${c.name}：金額${sK(c.d)}，YOY${sP(c.yoy)}`);
+      const x=det[c.name];const word=dir==='g'?'成長':'衰退';
+      const tm=Math.max(0,+$('#topMid').value||0);
+      if(!x){for(let j=1;j<=tm;j++)L.push(`${I}${I}${word}主類別TOP${j}：（待補）`);return;}
+      const sel=selFor(c.name,dir,x);
+      const book=/書|小說|影音|音樂|漫|雜誌/.test(c.name);
+      const q=s=>book?`《${s}》`:s;
+      x.list.filter(o2=>sel.mids.has(o2.mid)).forEach((m,j)=>{
+        let line=`${I}${I}${word}主類別TOP${j+1}：${m.mid}(${sK(m.d)})`;
+        const ss=m.series.filter(s=>(sel.ser[m.mid]||new Set()).has(s.name));
+        if(ss.length){
+          if(dir==='g'){
+            const isNew=s=>s.ly<=s.cur*0.1;
+            line+=`，${ss.map(s=>isNew(s)?`${q(s.name)}(${K(s.cur)}K)`:`${q(s.name)}(${K(s.cur)}K，較去年${sK(s.d)})`).join('、')}${ss.length>1?'等':''}${ss.every(isNew)?'新品':''}帶動`;
+          }else{
+            line+=`，去年同期有${ss.map(s=>`${q(s.name)}(${K(s.ly)}K)`).join('、')}${ss.length>1?'等':''}熱銷，今年缺乏同量級新品`;
+          }
+        }
+        L.push(line);
+      });
+    });
+    L.push('');
+  }
+  return L.join('\n').trim();
+}
+
+/* ---------- render ---------- */
+function recompute(){R=compute();renderResults();genText();}
+function row(label,o,unit,fmt){return `<tr><td class="name">${label}</td><td>${fmt(o.cur)}${unit}</td><td>${fmt(o.ly)}${unit}</td><td class="${cls(o.d)}">${o.d>=0?'+':'-'}${fmt(Math.abs(o.d))}${unit}</td><td class="${cls(o.g)}">${sP(o.g)}</td></tr>`;}
+function renderResults(){
+  const box=$('#results');
+  if(!R){const miss=[!S.src3&&'3_EC消費_分月_趨勢_消費卡別',!S.src2&&'2_EC消費_TOP_觀察',!S.src9&&'9_EC消費_館別_觀察'].filter(Boolean);
+    box.innerHTML=`<p class="empty">${S.src3||S.src2||S.src9?'還缺：'+miss.join('、'):'上傳 3、2、9 三份來源檔後，這裡會出現計算結果。'}</p>`;return;}
+  const {o,cs,tc,det,mon}=R;
+  const baseNote=document.querySelector('input[name=base]:checked').value==='manual'?'去年同期：手動輸入':'去年同期：來源檔';
+  let h=`<div class="block"><h3>整體四項指標 <small>${S.src3.cur} vs ${S.src3.ly}，${baseNote}</small></h3><div class="tbl-wrap"><table>
+    <thead><tr><th class="name">指標</th><th>本月</th><th>去年同月</th><th>差額</th><th>成長率</th></tr></thead><tbody>
+    ${row('不重複消費人數',o.ppl,'',N)}${row('會員消費金額（K）',{...o.amt,cur:o.amt.cur/1000,ly:o.amt.ly/1000,d:o.amt.d/1000},'',N)}${row('消費筆次',o.trn,'',N)}${row('平均客單價（人均消）',o.avg,'',N)}
+    </tbody></table></div></div>`;
+  const t=S.src2;
+  h+=`<div class="block"><h3>卡別表現 <small>前10% 分母 ${K(t.total)}K（YTD 至 ${t.month||'-'}）</small></h3><div class="tbl-wrap"><table>
+    <thead><tr><th class="name">卡別</th><th>前10%貢獻</th><th>金額(K)</th><th>金額差額</th><th>金額YOY</th><th>人數YOY</th><th>筆次YOY</th><th>人數佔比</th><th>金額佔比</th><th>人均消</th><th>人均消YOY</th><th>人均筆次</th><th>人均筆次YOY</th></tr></thead><tbody>
+    ${cs.map(c=>`<tr><td class="name">${c.name}</td><td>${P((t.top10[c.name]||0)/t.total)}</td><td>${K(c.amt.cur)}</td><td class="${cls(c.d)}">${sK(c.d)}</td><td class="${cls(c.g)}">${sP(c.g,2)}</td><td class="${cls(c.pg)}">${sP(c.pg)}</td><td class="${cls(c.tg)}">${sP(c.tg)}</td>
+      <td>${P(c.ps.ly,0)}→${P(c.ps.cur,0)}</td><td>${P(c.as.ly,0)}→${P(c.as.cur,0)}</td><td>${N(c.avg.cur)}</td><td class="${cls(c.avgG)}">${sP(c.avgG,2)}</td><td>${(c.fr.cur||0).toFixed(2)}</td><td class="${cls(c.frG)}">${sP(c.frG,2)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  const all=[...S.src9.cats].sort((a,b)=>b.d-a.d);
+  const tops=new Set([...tc.g,...tc.d].map(c=>c.name));
+  h+=`<div class="block"><h3>品類 YOY <small>${S.src9.month||''} vs 去年同期，標黃的是寫進摘要的 Top 名單</small></h3><div class="tbl-wrap"><table>
+    <thead><tr><th class="name">品類</th><th>本月(K)</th><th>去年同期(K)</th><th>差額</th><th>YOY</th><th class="name">主類別明細</th></tr></thead><tbody>
+    ${all.map(c=>`<tr class="${tops.has(c.name)?'on':''}"><td class="name">${esc(c.name)}</td><td>${K(c.cur)}</td><td>${K(c.ly)}</td><td class="${cls(c.d)}">${sK(c.d)}</td><td class="${cls(c.d)}">${sP(c.yoy)}</td><td class="name">${tops.has(c.name)?(det[c.name]?'已上傳':'未上傳，摘要會寫（待補）'):''}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  for(const dir of ['g','d'])tc[dir].forEach(c=>{
+    const x=det[c.name];if(!x)return;
+    const sel=selFor(c.name,dir,x);
+    const midRows=x.list.slice(0,10).map(m=>`<tr class="${sel.mids.has(m.mid)?'on':''}"><td class="c"><input type="checkbox" aria-label="選為主類別" data-k="${esc(c.name+'|'+dir)}" data-mid="${esc(m.mid)}"${sel.mids.has(m.mid)?' checked':''}></td><td class="name">${esc(m.mid)}</td><td>${K(m.cur)}</td><td>${K(m.ly)}</td><td class="${cls(m.d)}">${sK(m.d)}</td><td class="${cls(m.d)}">${sP(m.ly?m.d/m.ly:null)}</td></tr>`).join('');
+    const subs=x.list.filter(m=>sel.mids.has(m.mid)).map(m=>{
+      if(!x.d.hasProd)return `<div class="sub"><p class="note">${esc(m.mid)}：這份明細沒有商品欄位，只能寫到中類。</p></div>`;
+      const ss=sel.ser[m.mid]||(sel.ser[m.mid]=new Set());
+      return `<div class="sub"><h4>${esc(m.mid)}：${dir==='g'?'帶動成長':'造成衰退'}的商品系列</h4><div class="tbl-wrap"><table>
+        <thead><tr><th class="c"></th><th class="name">商品／系列</th><th>本月(K)</th><th>本月筆次</th><th>去年同期(K)</th><th>去年筆次</th><th>差額</th></tr></thead><tbody>
+        ${m.series.slice(0,10).map(s=>`<tr class="${ss.has(s.name)?'on':''}"><td class="c"><input type="checkbox" aria-label="寫進摘要" data-k="${esc(c.name+'|'+dir)}" data-smid="${esc(m.mid)}" data-ser="${esc(s.name)}"${ss.has(s.name)?' checked':''}></td>
+          <td class="name" title="${esc([...s.items].slice(0,8).join('\n'))}">${esc(s.name)}${s.items.size>1?` <span class="note">（${s.items.size} 個品項）</span>`:''}</td><td>${K(s.cur)}</td><td>${N(s.ct)}</td><td>${K(s.ly)}</td><td>${N(s.lt)}</td><td class="${cls(s.d)}">${sK(s.d)}</td></tr>`).join('')}
+        </tbody></table></div></div>`;}).join('');
+    h+=`<div class="block"><h3>${esc(c.name)} 主類別 <small>${dir==='g'?'成長':'衰退'}；明細合計差額 ${sK(x.tc-x.tl)}${x.ex.length?'，已排除「'+esc(x.ex.join('、'))+'」中類':''}；摘要品類總額以館別觀察為準</small></h3>
+      <div class="tbl-wrap"><table><thead><tr><th class="c">選</th><th class="name">中類</th><th>本月(K)</th><th>去年同期(K)</th><th>差額</th><th>YOY</th></tr></thead><tbody>${midRows}</tbody></table></div>${subs}</div>`;
+  });
+  box.innerHTML=h;
+}
+$('#results').addEventListener('change',e=>{
+  const t=e.target;if(t.type!=='checkbox'||!t.dataset.k)return;
+  const sel=S.sel[t.dataset.k];if(!sel)return;
+  if(t.dataset.mid!=null){t.checked?sel.mids.add(t.dataset.mid):sel.mids.delete(t.dataset.mid);}
+  else{const s=sel.ser[t.dataset.smid]||(sel.ser[t.dataset.smid]=new Set());t.checked?s.add(t.dataset.ser):s.delete(t.dataset.ser);}
+  renderResults();genText();
+});
+
+/* ---------- text output ---------- */
+function genText(force){
+  if(S.textDirty&&!force){renderPreview();return;}
+  $('#text').value=buildText();S.textDirty=false;renderPreview();
+}
+function renderPreview(){
+  const v=$('#text').value;
+  $('#preview').innerHTML=esc(v).replace(/[+\-]\$?\d[\d,]*(?:\.\d+)?%?K?/g,m=>`<span class="${m[0]==='+'?'p':'n'}">${m}</span>`);
+}
+$('#text').addEventListener('input',()=>{S.textDirty=true;renderPreview();});
+$('#regen').addEventListener('click',()=>{genText(true);flash('已依目前結果重新產生');});
+$('#copy').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($('#text').value);flash('已複製摘要');}
+  catch(e){$('#text').select();flash('已選取文字，請按 Ctrl+C 複製');}
+});
+function setTab(prev){$('#tabEdit').setAttribute('aria-selected',String(!prev));$('#tabPrev').setAttribute('aria-selected',String(prev));$('#text').hidden=prev;$('#preview').hidden=!prev;}
+$('#tabEdit').addEventListener('click',()=>setTab(false));
+$('#tabPrev').addEventListener('click',()=>setTab(true));
+function flash(m){$('#status').textContent=m;clearTimeout(flash.t);flash.t=setTimeout(()=>$('#status').textContent='',2600);}
+
+/* ---------- inputs ---------- */
+const drop=$('#drop'),fileIn=$('#file');
+drop.addEventListener('click',()=>fileIn.click());
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileIn.click();}});
+fileIn.addEventListener('change',()=>{handleFiles([...fileIn.files]);fileIn.value='';});
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handleFiles([...e.dataTransfer.files]));
+document.querySelectorAll('input[name=base]').forEach(r=>r.addEventListener('change',()=>{
+  const m=document.querySelector('input[name=base]:checked').value==='manual';['#bPpl','#bAmt','#bTrn'].forEach(s=>$(s).disabled=!m);recompute();}));
+['#bPpl','#bAmt','#bTrn'].forEach(s=>$(s).addEventListener('input',recompute));
+['#topCat','#topMid','#topSer','#kw','#exRules'].forEach(s=>$(s).addEventListener(s==='#kw'||s==='#exRules'?'change':'input',()=>{saveSettings();S.sel={};recompute();}));
+loadSettings();renderChecklist();
+})();
+</script>
+</body>
+</html>
