@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>品類YOY主類別說明產生器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#EEF2F6; --paper:#FFFFFF; --ink:#1B2430; --muted:#5B6878; --rule:#C9D3DE; --soft:#E3E9F0;
+  --pos:#1F4FD1; --neg:#C8322B; --pos-bg:#E6EDFC; --neg-bg:#FBE9E8; --sel:#FFF6D6; --focus:#1F4FD1;
+  color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121821; --paper:#1A222D; --ink:#E4EAF1; --muted:#9AA7B6; --rule:#33404F; --soft:#232D3A;
+    --pos:#7FA2FF; --neg:#FF8A80; --pos-bg:#1E2A4A; --neg-bg:#3A1F1E; --sel:#3A3420; --focus:#7FA2FF; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121821; --paper:#1A222D; --ink:#E4EAF1; --muted:#9AA7B6; --rule:#33404F; --soft:#232D3A;
+  --pos:#7FA2FF; --neg:#FF8A80; --pos-bg:#1E2A4A; --neg-bg:#3A1F1E; --sel:#3A3420; --focus:#7FA2FF; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+header h1{font-size:26px;line-height:1.3;margin:0 0 6px;font-weight:700;letter-spacing:.01em}
+header p{margin:0;color:var(--muted);max-width:70ch}
+.step{display:grid;grid-template-columns:44px 1fr;gap:16px;margin-top:30px}
+.step-no{width:36px;height:36px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center;font-weight:700;font-variant-numeric:tabular-nums}
+.step h2{font-size:18px;margin:4px 0 4px;font-weight:700}
+.step .hint{color:var(--muted);margin:0 0 14px;font-size:14px;max-width:75ch}
+.panel{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:16px}
+.drop{border:2px dashed var(--rule);border-radius:6px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:var(--paper)}
+.drop.over{border-color:var(--focus);color:var(--ink)}
+.drop strong{color:var(--ink)}
+.cats{display:grid;gap:12px;margin-top:12px}
+.cat-card{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;align-items:end}
+.cat-card .file{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:6px 8px;min-width:0}
+textarea{width:100%;resize:vertical}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,.drop:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button{font:inherit;cursor:pointer;border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);padding:7px 14px;font-weight:500}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--rule)}
+button.danger{background:transparent;color:var(--neg);border-color:var(--rule)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 16px}
+.settings .wide{grid-column:1/-1}
+.chk{display:flex;gap:6px;align-items:center;font-size:14px;color:var(--ink)}
+.result{margin-top:14px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.result-head{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--rule)}
+.result-head h3{margin:0;font-size:17px}
+.kpi{font-variant-numeric:tabular-nums;color:var(--muted);font-size:14px}
+.kpi b{color:var(--ink);font-weight:700}
+.dir{font-size:12px;font-weight:700;padding:1px 8px;border-radius:10px}
+.dir.g{background:var(--pos-bg);color:var(--pos)} .dir.d{background:var(--neg-bg);color:var(--neg)}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--soft);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:500;background:var(--soft)}
+td.name,th.name{text-align:left;white-space:normal;min-width:220px}
+td.c,th.c{text-align:center;width:36px}
+tr.on td{background:var(--sel)}
+.p{color:var(--pos)} .n{color:var(--neg)}
+.sub{padding:10px 16px 14px;border-top:1px solid var(--rule)}
+.sub h4{margin:4px 0 8px;font-size:14.5px}
+.sub .note{color:var(--muted);font-size:13px;margin:0 0 8px}
+.out{display:grid;gap:10px}
+.out-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.status{color:var(--muted);font-size:13px}
+.preview{background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 14px;white-space:pre-wrap;font-size:14px;line-height:1.75}
+details.logic{margin-top:34px;background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:12px 16px}
+details.logic summary{cursor:pointer;font-weight:700}
+details.logic ol{padding-left:20px;max-width:80ch} details.logic li{margin:6px 0}
+.empty{color:var(--muted);padding:14px 0}
+.err{color:var(--neg);font-size:13px}
+@media (max-width:640px){.step{grid-template-columns:1fr}.step-no{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>品類YOY主類別說明產生器</h1>
+  <p>上傳各品類的中類或商品明細，自動算出本期與去年同期的差額，找出成長或衰退的主類別與帶動商品，產生可以直接貼進「EC會員行銷觀測報表」摘要的文字。</p>
+</header>
+
+<section class="step">
+  <div class="step-no">1</div>
+  <div>
+    <h2>上傳品類明細</h2>
+    <p class="hint">每個品類一個檔案，可以一次拖多個。欄位需要有：年月、中類名稱、商品消費金額；有「商品全名」欄位時才會分析到商品層級。檔名會自動變成品類名稱，例如「中文_商品明細.xlsx」會變成「中文」。</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="選擇或拖曳檔案">
+      <strong>拖曳 .xlsx／.csv 到這裡</strong>，或點一下選擇檔案
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple hidden>
+    </div>
+    <div class="cats" id="cats"></div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">2</div>
+  <div>
+    <h2>確認比較設定</h2>
+    <p class="hint">年月會自動抓檔案裡最新的月份，跟去年同月比較。合併關鍵字的設定會記在這台電腦的瀏覽器裡。</p>
+    <div class="panel settings">
+      <label class="f">本期年月<select id="mCur"></select></label>
+      <label class="f">比較年月<select id="mPrev"></select></label>
+      <label class="f">通路<select id="chan"></select></label>
+      <label class="f">主類別取前幾名<input type="number" id="topMid" min="1" max="5" value="2"></label>
+      <label class="f">每個主類別列幾個帶動商品<input type="number" id="topSer" min="0" max="6" value="3"></label>
+      <label class="f">新品判定門檻（去年 ≤ 本期的 %）<input type="number" id="newPct" min="0" max="100" value="10"></label>
+      <label class="f wide">商品合併關鍵字（逗號分隔；商品名稱含這些字就合併成同一系列）
+        <input type="text" id="kw" placeholder="例如：天官賜福, BEYBLADE, Jellycat, iPhone 18 Pro Max, 寶可夢30週年">
+      </label>
+      <label class="chk wide"><input type="checkbox" id="autoSeries" checked> 自動合併同系列商品（去掉冊數、顏色、容量、括號內的版本說明）</label>
+    </div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">3</div>
+  <div>
+    <h2>檢視拆解結果</h2>
+    <p class="hint">勾選要寫進摘要的主類別和商品。預設已勾好前幾名，勾選會即時更新下方文字。</p>
+    <div id="results"><p class="empty">上傳明細後，這裡會出現各品類的中類排名與帶動商品。</p></div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-no">4</div>
+  <div>
+    <h2>複製摘要文字</h2>
+    <p class="hint">文字可以直接修改。改過之後勾選變動不會覆蓋你的修改，要重新套用勾選請按「依勾選重新產生」。</p>
+    <div class="out">
+      <textarea id="text" rows="16" spellcheck="false" placeholder="產生的摘要文字會出現在這裡"></textarea>
+      <div class="out-actions">
+        <button id="copy">複製文字</button>
+        <button class="ghost" id="regen">依勾選重新產生</button>
+        <button class="ghost" id="dl" hidden>下載 RAW DATA（.xlsx）</button>
+        <button class="ghost" id="copyRaw">複製 RAW DATA（貼到 Excel）</button>
+        <span class="status" id="status" role="status"></span>
+      </div>
+      <p class="hint" style="margin:0">正負數的紅藍上色要在 Excel 裡做：貼進儲存格後，把「+」開頭的數字設成藍色、「-」開頭的設成紅色。</p>
+    </div>
+  </div>
+</section>
+
+<details class="logic">
+  <summary>這個工具的計算邏輯</summary>
+  <ol>
+    <li>讀取每個檔案中，同時有「年月、中類名稱、金額」欄位的工作表；有好幾張時取資料列最多的那張，避免重複計算。</li>
+    <li>依「通路」篩選後，排除該品類設定的中類關鍵字（例如中文書排除「3C家電」開頭的中類）。</li>
+    <li>品類總額＝所有保留中類的金額加總；差額＝本期－比較期；YOY＝差額÷比較期。如果有填「品類總額覆寫」，摘要的品類那一行會改用覆寫值（例如以『8)線別分析』為準）。</li>
+    <li>品類方向：總差額 ≥ 0 視為成長、&lt; 0 視為衰退，也可以手動指定。成長品類取差額最大的中類，衰退品類取差額最小（掉最多）的中類。</li>
+    <li>商品層級：先把同系列商品合併（關鍵字優先，其次自動去掉冊數、顏色、容量、括號說明），再算每個系列的差額。成長中類列出差額最大的系列，寫本期金額；衰退中類列出掉最多的系列，寫去年同期金額。</li>
+    <li>成長系列如果去年同期金額 ≤ 本期的門檻比例，視為新品；全部是新品時寫「等新品帶動」，去年就有銷售的系列會加註「較去年+XK」。衰退中類會寫成「去年同期有…熱銷，今年缺乏同量級新品」。預設只勾選差額佔該中類差額 5% 以上的系列。</li>
+    <li>RAW DATA 匯出內容：彙總表、各品類中類 YOY 表、主類別的系列明細。人數合計是各中類加總，跨中類購買會重複計算。</li>
+  </ol>
+</details>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const state={cats:[],textDirty:false};
+let uid=0;
+
+/* ---------- storage (per-viewer convenience) ---------- */
+const LS='catyoy-settings-v1';
+function loadSettings(){try{const s=JSON.parse(localStorage.getItem(LS)||'{}');if(s.kw)$('#kw').value=s.kw;if(s.topMid)$('#topMid').value=s.topMid;if(s.topSer!=null)$('#topSer').value=s.topSer;if(s.newPct!=null)$('#newPct').value=s.newPct;if(s.autoSeries===false)$('#autoSeries').checked=false;}catch(e){}}
+function saveSettings(){try{localStorage.setItem(LS,JSON.stringify({kw:$('#kw').value,topMid:$('#topMid').value,topSer:$('#topSer').value,newPct:$('#newPct').value,autoSeries:$('#autoSeries').checked}));}catch(e){}}
+
+/* ---------- formatting ---------- */
+const nf=new Intl.NumberFormat('en-US');
+const K=v=>nf.format(Math.round(v/1000));
+const sK=v=>(v>=0?'+':'-')+nf.format(Math.abs(Math.round(v/1000)))+'K';
+const pct=(d,b)=>b?((d>=0?'+':'')+(d/b*100).toFixed(1)+'%'):'-';
+const cls=v=>v>=0?'p':'n';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- file parsing ---------- */
+function pickCol(h,tests){for(const t of tests){const i=h.findIndex(x=>x!=null&&t(String(x).trim()));if(i>=0)return i;}return -1;}
+function parseWorkbook(wb){
+  let best=null;
+  for(const sn of wb.SheetNames){
+    const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+    let hr=-1;
+    for(let i=0;i<Math.min(aoa.length,15);i++){const r=aoa[i].map(x=>x==null?'':String(x));if(r.some(x=>x.includes('年月'))&&r.some(x=>x.includes('中類'))){hr=i;break;}}
+    if(hr<0)continue;
+    const h=aoa[hr];
+    const ix={
+      m:pickCol(h,[x=>x==='年月',x=>x.includes('年月')]),
+      ch:pickCol(h,[x=>x.includes('通路')]),
+      mid:pickCol(h,[x=>x==='中類名稱',x=>x.includes('中類')]),
+      prod:pickCol(h,[x=>x==='商品全名',x=>x.includes('商品全名'),x=>x.includes('商品名稱')]),
+      amt:pickCol(h,[x=>x.includes('消費金額'),x=>x.includes('金額')]),
+      ppl:pickCol(h,[x=>x.includes('人數')]),
+      trn:pickCol(h,[x=>x.includes('筆次')])
+    };
+    if(ix.m<0||ix.mid<0||ix.amt<0)continue;
+    const rows=[];
+    for(let i=hr+1;i<aoa.length;i++){
+      const r=aoa[i];if(!r||r[ix.m]==null||r[ix.mid]==null)continue;
+      const m=String(r[ix.m]).replace(/\D/g,'').slice(0,6);if(m.length!==6)continue;
+      rows.push({m,ch:ix.ch>=0&&r[ix.ch]!=null?String(r[ix.ch]):'',mid:String(r[ix.mid]).trim(),prod:ix.prod>=0&&r[ix.prod]!=null?String(r[ix.prod]).trim():'',
+        amt:+r[ix.amt]||0,ppl:ix.ppl>=0?(+r[ix.ppl]||0):0,trn:ix.trn>=0?(+r[ix.trn]||0):0});
+    }
+    if(!best||rows.length>best.rows.length)best={rows,hasProd:ix.prod>=0,sheet:sn};
+  }
+  return best;
+}
+function catNameFromFile(fn){
+  let n=fn.replace(/\.(xlsx|xls|csv)$/i,'').replace(/[_\s-]*(商品明細|中類明細|明細)$/,'').replace(/_/g,' ').trim();
+  return n||fn;
+}
+async function handleFiles(files){
+  for(const f of files){
+    const status=$('#status');
+    try{
+      const buf=await f.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array'});
+      const p=parseWorkbook(wb);
+      if(!p||!p.rows.length){addErrorCard(f.name,'找不到同時有「年月、中類名稱、金額」欄位的工作表。');continue;}
+      const name=catNameFromFile(f.name);
+      state.cats.push({id:++uid,file:f.name,sheet:p.sheet,name,rows:p.rows,hasProd:p.hasProd,dir:'auto',
+        exclude:/中文/.test(name)?'3C家電':'',ovAmt:'',ovYoy:'',book:/書|小說|影音|音樂|漫|中文/.test(name),
+        selMid:null,selSer:{}});
+    }catch(e){addErrorCard(f.name,'讀取失敗：'+(e&&e.message||e));}
+  }
+  refreshPeriods();renderCats();recompute();
+}
+function addErrorCard(fn,msg){state.cats.push({id:++uid,file:fn,error:msg,rows:[]});}
+
+/* ---------- periods / channels ---------- */
+function refreshPeriods(){
+  const ms=new Set(),chs=new Set();
+  state.cats.forEach(c=>c.rows.forEach(r=>{ms.add(r.m);if(r.ch)chs.add(r.ch);}));
+  const list=[...ms].sort().reverse();
+  const cur=$('#mCur').value,prev=$('#mPrev').value,ch=$('#chan').value;
+  $('#mCur').innerHTML=list.map(m=>`<option>${m}</option>`).join('');
+  $('#mPrev').innerHTML=list.map(m=>`<option>${m}</option>`).join('');
+  if(list.length){
+    const c=list.includes(cur)?cur:list[0];$('#mCur').value=c;
+    const ly=String(+c-100);
+    $('#mPrev').value=list.includes(prev)&&prev!==c?prev:(list.includes(ly)?ly:(list[1]||list[0]));
+  }
+  const cl=[...chs].sort();
+  $('#chan').innerHTML='<option value="">全部通路</option>'+cl.map(x=>`<option>${esc(x)}</option>`).join('');
+  $('#chan').value=cl.includes(ch)?ch:(cl.includes('EC')?'EC':'');
+}
+
+/* ---------- series grouping ---------- */
+const CN='一二三四五六七八九十百';
+function seriesOf(name){
+  const kws=$('#kw').value.split(/[,，、]/).map(s=>s.trim()).filter(Boolean);
+  const low=name.toLowerCase();
+  for(const k of kws)if(low.includes(k.toLowerCase()))return k;
+  if(!$('#autoSeries').checked)return name;
+  let s=name.replace(/【預購】|\(預購\)|（預購）|【[^】]*預購[^】]*】/g,'').replace(/[【】]/g,' ').trim();
+  const cut=s.search(/\s*[\(（\/／]|:\s|：/);
+  if(cut>0)s=s.slice(0,cut);
+  s=s.replace(/\s+\d+\s*(GB|TB)\b.*$/i,'');
+  const vol=new RegExp(`\\s*(\\d+\\s*[-~～]\\s*\\d+|[${CN}]+\\s*[-~～]\\s*[${CN}]+|\\d+\\s*(GB|TB|G|T)|\\d+|[${CN}]+)$`,'i');
+  for(let i=0;i<3;i++){const m=s.match(vol);if(!m)break;const before=s.slice(0,m.index).trim();
+    if(/^\s*\d/.test(m[0])&&!/(GB|TB)$/i.test(m[0].trim())&&/[A-Za-z0-9]$/.test(before))break;
+    if(before&&before.length>=2)s=before;else break;}
+  return s.trim()||name;
+}
+
+/* ---------- compute ---------- */
+function computeCat(c){
+  const cur=$('#mCur').value,prev=$('#mPrev').value,ch=$('#chan').value;
+  const ex=c.exclude.split(/[,，、]/).map(s=>s.trim()).filter(Boolean);
+  const mids=new Map(),excluded=new Map();
+  for(const r of c.rows){
+    if(r.m!==cur&&r.m!==prev)continue;
+    if(ch&&r.ch&&r.ch!==ch)continue;
+    const isEx=ex.some(k=>r.mid.startsWith(k)||r.mid.includes(k));
+    const map=isEx?excluded:mids;
+    let o=map.get(r.mid);if(!o){o={mid:r.mid,cur:[0,0,0],prev:[0,0,0],ser:new Map()};map.set(r.mid,o);}
+    const t=r.m===cur?o.cur:o.prev;t[0]+=r.amt;t[1]+=r.ppl;t[2]+=r.trn;
+    if(!isEx&&c.hasProd&&r.prod){
+      const sk=seriesOf(r.prod);let so=o.ser.get(sk);if(!so){so={name:sk,cur:[0,0],prev:[0,0],items:new Set()};o.ser.set(sk,so);}
+      const st=r.m===cur?so.cur:so.prev;st[0]+=r.amt;st[1]+=r.trn;so.items.add(r.prod);
+    }
+  }
+  const list=[...mids.values()].map(o=>({...o,d:o.cur[0]-o.prev[0]}));
+  const tc=list.reduce((a,o)=>a+o.cur[0],0),tp=list.reduce((a,o)=>a+o.prev[0],0);
+  const dir=c.dir==='auto'?(tc-tp>=0?'g':'d'):c.dir;
+  list.sort((a,b)=>dir==='g'?b.d-a.d:a.d-b.d);
+  const topMid=Math.max(1,+$('#topMid').value||2);
+  if(!c.selMid||c._sig!==sig(c)){c.selMid=new Set(list.slice(0,topMid).map(o=>o.mid));c.selSer={};c._sig=sig(c);}
+  return {list,tc,tp,dir,excluded:[...excluded.values()]};
+}
+function sig(c){return [$('#mCur').value,$('#mPrev').value,$('#chan').value,c.exclude,c.dir,$('#topMid').value,$('#kw').value,$('#autoSeries').checked].join('|');}
+function seriesList(o,dir){
+  const arr=[...o.ser.values()].map(s=>({...s,d:s.cur[0]-s.prev[0]}));
+  arr.sort((a,b)=>dir==='g'?b.d-a.d:a.d-b.d);
+  return arr;
+}
+
+/* ---------- render inputs ---------- */
+function renderCats(){
+  const box=$('#cats');
+  box.innerHTML=state.cats.map(c=>c.error?`
+    <div class="cat-card"><div class="file"><span>${esc(c.file)}</span><span class="err">${esc(c.error)}</span><button class="danger" data-del="${c.id}">移除</button></div></div>`:`
+    <div class="cat-card" data-id="${c.id}">
+      <div class="file"><span>${esc(c.file)}（${esc(c.sheet)}，${nf.format(c.rows.length)} 列${c.hasProd?'，含商品':'，僅中類'}）</span><button class="danger" data-del="${c.id}">移除</button></div>
+      <label class="f">品類名稱<input type="text" data-k="name" value="${esc(c.name)}"></label>
+      <label class="f">方向<select data-k="dir"><option value="auto"${c.dir==='auto'?' selected':''}>自動判斷</option><option value="g"${c.dir==='g'?' selected':''}>成長</option><option value="d"${c.dir==='d'?' selected':''}>衰退</option></select></label>
+      <label class="f">排除中類（關鍵字）<input type="text" data-k="exclude" value="${esc(c.exclude)}" placeholder="例如：3C家電"></label>
+      <label class="f">品類總額覆寫：差額（元）<input type="text" data-k="ovAmt" value="${esc(c.ovAmt)}" placeholder="例如：7277808"></label>
+      <label class="f">品類總額覆寫：YOY%<input type="text" data-k="ovYoy" value="${esc(c.ovYoy)}" placeholder="例如：23.2"></label>
+      <label class="chk"><input type="checkbox" data-k="book"${c.book?' checked':''}> 商品名稱加《》</label>
+    </div>`).join('');
+}
+$('#cats').addEventListener('input',e=>{
+  const card=e.target.closest('[data-id]');if(!card)return;
+  const c=state.cats.find(x=>x.id==card.dataset.id);const k=e.target.dataset.k;if(!c||!k)return;
+  c[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;
+  if(k==='book'||k==='name'||k==='ovAmt'||k==='ovYoy'){renderResults();}else recompute();
+});
+$('#cats').addEventListener('click',e=>{
+  const id=e.target.dataset.del;if(!id)return;
+  state.cats=state.cats.filter(c=>c.id!=id);refreshPeriods();renderCats();recompute();
+});
+
+/* ---------- render results ---------- */
+let computed=[];
+function recompute(){computed=state.cats.filter(c=>!c.error).map(c=>({c,r:computeCat(c)}));renderResults();}
+function renderResults(){
+  const box=$('#results');
+  if(!computed.length){box.innerHTML='<p class="empty">上傳明細後，這裡會出現各品類的中類排名與帶動商品。</p>';genText();return;}
+  const topSer=Math.max(0,+$('#topSer').value||0);
+  box.innerHTML=computed.map(({c,r})=>{
+    const d=r.tc-r.tp;
+    const midRows=r.list.slice(0,12).map(o=>`<tr class="${c.selMid.has(o.mid)?'on':''}">
+      <td class="c"><input type="checkbox" aria-label="選為主類別" data-cat="${c.id}" data-mid="${esc(o.mid)}"${c.selMid.has(o.mid)?' checked':''}></td>
+      <td class="name">${esc(o.mid)}</td><td>${K(o.cur[0])}</td><td>${K(o.prev[0])}</td>
+      <td class="${cls(o.d)}">${sK(o.d)}</td><td class="${cls(o.d)}">${pct(o.d,o.prev[0])}</td></tr>`).join('');
+    const subs=r.list.filter(o=>c.selMid.has(o.mid)).map(o=>{
+      if(!c.hasProd)return `<div class="sub"><h4>${esc(o.mid)}</h4><p class="note">這個檔案沒有「商品全名」欄位，只能分析到中類。</p></div>`;
+      const sl=seriesList(o,r.dir);
+      if(!c.selSer[o.mid])c.selSer[o.mid]=new Set(sl.filter(s=>(r.dir==='g'?s.d>0:s.d<0)&&Math.abs(s.d)>=Math.abs(o.d)*0.05).slice(0,topSer).map(s=>s.name));
+      const sel=c.selSer[o.mid];
+      const rows=sl.slice(0,10).map(s=>`<tr class="${sel.has(s.name)?'on':''}">
+        <td class="c"><input type="checkbox" aria-label="寫進摘要" data-cat="${c.id}" data-smid="${esc(o.mid)}" data-ser="${esc(s.name)}"${sel.has(s.name)?' checked':''}></td>
+        <td class="name" title="${esc([...s.items].slice(0,8).join('\n'))}">${esc(s.name)}${s.items.size>1?` <span class="kpi">（${s.items.size} 個品項）</span>`:''}</td>
+        <td>${K(s.cur[0])}</td><td>${nf.format(s.cur[1])}</td><td>${K(s.prev[0])}</td><td>${nf.format(s.prev[1])}</td><td class="${cls(s.d)}">${sK(s.d)}</td></tr>`).join('');
+      return `<div class="sub"><h4>${esc(o.mid)}：${r.dir==='g'?'帶動成長':'造成衰退'}的商品系列</h4>
+        <p class="note">${r.dir==='g'?'依差額由大到小':'依差額由小到大（掉最多的在前）'}，滑鼠移到系列名稱上可以看到合併了哪些品項。</p>
+        <div class="tbl-wrap"><table><thead><tr><th class="c"></th><th class="name">商品／系列</th><th>本期(K)</th><th>本期筆次</th><th>去年同期(K)</th><th>去年筆次</th><th>差額</th></tr></thead><tbody>${rows||'<tr><td colspan="7" class="name">沒有商品資料</td></tr>'}</tbody></table></div></div>`;
+    }).join('');
+    const exNote=r.excluded.length?`<div class="sub"><p class="note">已排除 ${r.excluded.length} 個中類（${esc(r.excluded.map(o=>o.mid).slice(0,6).join('、'))}${r.excluded.length>6?'…':''}），不列入排名與品類合計。</p></div>`:'';
+    return `<div class="result">
+      <div class="result-head"><h3>${esc(c.name)}</h3><span class="dir ${r.dir}">${r.dir==='g'?'成長':'衰退'}</span>
+        <span class="kpi">本期 <b>${K(r.tc)}K</b></span><span class="kpi">去年同期 <b>${K(r.tp)}K</b></span>
+        <span class="kpi">差額 <b class="${cls(d)}">${sK(d)}</b></span><span class="kpi">YOY <b class="${cls(d)}">${pct(d,r.tp)}</b></span></div>
+      <div class="tbl-wrap"><table><thead><tr><th class="c">主類別</th><th class="name">中類</th><th>本期(K)</th><th>去年同期(K)</th><th>差額</th><th>YOY</th></tr></thead><tbody>${midRows||'<tr><td colspan="6" class="name">選定的年月沒有資料</td></tr>'}</tbody></table></div>
+      ${subs}${exNote}</div>`;
+  }).join('');
+  genText();
+}
+$('#results').addEventListener('change',e=>{
+  const t=e.target;if(t.type!=='checkbox')return;
+  const c=state.cats.find(x=>x.id==t.dataset.cat);if(!c)return;
+  if(t.dataset.mid!=null){t.checked?c.selMid.add(t.dataset.mid):c.selMid.delete(t.dataset.mid);}
+  else if(t.dataset.ser!=null){const s=c.selSer[t.dataset.smid]||(c.selSer[t.dataset.smid]=new Set());t.checked?s.add(t.dataset.ser):s.delete(t.dataset.ser);}
+  renderResults();
+});
+
+/* ---------- text generation ---------- */
+function buildText(){
+  const pctNew=(+$('#newPct').value||0)/100;
+  const I='\u3000';
+  const groups={g:[],d:[]};
+  computed.forEach(x=>groups[x.r.dir].push(x));
+  const mon=+$('#mCur').value.slice(4);
+  const out=[];
+  for(const dir of ['g','d']){
+    if(!groups[dir].length)continue;
+    out.push(`※${mon}月YOY_品類${dir==='g'?'成長':'衰退'}Top${groups[dir].length}：`);
+    groups[dir].forEach(({c,r},i)=>{
+      let d=r.tc-r.tp,yoy=pct(d,r.tp);
+      if(c.ovAmt!==''&&!isNaN(+c.ovAmt.replace(/,/g,'')))d=+c.ovAmt.replace(/,/g,'');
+      if(c.ovYoy!==''&&!isNaN(+c.ovYoy))yoy=(+c.ovYoy>=0?'+':'')+(+c.ovYoy).toFixed(1)+'%';
+      out.push(`${I}${i+1}. ${c.name}：金額${sK(d)}，YOY${yoy}`);
+      const q=s=>c.book?`《${s}》`:s;
+      r.list.filter(o=>c.selMid.has(o.mid)).forEach((o,j)=>{
+        let line=`${I}${I}${dir==='g'?'成長':'衰退'}主類別TOP${j+1}：${o.mid}(${sK(o.d)})`;
+        if(c.hasProd){
+          const sel=c.selSer[o.mid]||new Set();
+          const ss=seriesList(o,dir).filter(s=>sel.has(s.name));
+          if(ss.length){
+            if(dir==='g'){
+              const isNew=s=>s.prev[0]<=s.cur[0]*pctNew;
+              const allNew=ss.every(isNew);
+              line+=`，${ss.map(s=>isNew(s)?`${q(s.name)}(${K(s.cur[0])}K)`:`${q(s.name)}(${K(s.cur[0])}K，較去年${sK(s.d)})`).join('、')}${ss.length>1?'等':''}${allNew?'新品':''}帶動`;
+            }else{
+              line+=`，去年同期有${ss.map(s=>`${q(s.name)}(${K(s.prev[0])}K)`).join('、')}${ss.length>1?'等':''}熱銷，今年缺乏同量級新品`;
+            }
+          }
+        }
+        out.push(line);
+      });
+    });
+    out.push('');
+  }
+  return out.join('\n').trim();
+}
+function genText(force){
+  if(state.textDirty&&!force)return;
+  $('#text').value=buildText();state.textDirty=false;
+}
+$('#text').addEventListener('input',()=>{state.textDirty=true;});
+$('#regen').addEventListener('click',()=>{genText(true);flash('已依勾選重新產生');});
+$('#copy').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText($('#text').value);flash('已複製摘要文字');}
+  catch(e){$('#text').select();document.execCommand&&document.execCommand('copy');flash('已選取文字，請按 Ctrl+C 複製');}
+});
+function flash(m){$('#status').textContent=m;clearTimeout(flash.t);flash.t=setTimeout(()=>$('#status').textContent='',2600);}
+
+/* ---------- RAW data ---------- */
+function rawSheets(){
+  const cur=$('#mCur').value,prev=$('#mPrev').value;
+  const summ=[['品類','方向',cur+' 金額',prev+' 金額','金額差額','金額YOY%','主類別TOP1','TOP1差額','主類別TOP2','TOP2差額']];
+  const sheets=[];
+  computed.forEach(({c,r})=>{
+    const sel=r.list.filter(o=>c.selMid.has(o.mid));
+    summ.push([c.name,r.dir==='g'?'成長':'衰退',r.tc,r.tp,r.tc-r.tp,r.tp?(r.tc-r.tp)/r.tp:null,sel[0]?.mid||'',sel[0]?.d??'',sel[1]?.mid||'',sel[1]?.d??'']);
+    const mid=[['排名','中類名稱',cur+' 金額',prev+' 金額','金額差額','金額YOY%',cur+' 人數',prev+' 人數',cur+' 筆次',prev+' 筆次']];
+    r.list.forEach((o,i)=>mid.push([i+1,o.mid,o.cur[0],o.prev[0],o.d,o.prev[0]?o.d/o.prev[0]:null,o.cur[1],o.prev[1],o.cur[2],o.prev[2]]));
+    mid.push(['','合計',r.tc,r.tp,r.tc-r.tp,r.tp?(r.tc-r.tp)/r.tp:null]);
+    if(r.excluded.length){mid.push([]);mid.push(['','已排除之中類（未列入排名與合計）']);r.excluded.forEach(o=>mid.push(['-',o.mid,o.cur[0],o.prev[0],o.cur[0]-o.prev[0],o.prev[0]?(o.cur[0]-o.prev[0])/o.prev[0]:null,o.cur[1],o.prev[1],o.cur[2],o.prev[2]]));}
+    sheets.push([c.name.slice(0,25),mid]);
+    if(c.hasProd&&sel.length){
+      const ser=[['中類名稱','商品／系列',cur+' 金額',prev+' 金額','差額',cur+' 筆次',prev+' 筆次','合併品項數']];
+      sel.forEach(o=>seriesList(o,r.dir).forEach(s=>ser.push([o.mid,s.name,s.cur[0],s.prev[0],s.d,s.cur[1],s.prev[1],s.items.size])));
+      sheets.push([(c.name+'_系列').slice(0,30),ser]);
+    }
+  });
+  return [['彙總',summ],...sheets];
+}
+function buildXlsx(){
+  const wb=XLSX.utils.book_new(),used=new Set();
+  rawSheets().forEach(([n,aoa])=>{
+    let name=n.replace(/[\\\/\?\*\[\]:]/g,' ');let k=2;while(used.has(name))name=n.slice(0,27)+'_'+(k++);used.add(name);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+    const hdr=aoa[0]||[];
+    for(let R=1;R<=range.e.r;R++)for(let C=0;C<=range.e.c;C++){
+      const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];if(!cell||cell.t!=='n')continue;
+      const h=String(hdr[C]||'');cell.z=h.includes('YOY')?'+0.0%;-0.0%;0.0%':(h.includes('差額')?'+#,##0;-#,##0;0':'#,##0');
+    }
+    ws['!cols']=hdr.map((h,i)=>({wch:i===1?34:14}));
+    XLSX.utils.book_append_sheet(wb,ws,name);
+  });
+  return XLSX.write(wb,{bookType:'xlsx',type:'array'});
+}
+$('#copyRaw').addEventListener('click',async()=>{
+  if(!computed.length){flash('請先上傳明細');return;}
+  const tsv=rawSheets().map(([n,aoa])=>'【'+n+'】\n'+aoa.map(r=>r.map(v=>v==null?'':v).join('\t')).join('\n')).join('\n\n');
+  try{await navigator.clipboard.writeText(tsv);flash('已複製 RAW DATA，可直接貼到 Excel');}catch(e){flash('複製失敗，請改用下載');}
+});
+let downloads=null;
+if(window.claude&&typeof window.claude.use==='function'){
+  window.claude.use('downloads').then(d=>{downloads=d;if(d)$('#dl').hidden=false;}).catch(()=>{});
+}
+$('#dl').addEventListener('click',async()=>{
+  if(!computed.length){flash('請先上傳明細');return;}
+  if(!downloads)return;
+  try{
+    const buf=buildXlsx();
+    await downloads.save({filename:`${$('#mCur').value}_品類YOY_中類RAWDATA.xlsx`,data:new Uint8Array(buf)});
+    flash('已下載 RAW DATA');
+  }catch(e){
+    const code=e&&e.code;
+    if(code==='declined')flash('已取消下載');
+    else if(code==='rate_limited')flash('已有下載視窗開著，請稍後再試');
+    else{flash('這裡無法下載，請改用「複製 RAW DATA」');$('#dl').hidden=true;}
+  }
+});
+
+/* ---------- inputs ---------- */
+const drop=$('#drop'),fileIn=$('#file');
+drop.addEventListener('click',()=>fileIn.click());
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileIn.click();}});
+fileIn.addEventListener('change',()=>{handleFiles([...fileIn.files]);fileIn.value='';});
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handleFiles([...e.dataTransfer.files]));
+['#mCur','#mPrev','#chan','#topMid','#topSer','#newPct','#kw','#autoSeries'].forEach(s=>$(s).addEventListener(s==='#kw'?'change':'input',()=>{saveSettings();
+  if(s==='#topSer')state.cats.forEach(c=>c.selSer={});
+  recompute();}));
+loadSettings();
+})();
+</script>
+</body>
+</html>
