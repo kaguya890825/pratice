@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>檔期商品銷售比對</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: plain working tool, clinical and exact
+   IDEA: a pharmacy box label — the 26碼 list is the prescription, sales are the dose filled
+   PICTURE: the live result block (KPI + category bars) is the picture
+   COLOUR and TYPE: white, emerald block, pale pink block, black; Schibsted Grotesk + Noto Sans TC
+   LAYOUT: page cut into rectangles: step boxes on top, result box below */
+:root{color-scheme:light dark;--bg:light-dark(#fff,#04140d);--ink:light-dark(#0b0b0b,#eef6f1);--em:#00a86b;--emd:light-dark(#00875a,#3fd39a);--pk:light-dark(#ffd6e0,#3a1f29);--line:light-dark(#0b0b0b,#cfe9dc);--mute:light-dark(#4b4b4b,#a9c3b6);--soft:light-dark(#f3faf6,#0b2219)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Schibsted Grotesk","Noto Sans TC",system-ui,sans-serif;overflow-x:clip}
+.wrap{max-width:1240px;margin:0 auto;padding:clamp(16px,3vw,40px) max(4vw,14px)}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.05;margin:0 0 6px;font-weight:800;text-wrap:balance}
+.sub{color:var(--mute);margin:0 0 20px;max-width:70ch}
+.box{border:2px solid var(--line);display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.step{padding:20px;border-right:2px solid var(--line)}.step:last-child{border-right:0}
+.step h2{font-size:20px;margin:0 0 4px;display:flex;gap:10px;align-items:center}
+.n{display:inline-grid;place-items:center;width:30px;height:30px;background:var(--em);color:#fff;font-weight:800;border-radius:50%;flex:none}
+.step p{margin:0 0 12px;color:var(--mute);font-size:14px}
+.drop{display:block;border:2px dashed var(--emd);padding:16px;text-align:center;cursor:pointer;background:var(--soft);min-height:44px}
+.drop:focus-within{outline:3px solid var(--em);outline-offset:2px}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.drop b{color:var(--emd)}
+.kw{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;font-size:14px}
+input[type=text],select{font:inherit;font-size:16px;padding:8px 10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);min-height:44px}
+input[type=text]:focus,select:focus,button:focus-visible{outline:3px solid var(--em);outline-offset:1px}
+.srcs{margin-top:12px;max-height:340px;overflow:auto;border-top:1px solid var(--line)}
+.src{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 25%,transparent);font-size:14px}
+.src select{min-height:36px;padding:4px 6px;font-size:14px}
+.src .c{font-variant-numeric:tabular-nums;color:var(--mute);white-space:nowrap}
+.src .t{overflow-wrap:anywhere}.src.off .t{text-decoration:line-through;color:var(--mute)}
+.status{font-size:14px;margin-top:10px;color:var(--mute)}.status.err{color:#c0244a}
+button{font:inherit;font-weight:600;min-height:44px;padding:8px 18px;border:2px solid var(--line);background:var(--ink);color:var(--bg);cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.go{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:16px 20px;border:2px solid var(--line);border-top:0}
+.res{margin-top:28px;border:2px solid var(--line)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--em);color:#fff}
+.kpi{padding:18px 20px;border-right:2px solid #0b0b0b}.kpi:last-child{border-right:0}
+.kpi .l{font-size:14px;opacity:.92}.kpi .v{font-size:clamp(26px,3.4vw,40px);font-weight:800;line-height:1.1;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:13px;opacity:.92}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.pane{padding:20px;border-top:2px solid var(--line)}.two .pane:first-child{border-right:2px solid var(--line)}
+.pane h3{font-size:20px;margin:0 0 12px}
+.bar{display:grid;grid-template-columns:7.5em minmax(0,1fr) 6.5em;gap:10px;align-items:center;font-size:14px;margin:6px 0}
+.bar .tr{height:18px;background:var(--pk)}.bar .f{height:100%;background:var(--emd);transition:width .5s}
+.bar .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid color-mix(in srgb,var(--line) 25%,transparent);text-align:left;vertical-align:top}
+th{font-weight:600;border-bottom:2px solid var(--line);white-space:nowrap}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+.pink{background:var(--pk)}
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.note{font-size:13px;color:var(--mute);margin:10px 0 0}
+.empty{padding:40px 20px;text-align:center;color:var(--mute);border:2px solid var(--line);border-top:0}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi:nth-child(2){border-right:0}.kpi:nth-child(-n+2){border-bottom:2px solid #0b0b0b}}
+@media(max-width:720px){.box,.two{grid-template-columns:minmax(0,1fr)}.step{border-right:0;border-bottom:2px solid var(--line)}.step:last-child{border-bottom:0}.two .pane:first-child{border-right:0}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}.bar{grid-template-columns:5.5em minmax(0,1fr) 5.5em}}
+@media(prefers-reduced-motion:reduce){.bar .f{transition:none}}
+</style><script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head><body><div class="wrap">
+<h1>檔期商品銷售比對</h1>
+<p class="sub">上傳檔期商品清單和 EC 訂單銷售檔，自動抓出 26碼、去掉重複，再算出清單商品在這段期間的銷售。所有檔案都只在你的瀏覽器裡處理，不會上傳到任何地方。</p>
+
+<div class="box">
+  <section class="step">
+    <h2><span class="n">1</span>檔期商品清單</h2>
+    <p>可一次選多個 Excel 檔，每張工作表會自動找出 26碼 欄位。</p>
+    <label class="drop" id="dropL"><input type="file" id="fL" multiple accept=".xlsx,.xls,.csv"><b>選擇清單檔</b>　或拖曳到這裡</label>
+    <div class="kw"><span>工作表名稱含這些字就不納入：</span><input type="text" id="kwOff" value="2025" aria-label="不納入關鍵字"></div>
+    <div class="kw"><span>當作除外商品（從清單扣掉）：</span><input type="text" id="kwEx" value="除外" aria-label="除外關鍵字"></div>
+    <div class="srcs" id="srcs"></div>
+    <div class="status" id="stL">尚未選擇檔案</div>
+  </section>
+  <section class="step">
+    <h2><span class="n">2</span>EC 訂單銷售檔</h2>
+    <p>需有「26碼」欄，另會讀取母訂單號碼、會員編號、類別1-2、商品名稱、銷售金額(點加金／純金)、銷售數量。最後一列的合計會當作全站總數。</p>
+    <label class="drop" id="dropS"><input type="file" id="fS" accept=".xlsx,.xls,.csv"><b>選擇銷售檔</b>　或拖曳到這裡</label>
+    <div class="status" id="stS">尚未選擇檔案</div>
+  </section>
+</div>
+<div class="go"><button id="run" disabled>開始比對</button><span class="status" id="stRun" style="margin:0">兩個步驟都完成後就能比對</span></div>
+
+<div id="out"><div class="empty">比對結果會顯示在這裡：動銷品項、金額佔全站比例、各類別與各清單來源的表現，以及可下載的明細。</div></div>
+</div>
+<script>
+// ---- core logic (shared by page and node test) ----
+const CODE_RE = /^26\d{11}$/;
+const NAME_KEYS = ['品名', '書名', '商品名稱', '物料名稱', '物料說明', '物料名稱'];
+function normCode(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'number') return Number.isFinite(v) ? String(Math.round(v)) : '';
+  let s = String(v).trim();
+  if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, '');
+  return s;
+}
+function cleanHead(v) { return String(v == null ? '' : v).replace(/\s+/g, ''); }
+
+// scan one sheet (array of arrays) -> [{codeCol, nameCol, items:[{code,name}]}]
+function scanSheet(rows) {
+  const width = rows.reduce((m, r) => Math.max(m, r ? r.length : 0), 0);
+  const out = [];
+  for (let c = 0; c < width; c++) {
+    let hit = 0, nonnull = 0;
+    for (const r of rows) {
+      const v = r ? r[c] : null;
+      if (v === null || v === undefined || v === '') continue;
+      nonnull++;
+      if (CODE_RE.test(normCode(v))) hit++;
+    }
+    if (hit >= 3 && hit / nonnull >= 0.5) out.push({ codeCol: c, hit });
+  }
+  for (const o of out) {
+    // header row = last row before first code row in this column
+    let first = rows.findIndex(r => r && CODE_RE.test(normCode(r[o.codeCol])));
+    let nameCol = -1;
+    for (let h = first - 1; h >= Math.max(0, first - 4) && nameCol < 0; h--) {
+      const r = rows[h] || [];
+      for (let k = 0; k < r.length; k++) {
+        const t = cleanHead(r[k]);
+        if (NAME_KEYS.some(n => t === n || t.endsWith(n))) {
+          // choose the name column nearest to the right of the code column
+          if (nameCol < 0 || (k > o.codeCol && (nameCol < o.codeCol || k < nameCol))) nameCol = k;
+        }
+      }
+    }
+    if (nameCol < 0) nameCol = o.codeCol + 1;
+    o.nameCol = nameCol;
+    o.items = [];
+    for (const r of rows) {
+      if (!r) continue;
+      const code = normCode(r[o.codeCol]);
+      if (CODE_RE.test(code)) o.items.push({ code, name: r[nameCol] == null ? '' : String(r[nameCol]).trim() });
+    }
+  }
+  return out;
+}
+
+// sales: find header row containing 26碼; map columns by header text
+function parseSales(rows) {
+  let hr = -1;
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    if ((rows[i] || []).some(v => cleanHead(v) === '26碼')) { hr = i; break; }
+  }
+  if (hr < 0) throw new Error('銷售檔找不到「26碼」欄位標題');
+  const H = (rows[hr] || []).map(cleanHead);
+  const find = (...keys) => { for (const k of keys) { const i = H.findIndex(h => h === k); if (i >= 0) return i; } for (const k of keys) { const i = H.findIndex(h => h.includes(k)); if (i >= 0) return i; } return -1; };
+  const col = {
+    order: find('母訂單號碼', '訂單號碼', '訂單編號'),
+    cat: find('類別1-2', '類別'),
+    code: H.findIndex(h => h === '26碼'),
+    name: find('商品名稱', '品名'),
+    amt: find('銷售金額(點加金)', '銷售金額'),
+    cash: find('銷售金額(純金)'),
+    qty: find('銷售數量', '數量'),
+    ordersN: find('訂單筆數'),
+    member: find('會員編號', '會員卡號', '會員ID', '會員'),
+    buyersN: find('購買人數'),
+  };
+  const num = v => { const n = typeof v === 'number' ? v : parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return Number.isFinite(n) ? n : 0; };
+  const lines = []; let total = null;
+  for (let i = hr + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!r) continue;
+    const code = normCode(r[col.code]);
+    const order = col.order >= 0 ? normCode(r[col.order]) : '';
+    if (!code && !order) {
+      if (r.some(v => v !== null && v !== undefined && v !== '')) total = { amt: num(r[col.amt]), cash: col.cash >= 0 ? num(r[col.cash]) : 0, qty: num(r[col.qty]), orders: col.ordersN >= 0 ? num(r[col.ordersN]) : 0, buyers: col.buyersN >= 0 ? num(r[col.buyersN]) : 0 };
+      continue;
+    }
+    if (!code) continue;
+    lines.push({ order, member: col.member >= 0 ? normCode(r[col.member]) : '', cat: col.cat >= 0 ? String(r[col.cat] == null ? '' : r[col.cat]) : '', code, name: col.name >= 0 ? String(r[col.name] == null ? '' : r[col.name]) : '', amt: num(r[col.amt]), cash: col.cash >= 0 ? num(r[col.cash]) : 0, qty: num(r[col.qty]) });
+  }
+  if (!total) {
+    const os = new Set(lines.map(l => l.order));
+    const ms = new Set(lines.map(l => l.member).filter(Boolean));
+    total = { amt: lines.reduce((s, l) => s + l.amt, 0), cash: lines.reduce((s, l) => s + l.cash, 0), qty: lines.reduce((s, l) => s + l.qty, 0), orders: os.size, buyers: ms.size, computed: true };
+  }
+  return { lines, total, col, hasMember: col.member >= 0 };
+}
+
+// list: Map code -> {name, sources:Set}
+function buildList(sources) {
+  const list = new Map();
+  for (const s of sources) if (s.on) for (const it of s.items) {
+    let e = list.get(it.code);
+    if (!e) { e = { name: it.name, sources: new Set() }; list.set(it.code, e); }
+    if (!e.name && it.name) e.name = it.name;
+    e.sources.add(s.label);
+  }
+  // exclusion sheets (off & flagged as 除外) remove codes from list
+  const excl = new Set();
+  for (const s of sources) if (!s.on && s.excludeCodes) for (const it of s.items) excl.add(it.code);
+  let removed = 0;
+  for (const c of excl) if (list.delete(c)) removed++;
+  return { list, removed };
+}
+
+function analyse(list, sales) {
+  const m = sales.lines.filter(l => list.has(l.code));
+  const prod = new Map(), cat = new Map();
+  for (const l of m) {
+    let p = prod.get(l.code);
+    if (!p) { p = { code: l.code, cat: l.cat, name: l.name || list.get(l.code).name, orders: new Set(), buyers: new Set(), qty: 0, amt: 0, cash: 0 }; prod.set(l.code, p); }
+    p.orders.add(l.order); if (l.member) p.buyers.add(l.member); p.qty += l.qty; p.amt += l.amt; p.cash += l.cash;
+    let c = cat.get(l.cat);
+    if (!c) { c = { cat: l.cat, codes: new Set(), orders: new Set(), buyers: new Set(), qty: 0, amt: 0, cash: 0 }; cat.set(l.cat, c); }
+    c.codes.add(l.code); c.orders.add(l.order); if (l.member) c.buyers.add(l.member); c.qty += l.qty; c.amt += l.amt; c.cash += l.cash;
+  }
+  const src = new Map();
+  for (const [code, e] of list) for (const s of e.sources) {
+    let x = src.get(s); if (!x) { x = { src: s, n: 0, sold: 0, orders: new Set(), buyers: new Set(), qty: 0, amt: 0, cash: 0 }; src.set(s, x); }
+    x.n++;
+    const p = prod.get(code);
+    if (p) { x.sold++; for (const o of p.orders) x.orders.add(o); for (const b of p.buyers) x.buyers.add(b); x.qty += p.qty; x.amt += p.amt; x.cash += p.cash; }
+  }
+  const orders = new Set(m.map(l => l.order));
+  // per-member summary (rows without 會員編號 are counted separately)
+  const mem = new Map(); let noMemberAmt = 0; const noMemberOrders = new Set();
+  for (const l of m) {
+    if (!l.member) { noMemberAmt += l.amt; noMemberOrders.add(l.order); continue; }
+    let x = mem.get(l.member);
+    if (!x) { x = { member: l.member, orders: new Set(), codes: new Set(), cats: new Map(), qty: 0, amt: 0, cash: 0 }; mem.set(l.member, x); }
+    x.orders.add(l.order); x.codes.add(l.code); x.qty += l.qty; x.amt += l.amt; x.cash += l.cash;
+    x.cats.set(l.cat, (x.cats.get(l.cat) || 0) + l.amt);
+  }
+  for (const x of mem.values()) { let best = '', bv = -Infinity; for (const [c, v] of x.cats) if (v > bv) { bv = v; best = c; } x.topCat = best; }
+  return {
+    matched: m,
+    prods: [...prod.values()].sort((a, b) => b.amt - a.amt),
+    cats: [...cat.values()].sort((a, b) => b.amt - a.amt),
+    srcs: [...src.values()].sort((a, b) => b.amt - a.amt),
+    members: [...mem.values()].sort((a, b) => b.amt - a.amt),
+    noMember: { amt: noMemberAmt, orders: noMemberOrders.size },
+    kpi: { listN: list.size, sold: prod.size, orders: orders.size, buyers: mem.size, qty: m.reduce((s, l) => s + l.qty, 0), amt: m.reduce((s, l) => s + l.amt, 0), cash: m.reduce((s, l) => s + l.cash, 0) },
+  };
+}
+if (typeof module !== 'undefined') module.exports = { scanSheet, parseSales, buildList, analyse, CODE_RE };
+
+{
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString('zh-TW');
+const pct=n=>(n*100).toFixed(1)+'%';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let sources=[],sales=null,result=null,downloads=null;
+(async()=>{try{downloads=await window.claude?.use?.('downloads')}catch(e){downloads=null}})();
+
+const kws=id=>$(id).value.split(/[,，、\s]+/).filter(Boolean);
+function modeFor(sn){if(kws('kwEx').some(k=>sn.includes(k)))return'excl';if(kws('kwOff').some(k=>sn.includes(k)))return'off';return'on'}
+const readWB=f=>f.arrayBuffer().then(b=>XLSX.read(b,{type:'array'}));
+const rowsOf=ws=>XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+const short=n=>n.replace(/\.(xlsx|xls|csv)$/i,'');
+
+async function loadLists(files){
+  $('stL').className='status';$('stL').textContent='讀取中…';
+  try{
+    for(const f of files){
+      const wb=await readWB(f);
+      for(const sn of wb.SheetNames){
+        const found=scanSheet(rowsOf(wb.Sheets[sn]));
+        found.forEach((o,i)=>sources.push({file:short(f.name),sheet:sn,label:short(f.name)+'｜'+sn+(found.length>1?' #'+(i+1):''),items:o.items,mode:modeFor(sn)}));
+      }
+    }
+    renderSrcs();
+  }catch(e){$('stL').className='status err';$('stL').textContent='讀取失敗：'+e.message}
+  check();
+}
+function applyMode(){for(const s of sources){s.on=s.mode==='on';s.excludeCodes=s.mode==='excl'}}
+function renderSrcs(){
+  applyMode();
+  $('srcs').innerHTML=sources.map((s,i)=>`<div class="src ${s.mode!=='on'?'off':''}"><span class="t">${esc(s.label)}</span><span class="c">${fmt(s.items.length)} 筆</span><select data-i="${i}" aria-label="${esc(s.label)}"><option value="on"${s.mode==='on'?' selected':''}>納入</option><option value="off"${s.mode==='off'?' selected':''}>不納入</option><option value="excl"${s.mode==='excl'?' selected':''}>除外商品</option></select></div>`).join('');
+  if(!sources.length){$('stL').textContent='這些檔案裡沒有找到 26碼';return}
+  const {list,removed}=buildList(sources);
+  $('stL').textContent=`${sources.length} 張表／欄位，合併去重後 ${fmt(list.size)} 個 26碼`+(removed?`（已扣除除外商品 ${fmt(removed)} 個）`:'');
+}
+$('srcs').addEventListener('change',e=>{const i=e.target.dataset.i;if(i==null)return;sources[i].mode=e.target.value;renderSrcs();check()});
+['kwOff','kwEx'].forEach(id=>$(id).addEventListener('change',()=>{sources.forEach(s=>s.mode=modeFor(s.sheet));renderSrcs()}));
+
+async function loadSales(f){
+  $('stS').className='status';$('stS').textContent='讀取中…';
+  try{const wb=await readWB(f);sales=parseSales(rowsOf(wb.Sheets[wb.SheetNames[0]]));sales.file=short(f.name);
+    $('stS').textContent=`${fmt(sales.lines.length)} 列銷售明細，全站 ${fmt(sales.total.orders)} 張訂單、$${fmt(sales.total.amt)}`+(sales.hasMember?`、${fmt(sales.total.buyers)} 位購買會員`:'，沒有會員編號欄（不計算購買人數）')+(sales.total.computed?'（未找到合計列，依明細加總）':'');
+  }catch(e){sales=null;$('stS').className='status err';$('stS').textContent='讀取失敗：'+e.message}
+  check();
+}
+function check(){$('run').disabled=!(sources.length&&sales)}
+$('fL').addEventListener('change',e=>{sources=[];loadLists([...e.target.files])});
+$('fS').addEventListener('change',e=>{if(e.target.files[0])loadSales(e.target.files[0])});
+for(const [id,fn] of [['dropL',fs=>{sources=[];loadLists(fs)}],['dropS',fs=>fs[0]&&loadSales(fs[0])]]){
+  const d=$(id);d.addEventListener('dragover',e=>{e.preventDefault()});d.addEventListener('drop',e=>{e.preventDefault();fn([...e.dataTransfer.files])});
+}
+
+$('run').addEventListener('click',()=>{
+  const {list,removed}=buildList(sources);
+  result=analyse(list,sales);result.list=list;result.removed=removed;render();
+  $('stRun').textContent='比對完成';
+});
+
+function render(){
+  const k=result.kpi,T=sales.total,max=result.cats[0]?.amt||1,HM=sales.hasMember;
+  $('out').innerHTML=`<div class="res">
+  <div class="kpis">
+    <div class="kpi"><div class="l">清單商品銷售金額(點加金)</div><div class="v">$${fmt(k.amt)}</div><div class="s">佔全站 ${pct(k.amt/T.amt)}｜純金 $${fmt(k.cash)}</div></div>
+    <div class="kpi"><div class="l">含清單商品的訂單</div><div class="v">${fmt(k.orders)}</div><div class="s">佔全站 ${pct(k.orders/T.orders)}</div></div>
+    <div class="kpi"><div class="l">有銷售品項</div><div class="v">${fmt(k.sold)}</div><div class="s">清單 ${fmt(k.listN)} 項，動銷率 ${pct(k.sold/k.listN)}｜共 ${fmt(k.qty)} 件</div></div>
+    ${HM?`<div class="kpi"><div class="l">購買會員</div><div class="v">${fmt(k.buyers)}</div><div class="s">佔全站 ${pct(k.buyers/(T.buyers||1))}｜人均 $${fmt((k.amt-result.noMember.amt)/(k.buyers||1))}</div></div>`:`<div class="kpi"><div class="l">銷售數量</div><div class="v">${fmt(k.qty)}</div><div class="s">平均單件 $${fmt(k.amt/(k.qty||1))}</div></div>`}
+  </div>
+  <div class="two">
+    <div class="pane"><h3>各類別銷售金額</h3>${result.cats.map(c=>`<div class="bar" title="${HM?fmt(c.buyers.size)+' 位會員、':''}${fmt(c.orders.size)} 張訂單"><span>${esc(c.cat||'(無類別)')}</span><span class="tr"><span class="f" style="display:block;width:${(c.amt/max*100).toFixed(1)}%"></span></span><span class="num">$${fmt(c.amt)}</span></div>`).join('')}</div>
+    <div class="pane"><h3>各清單來源表現</h3><div class="scroll"><table><thead><tr><th>來源</th><th class="r">品項</th><th class="r">動銷率</th>${HM?'<th class="r">會員</th>':''}<th class="r">金額</th></tr></thead><tbody>${result.srcs.map(s=>`<tr><td>${esc(s.src)}</td><td class="r">${fmt(s.n)}</td><td class="r">${pct(s.sold/s.n)}</td>${HM?`<td class="r">${fmt(s.buyers.size)}</td>`:''}<td class="r">$${fmt(s.amt)}</td></tr>`).join('')}</tbody></table></div><p class="note">同一個 26碼 可能出現在多份清單，各來源金額加總會大於總計。</p></div>
+  </div>
+  <div class="pane">
+    <h3>有銷售商品</h3>
+    <div class="tools"><input type="text" id="q" placeholder="搜尋 26碼 或品名" aria-label="搜尋商品"><button id="dl">下載 Excel 明細</button><button class="ghost" id="cp">複製有銷售的 26碼</button>${HM?'<button class="ghost" id="cpm">複製購買會員編號</button>':''}<span class="status" id="stDl" style="margin:0"></span></div>
+    <div id="tbl"></div>
+    ${HM&&result.noMember.orders?`<p class="note">有 ${fmt(result.noMember.orders)} 張訂單沒有會員編號（金額 $${fmt(result.noMember.amt)}），購買會員數與人均不含這些訂單。</p>`:''}
+  </div></div>`;
+  drawTable('');
+  $('q').addEventListener('input',e=>drawTable(e.target.value.trim()));
+  $('dl').addEventListener('click',exportXlsx);
+  const copy=async(arr)=>{try{await navigator.clipboard.writeText(arr.join('\n'));$('stDl').textContent=`已複製 ${fmt(arr.length)} 筆`}catch(e){$('stDl').textContent='瀏覽器不允許複製'}};
+  $('cp').addEventListener('click',()=>copy(result.prods.map(p=>p.code)));
+  if(HM)$('cpm').addEventListener('click',()=>copy(result.members.map(m=>m.member)));
+}
+function drawTable(q){
+  const rows=(q?result.prods.filter(p=>p.code.includes(q)||p.name.includes(q)):result.prods);
+  const show=rows.slice(0,100);
+  $('tbl').innerHTML=`<table class="stack"><thead><tr><th class="r">#</th><th>26碼</th><th>品名</th><th>類別</th>${sales.hasMember?'<th class="r">會員</th>':''}<th class="r">訂單</th><th class="r">數量</th><th class="r">金額</th></tr></thead><tbody>${show.map((p,i)=>`<tr><td class="r">${i+1}</td><td>${p.code}</td><td>${esc(p.name)}</td><td>${esc(p.cat)}</td>${sales.hasMember?`<td class="r">${fmt(p.buyers.size)}</td>`:''}<td class="r">${fmt(p.orders.size)}</td><td class="r">${fmt(p.qty)}</td><td class="r">$${fmt(p.amt)}</td></tr>`).join('')}</tbody></table><p class="note">${rows.length>100?`顯示前 100 筆，共 ${fmt(rows.length)} 筆；完整資料請下載 Excel。`:`共 ${fmt(rows.length)} 筆`}</p>`;
+}
+function sheet(rows,cols){const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=cols.map(w=>({wch:w}));return ws}
+async function exportXlsx(){
+  const st=$('stDl');st.textContent='產生中…';
+  const k=result.kpi,T=sales.total,wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,sheet([
+    {指標:'銷售檔',數值:sales.file},{指標:'清單品項（去重後）',數值:k.listN},{指標:'有銷售品項',數值:k.sold},{指標:'動銷率',數值:pct(k.sold/k.listN)},
+    {指標:'含清單商品訂單數',數值:k.orders},...(sales.hasMember?[{指標:'購買會員數',數值:k.buyers},{指標:'全站購買人數',數值:T.buyers},{指標:'購買會員佔全站',數值:pct(k.buyers/(T.buyers||1))},{指標:'會員人均消費(點加金)',數值:Math.round((k.amt-result.noMember.amt)/(k.buyers||1))},{指標:'無會員編號訂單／金額',數值:result.noMember.orders+' 張／$'+fmt(result.noMember.amt)}]:[]),{指標:'銷售數量',數值:k.qty},{指標:'銷售金額(點加金)',數值:k.amt},{指標:'銷售金額(純金)',數值:k.cash},
+    {指標:'全站銷售金額(點加金)',數值:T.amt},{指標:'金額佔全站',數值:pct(k.amt/T.amt)},{指標:'全站訂單數',數值:T.orders},{指標:'訂單佔全站',數值:pct(k.orders/T.orders)},
+    ...sources.map(s=>({指標:'清單來源：'+s.label,數值:({on:'納入',off:'不納入',excl:'除外商品'})[s.mode]+'，'+s.items.length+' 筆'}))],[40,30]),'摘要');
+  XLSX.utils.book_append_sheet(wb,sheet(result.cats.map(c=>({類別:c.cat,有銷售品項:c.codes.size,購買會員:c.buyers.size,訂單數:c.orders.size,銷售數量:c.qty,'銷售金額(點加金)':c.amt,'銷售金額(純金)':c.cash,金額佔比:pct(c.amt/k.amt)})),[16,12,10,10,16,16,10]),'類別彙總');
+  XLSX.utils.book_append_sheet(wb,sheet(result.srcs.map(s=>({來源:s.src,清單品項:s.n,有銷售品項:s.sold,動銷率:pct(s.sold/s.n),購買會員:s.buyers.size,訂單數:s.orders.size,銷售數量:s.qty,'銷售金額(點加金)':s.amt,'銷售金額(純金)':s.cash})),[40,10,10,10,10,10,16,16]),'來源彙總');
+  XLSX.utils.book_append_sheet(wb,sheet(result.prods.map(p=>({'26碼':p.code,類別:p.cat,商品名稱:p.name,購買會員:p.buyers.size,訂單數:p.orders.size,銷售數量:p.qty,'銷售金額(點加金)':p.amt,'銷售金額(純金)':p.cash,來源:[...result.list.get(p.code).sources].join('、')})),[16,14,40,8,8,8,14,14,40]),'有銷售商品');
+  if(sales.hasMember)XLSX.utils.book_append_sheet(wb,sheet(result.members.map(m=>({會員編號:m.member,訂單數:m.orders.size,購買品項數:m.codes.size,銷售數量:m.qty,'銷售金額(點加金)':m.amt,'銷售金額(純金)':m.cash,主要購買類別:m.topCat})),[14,8,10,8,14,14,14]),'購買會員');
+  XLSX.utils.book_append_sheet(wb,sheet(result.matched.map(l=>({母訂單號碼:l.order,會員編號:l.member,類別:l.cat,'26碼':l.code,商品名稱:l.name,銷售數量:l.qty,'銷售金額(點加金)':l.amt,'銷售金額(純金)':l.cash})),[16,14,14,16,40,8,14,14]),'訂單明細');
+  const sold=new Set(result.prods.map(p=>p.code));
+  XLSX.utils.book_append_sheet(wb,sheet([...result.list].filter(([c])=>!sold.has(c)).map(([c,e])=>({'26碼':c,品名:e.name,來源:[...e.sources].join('、')})),[16,40,40]),'未銷售商品');
+  const data=new Uint8Array(XLSX.write(wb,{bookType:'xlsx',type:'array'}));
+  const filename='檔期銷售比對_'+(sales.file||'結果')+'.xlsx';
+  if(!downloads){st.textContent='這個檢視不支援下載，請在 claude.ai 開啟此頁';return}
+  try{await downloads.save({filename,data:new Blob([data],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})});st.textContent='已下載'}
+  catch(e){try{await downloads.save({filename,data});st.textContent='已下載'}catch(e2){st.textContent='下載未完成：'+(e2.message||e2)}}
+}
+}
+</script></body></html>
